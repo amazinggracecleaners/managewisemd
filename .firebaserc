@@ -1,0 +1,8 @@
+{
+  "projects": {
+    "prod": "managewise-cd655",
+    "default": "managewise-cd655"
+  },
+  "targets": {},
+  "etags": {}
+}
