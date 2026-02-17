@@ -78,6 +78,24 @@ import { useSettings } from "@/features/settings/hooks/useSettings";
 import { withComputed } from "@/lib/invoice-math";
 import { computeJobProfitability } from "@/lib/job-profitability";
 import { cleanForFirestore } from "@/lib/utils";
+import { addDays } from "date-fns";
+
+function sessionMinutesOnDay(s: Session, day: Date, nowTs: number = Date.now()): number {
+  const inTs = s.in?.ts ?? 0;
+  if (!inTs) return 0;
+
+  const outTs = s.out?.ts ?? nowTs;
+
+  const dayStart = startOfDay(day).getTime();
+  const dayEnd = addDays(startOfDay(day), 1).getTime();
+
+  const overlapStart = Math.max(inTs, dayStart);
+  const overlapEnd = Math.min(outTs, dayEnd);
+
+  if (overlapEnd <= overlapStart) return 0;
+  return Math.floor((overlapEnd - overlapStart) / 60000);
+}
+
 
 /** companyId is always derived the same way everywhere */
 const getCompanyId = (settings: Settings) =>
@@ -592,7 +610,7 @@ const getSiteStatuses = useCallback(
         .filter((s) => (s.in?.site || s.out?.site) === siteName)
         .filter((s) => {
           const start = s.in?.ts ?? s.out?.ts ?? 0;
-          const end = s.out?.ts ?? start;
+          const end = s.out?.ts ?? Date.now();
           return end > dayStart && start < dayEnd;
         });
 

@@ -74,6 +74,8 @@ export type CleaningSchedule = {
   servicePrice?: number;
   billingFrequency?: BillingFrequency;
   exceptionDates?: string[];
+  assignedTeamId?: string; // references settings.teams[].id
+
 };
 
 
@@ -120,12 +122,20 @@ export type Employee = {
   emergencyContact?: {
     name: string;
     phone: string;
+     // Manager-only organization (NOT shown to employees)
+  teamId?: string;   // stable id
+  teamName?: string; // optional display name (or derive from teamId)
   };
   bankInfo?: {
     bankName: string;
     accountNumber: string;
     routingNumber: string;
   };
+};
+// shared/types/domain.ts
+export type Team = {
+  id: string;   // "team-a" (stable id)
+  name: string; // "Team A" (display)
 };
 
 export type Invoice = {
@@ -177,6 +187,7 @@ export type Settings = {
   defaultHourlyWage?: number;
   lastBackupAt?: string;
   readOnlyMode?: boolean;
+   teams?: Team[];
 };
 
 export type Session = {

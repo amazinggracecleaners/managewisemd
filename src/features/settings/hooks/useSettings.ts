@@ -8,6 +8,7 @@ import { writeCloudSettings, subscribeCloudSettings, ensureCloudSettings } from 
 import { useToast } from '@/hooks/use-toast';
 import { onAuthStateChanged, type User } from 'firebase/auth';
 
+
 export function useSettings() {
     const { engine } = useEngine();
     const { toast } = useToast();

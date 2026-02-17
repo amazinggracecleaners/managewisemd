@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useMemo, useState, useRef } from "react";
+import React, { useMemo, useState } from "react";
 import type {
   Session,
   Settings,
@@ -16,8 +16,10 @@ import type {
   PayrollConfirmation,
   EmployeeUpdateRequest,
 } from "@/shared/types/domain";
+
 import { ManagerPinForm } from "./manager-pin-form";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+
 import { ScheduleView } from "./schedule-view";
 import { MileageView } from "./mileage-view";
 import { EmployeeManagerView } from "./employee-view";
@@ -27,8 +29,11 @@ import { InvoiceView } from "./invoice-view";
 import { FinancialsView } from "./financials-view";
 import { OtherExpensesView } from "./other-expenses-view";
 import { ManagerDashboard } from "./manager-dashboard";
-import type { JobProfitRow } from "@/lib/job-profitability";
 import { SiteListView } from "./site-list-view";
+import { ManagerSettingsView } from "./manager-settings-view";
+
+import type { JobProfitRow } from "@/lib/job-profitability";
+
 import {
   Card,
   CardHeader,
@@ -37,74 +42,79 @@ import {
   CardContent,
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Switch } from "@/components/ui/switch";
-import { RecoverSitesButton } from "@/components/admin/RecoverSitesButton";
-import { Label } from "@/components/ui/label";
-import { Input } from "@/components/ui/input";
-import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
-import { ManagerSettingsView } from "./manager-settings-view";
 
 interface ManagerViewProps {
   unlocked: boolean;
   setUnlocked: (unlocked: boolean) => void;
+
   settings: Settings;
   setSettings: (updater: (s: Settings) => Settings) => void;
+
   activeShifts: Session[];
   totalsByEmployee: { employee: string; minutes: number }[];
   filteredSessions: Session[];
+
   fromDate: string;
   setFromDate: (date: string) => void;
   toDate: string;
   setToDate: (date: string) => void;
+
   search: string;
   setSearch: (query: string) => void;
+
   exportCSV: () => void;
   exportSessionsCSV: () => void;
+
   setSiteLocationFromHere: (siteKey: string) => void;
   onGenerateSummary: () => void;
   isGenerating: boolean;
+
   updateEntry: (id: string, updates: Partial<Entry>) => Promise<void>;
   deleteEntry: (id: string) => Promise<void>;
-  // Schedule and mileage
+
+  // Schedule + sites
   sites: Site[];
   schedules: CleaningSchedule[];
   addSchedule: (schedule: Omit<CleaningSchedule, "id">) => void;
   updateSchedule: (id: string, updates: Partial<CleaningSchedule>) => void;
   deleteSchedule: (id: string) => void;
   deleteSite: (siteName: string) => Promise<void>;
+
+  // Mileage
   mileageLogs: MileageLog[];
   addMileageLog: (log: Omit<MileageLog, "id">) => void;
   updateMileageLog: (id: string, updates: Partial<MileageLog>) => void;
   deleteMileageLog: (id: string) => void;
+
+  // Expenses
   otherExpenses: OtherExpense[];
-  addOtherExpense: (
-    expense: Omit<OtherExpense, "id">,
-    receiptFile?: File
-  ) => Promise<void>;
-  updateOtherExpense: (
-    id: string,
-    updates: Partial<OtherExpense>,
-    receiptFile?: File
-  ) => Promise<void>;
+  addOtherExpense: (expense: Omit<OtherExpense, "id">, receiptFile?: File) => Promise<void>;
+  updateOtherExpense: (id: string, updates: Partial<OtherExpense>, receiptFile?: File) => Promise<void>;
   deleteOtherExpense: (id: string) => Promise<void>;
-  // Employee management
+
+  // Employees
   employees: Employee[];
   employeeNames: string[];
   addEmployee: (employee: Omit<Employee, "id">) => void;
-  updateEmployee: (id: string, updates: Partial<Employee>) => void;
-  deleteEmployee: (id: string) => void;
-  // Full data for employee view
+  updateEmployee: (id: string, updates: Partial<Employee>) => void; // NOTE: void in props
+  deleteEmployee: (id: string) => void; // NOTE: void in props
+
+  // Full data
   allEntries: Entry[];
+
   // Invoices
   invoices: Invoice[];
   addInvoice: (invoice: Omit<Invoice, "id">) => void;
   updateInvoice: (id: string, updates: Partial<Invoice>) => void;
   deleteInvoice: (id: string) => void;
+
   // Payroll
   payrollPeriods: PayrollPeriod[];
   savePayrollPeriod: (period: PayrollPeriod) => Promise<void>;
   deletePayrollPeriod: (periodId: string) => Promise<void>;
   payrollConfirmations: PayrollConfirmation[];
+
+  // Helpers
   getSiteStatuses: (forDate: Date) => Map<string, SiteStatus>;
   recordEntry: (
     action: "in" | "out",
@@ -116,64 +126,71 @@ interface ManagerViewProps {
   ) => Promise<void>;
   isClockedIn: (siteName?: string, employeeId?: string) => boolean;
   testGeofence: (site: Site) => Promise<void>;
+
   profitabilityBySite: Map<string, JobProfitRow>;
-  getDurationsBySite: (
-    forDate: Date
-  ) => Map<string, { minutes: number; byEmployee: Record<string, number> }>;
+  getDurationsBySite: (forDate: Date) => Map<string, { minutes: number; byEmployee: Record<string, number> }>;
+
   employeeUpdateRequests: EmployeeUpdateRequest[];
   approveEmployeeUpdate: (requestId: string) => Promise<void> | void;
-  rejectEmployeeUpdate: (
-    requestId: string,
-    reason?: string
-  ) => Promise<void> | void;
+  rejectEmployeeUpdate: (requestId: string, reason?: string) => Promise<void> | void;
+
   engine: "local" | "cloud";
   setEngine: (engine: "local" | "cloud") => void;
 }
 
 export function ManagerView(props: ManagerViewProps) {
-  const [managerTab, setManagerTab] = useState("dashboard");
-  
-  const employeeById = useMemo(
-    () => new Map(props.employees.map((e) => [e.id, e])),
-    [props.employees]
-  );
+  const [managerTab, setManagerTab] = useState<
+    | "dashboard"
+    | "requests"
+    | "schedule"
+    | "sites"
+    | "invoices"
+    | "financials"
+    | "mileage"
+    | "otherExpenses"
+    | "employees"
+    | "payroll"
+    | "employeeView"
+    | "settings"
+  >("dashboard");
+
+  const employeeById = useMemo(() => new Map(props.employees.map((e) => [e.id, e])), [props.employees]);
 
   const pendingRequests = useMemo(
     () => props.employeeUpdateRequests.filter((r) => r.status === "pending"),
     [props.employeeUpdateRequests]
   );
-  
+
+  // --- Settings helpers ---
   const onRecoverSites = async () => {
-    // This is a placeholder for the actual implementation which would live in `page.tsx`
-    // and be passed down as a prop.
+    // placeholder: your actual implementation should live in page.tsx and be passed down
     console.log("Recovering sites...");
   };
 
   const onExportSettings = () => {
     const blob = new Blob([JSON.stringify(props.settings, null, 2)], { type: "application/json" });
     const url = URL.createObjectURL(blob);
+
     const a = document.createElement("a");
     a.href = url;
     a.download = `timewise-settings-${new Date().toISOString().slice(0, 10)}.json`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
+
     URL.revokeObjectURL(url);
   };
-  
+
   const onImportSettings = (data: Settings) => {
     props.setSettings(() => data);
   };
 
+  // --- Auth gate ---
   if (!props.unlocked) {
-    return (
-      <ManagerPinForm
-        managerPIN={props.settings.managerPIN}
-        setUnlocked={props.setUnlocked}
-      />
-    );
+    return <ManagerPinForm managerPIN={props.settings.managerPIN} setUnlocked={props.setUnlocked} />;
   }
 
+  // --- Manager clock-in/out wrapper ---
   const recordEntryAsManager = (
     action: "in" | "out",
     site: Site,
@@ -201,9 +218,10 @@ export function ManagerView(props: ManagerViewProps) {
 
   return (
     <section>
-      <Tabs value={managerTab} onValueChange={setManagerTab}>
+      <Tabs value={managerTab} onValueChange={(v) => setManagerTab(v as any)}>
         <TabsList className="grid w-full grid-cols-1 md:grid-cols-6 lg:grid-cols-12 mb-4 h-auto flex-wrap">
           <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
+
           <TabsTrigger value="requests" className="relative">
             Profile Requests
             {pendingRequests.length > 0 && (
@@ -212,6 +230,7 @@ export function ManagerView(props: ManagerViewProps) {
               </span>
             )}
           </TabsTrigger>
+
           <TabsTrigger value="schedule">Schedule</TabsTrigger>
           <TabsTrigger value="sites">Sites</TabsTrigger>
           <TabsTrigger value="invoices">Invoices</TabsTrigger>
@@ -223,6 +242,8 @@ export function ManagerView(props: ManagerViewProps) {
           <TabsTrigger value="employeeView">Employee View</TabsTrigger>
           <TabsTrigger value="settings">Settings</TabsTrigger>
         </TabsList>
+
+        {/* DASHBOARD */}
         <TabsContent value="dashboard">
           <ManagerDashboard
             activeShifts={props.activeShifts}
@@ -252,27 +273,23 @@ export function ManagerView(props: ManagerViewProps) {
           />
         </TabsContent>
 
+        {/* REQUESTS */}
         <TabsContent value="requests">
           <Card>
             <CardHeader>
               <CardTitle>Profile Change Requests</CardTitle>
-              <CardDescription>
-                Employees’ self-updates waiting for your approval.
-              </CardDescription>
+              <CardDescription>Employees’ self-updates waiting for your approval.</CardDescription>
             </CardHeader>
+
             <CardContent>
               {pendingRequests.length === 0 ? (
-                <p className="text-sm text-muted-foreground">
-                  No pending profile change requests.
-                </p>
+                <p className="text-sm text-muted-foreground">No pending profile change requests.</p>
               ) : (
                 <div className="space-y-3">
                   {pendingRequests.map((req) => {
                     const employee = employeeById.get(req.employeeId);
 
-                    const changedEntries = Object.entries(
-                      req.updates || {}
-                    ).filter(([field, value]) => {
+                    const changedEntries = Object.entries(req.updates || {}).filter(([field, value]) => {
                       if (!employee) return true;
                       const key = field as keyof Employee;
                       const current = employee[key];
@@ -283,9 +300,7 @@ export function ManagerView(props: ManagerViewProps) {
                         typeof value === "object" &&
                         value !== null
                       ) {
-                        return (
-                          JSON.stringify(current) !== JSON.stringify(value)
-                        );
+                        return JSON.stringify(current) !== JSON.stringify(value);
                       }
                       return current !== value;
                     });
@@ -298,9 +313,7 @@ export function ManagerView(props: ManagerViewProps) {
                         <div>
                           <p className="font-medium text-sm">
                             {req.employeeName}{" "}
-                            <span className="text-xs text-muted-foreground">
-                              ({req.employeeId})
-                            </span>
+                            <span className="text-xs text-muted-foreground">({req.employeeId})</span>
                           </p>
 
                           {changedEntries.length === 0 ? (
@@ -309,16 +322,12 @@ export function ManagerView(props: ManagerViewProps) {
                             </p>
                           ) : (
                             <>
-                              <p className="text-xs text-muted-foreground mb-1">
-                                Requested changes:
-                              </p>
+                              <p className="text-xs text-muted-foreground mb-1">Requested changes:</p>
                               <ul className="text-xs list-disc list-inside space-y-0.5">
-                                {changedEntries.map(([field, value]) => {
+                                {changedEntries.flatMap(([field, value]) => {
                                   const key = field as keyof Employee;
                                   const label = FIELD_LABELS[key] ?? field;
-                                  const currentValue = employee
-                                    ? (employee as any)[key]
-                                    : undefined;
+                                  const currentValue = employee ? (employee as any)[key] : undefined;
 
                                   if (
                                     typeof currentValue === "object" &&
@@ -328,50 +337,33 @@ export function ManagerView(props: ManagerViewProps) {
                                   ) {
                                     return Object.entries(value)
                                       .map(([nestedKey, nestedValue]) => {
-                                        const oldNestedValue = (
-                                          currentValue as any
-                                        )[nestedKey];
-                                        if (
-                                          oldNestedValue === nestedValue
-                                        ) {
-                                          return null;
-                                        }
+                                        const oldNestedValue = (currentValue as any)[nestedKey];
+                                        if (oldNestedValue === nestedValue) return null;
+
                                         return (
-                                          <li
-                                            key={`${field}.${nestedKey}`}
-                                          >
+                                          <li key={`${field}.${nestedKey}`}>
                                             <span className="font-semibold">
                                               {label}.{nestedKey}
                                             </span>
                                             :{" "}
                                             <span className="line-through text-muted-foreground">
-                                              {String(
-                                                oldNestedValue ?? "N/A"
-                                              )}
+                                              {String(oldNestedValue ?? "N/A")}
                                             </span>{" "}
                                             →{" "}
-                                            <span className="text-primary font-medium">
-                                              {String(nestedValue)}
-                                            </span>
+                                            <span className="text-primary font-medium">{String(nestedValue)}</span>
                                           </li>
                                         );
                                       })
-                                      .filter(Boolean);
+                                      .filter(Boolean) as any;
                                   }
 
                                   return (
                                     <li key={field}>
-                                      <span className="font-semibold">
-                                        {label}
-                                      </span>
-                                      :{" "}
+                                      <span className="font-semibold">{label}</span>:{" "}
                                       <span className="line-through text-muted-foreground">
                                         {String(currentValue ?? "N/A")}
                                       </span>{" "}
-                                      →{" "}
-                                      <span className="text-primary font-medium">
-                                        {String(value ?? "")}
-                                      </span>
+                                      → <span className="text-primary font-medium">{String(value ?? "")}</span>
                                     </li>
                                   );
                                 })}
@@ -379,29 +371,20 @@ export function ManagerView(props: ManagerViewProps) {
                             </>
                           )}
                         </div>
+
                         <div className="flex gap-2 mt-2 md:mt-0">
                           <Button
                             size="sm"
                             variant="outline"
                             onClick={() => {
-                              const reason = window.prompt(
-                                "Optional: Reason for rejecting this change?"
-                              );
-                              props.rejectEmployeeUpdate(
-                                req.id,
-                                reason || undefined
-                              );
+                              const reason = window.prompt("Optional: Reason for rejecting this change?");
+                              props.rejectEmployeeUpdate(req.id, reason || undefined);
                             }}
                           >
                             Reject
                           </Button>
-                          <Button
-                            size="sm"
-                            variant="default"
-                            onClick={() =>
-                              props.approveEmployeeUpdate(req.id)
-                            }
-                          >
+
+                          <Button size="sm" variant="default" onClick={() => props.approveEmployeeUpdate(req.id)}>
                             Approve
                           </Button>
                         </div>
@@ -414,6 +397,7 @@ export function ManagerView(props: ManagerViewProps) {
           </Card>
         </TabsContent>
 
+        {/* SCHEDULE */}
         <TabsContent value="schedule">
           <ScheduleView
             sites={props.sites}
@@ -427,8 +411,11 @@ export function ManagerView(props: ManagerViewProps) {
             recordEntry={recordEntryAsManager}
             isClockedIn={props.isClockedIn}
             getDurationsBySite={props.getDurationsBySite}
+            teams={props.settings.teams ?? []}
           />
         </TabsContent>
+
+        {/* SITES */}
         <TabsContent value="sites">
           <SiteListView
             sites={props.sites}
@@ -439,9 +426,13 @@ export function ManagerView(props: ManagerViewProps) {
             testGeofence={props.testGeofence}
           />
         </TabsContent>
+
+        {/* INVOICES */}
         <TabsContent value="invoices">
           <InvoiceView sites={props.sites} />
         </TabsContent>
+
+        {/* FINANCIALS */}
         <TabsContent value="financials">
           <FinancialsView
             invoices={props.invoices}
@@ -455,6 +446,8 @@ export function ManagerView(props: ManagerViewProps) {
             mileageRate={props.settings.mileageRate}
           />
         </TabsContent>
+
+        {/* MILEAGE */}
         <TabsContent value="mileage">
           <MileageView
             mileageLogs={props.mileageLogs}
@@ -466,6 +459,8 @@ export function ManagerView(props: ManagerViewProps) {
             toDate={props.toDate}
           />
         </TabsContent>
+
+        {/* EXPENSES */}
         <TabsContent value="otherExpenses">
           <OtherExpensesView
             otherExpenses={props.otherExpenses}
@@ -477,20 +472,25 @@ export function ManagerView(props: ManagerViewProps) {
             toDate={props.toDate}
           />
         </TabsContent>
-        <TabsContent value="employees">
-          <EmployeeManagerView
-            employees={props.employees}
-            addEmployee={props.addEmployee}
-            updateEmployee={async (id, updates) => {
-    // wrap your current void function so it matches Promise<void>
-    props.updateEmployee(id, updates);
-  }}
-            deleteEmployee={async (id) => {
-  props.deleteEmployee(id);
-}}
 
-          />
-        </TabsContent>
+        {/* EMPLOYEES */}
+        <TabsContent value="employees">
+  <EmployeeManagerView
+    employees={props.employees}
+    teams={props.settings.teams ?? []}
+    addEmployee={props.addEmployee}
+    updateEmployee={async (id, updates) => {
+      props.updateEmployee(id, updates);
+    }}
+    deleteEmployee={async (id) => {
+      props.deleteEmployee(id);
+    }}
+    
+  />
+</TabsContent>
+
+
+        {/* PAYROLL */}
         <TabsContent value="payroll">
           <PayrollView
             employees={props.employees}
@@ -502,6 +502,8 @@ export function ManagerView(props: ManagerViewProps) {
             payrollConfirmations={props.payrollConfirmations}
           />
         </TabsContent>
+
+        {/* EMPLOYEE VIEWER */}
         <TabsContent value="employeeView">
           <EmployeeViewer
             allEntries={props.allEntries}
@@ -509,15 +511,16 @@ export function ManagerView(props: ManagerViewProps) {
             allEmployees={props.employees}
             settings={props.settings}
             updateEmployee={async (id, updates) => {
-    // wrap your current void function so it matches Promise<void>
-    props.updateEmployee(id, updates);
-  }}
+              props.updateEmployee(id, updates);
+            }}
             updateSchedule={props.updateSchedule}
             payrollPeriods={props.payrollPeriods}
             payrollConfirmations={props.payrollConfirmations}
             getSiteStatuses={props.getSiteStatuses}
           />
         </TabsContent>
+
+        {/* SETTINGS */}
         <TabsContent value="settings">
           <ManagerSettingsView
             settings={props.settings}
@@ -533,5 +536,3 @@ export function ManagerView(props: ManagerViewProps) {
     </section>
   );
 }
-
-    

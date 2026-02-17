@@ -1,7 +1,7 @@
 // src/components/timewise/manager/ManagerSettingsView.tsx
 "use client";
 
-import React from "react";
+import React, { useMemo, useState } from "react";
 import {
   Card,
   CardHeader,
@@ -41,20 +41,26 @@ interface ManagerSettingsViewProps {
 
 const FT_PER_M = 3.28084;
 
-const metersToFeet = (m: number) =>
-  Number.isFinite(m) ? m * FT_PER_M : 0;
+const metersToFeet = (m: number) => (Number.isFinite(m) ? m * FT_PER_M : 0);
+const feetToMeters = (ft: number) => (Number.isFinite(ft) ? ft / FT_PER_M : 0);
 
-const feetToMeters = (ft: number) =>
-  Number.isFinite(ft) ? ft / FT_PER_M : 0;
+// simple stable-ish id for teams (fine for settings lists)
+const makeId = () =>
+  `team_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
 
 export function ManagerSettingsView(props: ManagerSettingsViewProps) {
-  // ✅ Prevent runtime crash if settings is temporarily undefined during load
   const settings = (props.settings ?? ({} as Settings)) as Settings;
   const { setSettings, engine, setEngine } = props;
 
-  const handleImportClick = async (
-    event: React.ChangeEvent<HTMLInputElement>
-  ) => {
+  const teams = useMemo(
+    () => (settings.teams ?? []).slice().sort((a, b) => a.name.localeCompare(b.name)),
+    [settings.teams]
+  );
+
+  // Teams UI state
+  const [newTeamName, setNewTeamName] = useState("");
+
+  const handleImportClick = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
 
@@ -68,12 +74,64 @@ export function ManagerSettingsView(props: ManagerSettingsViewProps) {
     props.onImportSettings(parsed);
   };
 
-  // ✅ Stored in METERS (Option 1). Display in FEET.
+  // Stored in METERS (Option 1). Display in FEET.
   const radiusMeters = Number(settings.geofenceRadius ?? 0) || 0;
-  const radiusFeet =
-    radiusMeters > 0
-      ? Math.round(metersToFeet(radiusMeters))
-      : 150;
+  const radiusFeet = radiusMeters > 0 ? Math.round(metersToFeet(radiusMeters)) : 150;
+
+  // ---------- Teams helpers ----------
+  const addTeam = () => {
+    const name = newTeamName.trim();
+    if (!name) return;
+
+    setSettings((s) => {
+      const current = (s.teams ?? []).slice();
+
+      // prevent duplicates by name (case-insensitive)
+      const exists = current.some((t) => t.name.trim().toLowerCase() === name.toLowerCase());
+      if (exists) return s;
+
+      current.push({ id: makeId(), name });
+      return { ...s, teams: current };
+    });
+
+    setNewTeamName("");
+  };
+
+  const renameTeam = (teamId: string) => {
+    const next = window.prompt("Rename team to:", teams.find((t) => t.id === teamId)?.name ?? "");
+    if (!next) return;
+
+    const name = next.trim();
+    if (!name) return;
+
+    setSettings((s) => {
+      const current = (s.teams ?? []).slice();
+
+      // prevent duplicates by name (case-insensitive), excluding self
+      const dup = current.some(
+        (t) => t.id !== teamId && t.name.trim().toLowerCase() === name.toLowerCase()
+      );
+      if (dup) return s;
+
+      return {
+        ...s,
+        teams: current.map((t) => (t.id === teamId ? { ...t, name } : t)),
+      };
+    });
+  };
+
+  const deleteTeam = (teamId: string) => {
+    const teamName = teams.find((t) => t.id === teamId)?.name ?? "this team";
+    const ok = window.confirm(
+      `Delete "${teamName}"?\n\nThis removes the team from settings. Any employees or schedules using this teamId should be updated separately.`
+    );
+    if (!ok) return;
+
+    setSettings((s) => ({
+      ...s,
+      teams: (s.teams ?? []).filter((t) => t.id !== teamId),
+    }));
+  };
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
@@ -110,8 +168,7 @@ export function ManagerSettingsView(props: ManagerSettingsViewProps) {
               </SelectContent>
             </Select>
             <p className="text-xs text-muted-foreground">
-              You can switch at any time, but make sure you understand where
-              data is kept.
+              You can switch at any time, but make sure you understand where data is kept.
             </p>
           </div>
 
@@ -119,8 +176,7 @@ export function ManagerSettingsView(props: ManagerSettingsViewProps) {
             <div>
               <p className="text-sm font-semibold">Read-only mode</p>
               <p className="text-xs text-muted-foreground">
-                Temporarily block new clock-ins and changes until you turn this
-                off.
+                Temporarily block new clock-ins and changes until you turn this off.
               </p>
             </div>
             <Switch
@@ -139,9 +195,7 @@ export function ManagerSettingsView(props: ManagerSettingsViewProps) {
       <Card>
         <CardHeader>
           <CardTitle>Manager access</CardTitle>
-          <CardDescription>
-            Protect the Manager view with a simple PIN.
-          </CardDescription>
+          <CardDescription>Protect the Manager view with a simple PIN.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="flex items-center justify-between gap-4">
@@ -157,12 +211,8 @@ export function ManagerSettingsView(props: ManagerSettingsViewProps) {
                 if (!checked) {
                   setSettings((s) => ({ ...s, managerPIN: "" }));
                 } else {
-                  const pin = window.prompt(
-                    "Set a new 4–6 digit manager PIN:"
-                  );
-                  if (pin) {
-                    setSettings((s) => ({ ...s, managerPIN: pin }));
-                  }
+                  const pin = window.prompt("Set a new 4–6 digit manager PIN:");
+                  if (pin) setSettings((s) => ({ ...s, managerPIN: pin }));
                 }
               }}
             />
@@ -173,12 +223,7 @@ export function ManagerSettingsView(props: ManagerSettingsViewProps) {
             <Input
               type="password"
               value={settings.managerPIN ?? ""}
-              onChange={(e) =>
-                setSettings((s) => ({
-                  ...s,
-                  managerPIN: e.target.value,
-                }))
-              }
+              onChange={(e) => setSettings((s) => ({ ...s, managerPIN: e.target.value }))}
               placeholder="Enter a 4–6 digit PIN"
             />
             <p className="text-xs text-muted-foreground">
@@ -198,27 +243,20 @@ export function ManagerSettingsView(props: ManagerSettingsViewProps) {
         <CardContent className="space-y-4">
           <div className="flex items-center justify-between gap-4">
             <div>
-              <p className="text-sm font-semibold">
-                Require GPS to clock in/out
-              </p>
+              <p className="text-sm font-semibold">Require GPS to clock in/out</p>
               <p className="text-xs text-muted-foreground">
-                Employees must share their location when starting or ending a
-                shift.
+                Employees must share their location when starting or ending a shift.
               </p>
             </div>
             <Switch
               checked={!!settings.requireGPS}
-              onCheckedChange={(checked) =>
-                setSettings((s) => ({ ...s, requireGPS: checked }))
-              }
+              onCheckedChange={(checked) => setSettings((s) => ({ ...s, requireGPS: checked }))}
             />
           </div>
 
           <div className="flex items-center justify-between gap-4 border-t pt-3">
             <div>
-              <p className="text-sm font-semibold">
-                Require geofence for clock-in
-              </p>
+              <p className="text-sm font-semibold">Require geofence for clock-in</p>
               <p className="text-xs text-muted-foreground">
                 Only allow clock-in when the employee is close to the site.
               </p>
@@ -234,8 +272,6 @@ export function ManagerSettingsView(props: ManagerSettingsViewProps) {
           {settings.requireGeofence && (
             <div className="grid gap-2 max-w-xs">
               <Label className="text-sm">Geofence radius (feet)</Label>
-
-              {/* ✅ FEET in UI, stored METERS in settings.geofenceRadius */}
               <Input
                 type="number"
                 min={25}
@@ -243,23 +279,94 @@ export function ManagerSettingsView(props: ManagerSettingsViewProps) {
                 value={radiusFeet}
                 onChange={(e) => {
                   const rawFeet = Number(e.target.value);
-                  const safeFeet =
-                    Number.isFinite(rawFeet) && rawFeet > 0 ? rawFeet : 150;
-
+                  const safeFeet = Number.isFinite(rawFeet) && rawFeet > 0 ? rawFeet : 150;
                   const meters = feetToMeters(safeFeet);
 
                   setSettings((s) => ({
                     ...s,
-                    geofenceRadius: meters, // stored in meters (Option 1)
+                    geofenceRadius: meters,
                   }));
                 }}
               />
-
               <p className="text-xs text-muted-foreground">
                 This radius applies to all sites that have GPS coordinates.
               </p>
             </div>
           )}
+        </CardContent>
+      </Card>
+
+      {/* ✅ NEW: TEAMS MANAGER */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Teams</CardTitle>
+          <CardDescription>
+            Create teams to group employees and assign schedules to a team.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex gap-2">
+            <div className="flex-1">
+              <Label className="text-sm">New team name</Label>
+              <Input
+                value={newTeamName}
+                onChange={(e) => setNewTeamName(e.target.value)}
+                placeholder="e.g., Team A"
+              />
+            </div>
+            <div className="flex items-end">
+              <Button
+                type="button"
+                onClick={addTeam}
+                disabled={!newTeamName.trim()}
+              >
+                Add team
+              </Button>
+            </div>
+          </div>
+
+          {teams.length === 0 ? (
+            <p className="text-sm text-muted-foreground">
+              No teams yet. Add your first team above.
+            </p>
+          ) : (
+            <div className="space-y-2">
+              {teams.map((t) => (
+                <div
+                  key={t.id}
+                  className="flex items-center justify-between gap-3 rounded-md border p-3"
+                >
+                  <div className="min-w-0">
+                    <p className="font-medium truncate">{t.name}</p>
+                    <p className="text-xs text-muted-foreground truncate">
+                      id: {t.id}
+                    </p>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => renameTeam(t.id)}
+                    >
+                      Rename
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="destructive"
+                      onClick={() => deleteTeam(t.id)}
+                    >
+                      Delete
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          <p className="text-xs text-muted-foreground">
+            Tip: After creating teams, assign employees a <code>teamId</code> in the Employees editor,
+            then create schedules assigned to that team.
+          </p>
         </CardContent>
       </Card>
 
@@ -300,9 +407,7 @@ export function ManagerSettingsView(props: ManagerSettingsViewProps) {
       <Card>
         <CardHeader>
           <CardTitle>Financials</CardTitle>
-          <CardDescription>
-            Settings related to payroll and expenses.
-          </CardDescription>
+          <CardDescription>Settings related to payroll and expenses.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-2">

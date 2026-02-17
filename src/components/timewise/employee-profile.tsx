@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import type { Employee } from "@/shared/types/domain";
 import { Button } from "@/components/ui/button";
 import {
@@ -18,7 +18,18 @@ import { useToast } from "@/hooks/use-toast";
 import { DEFAULT_PIN } from "@/lib/constants";
 import { cleanForFirestore } from "@/lib/utils";
 
+// ✅ add these imports
+import {
+  Select,
+  SelectTrigger,
+  SelectValue,
+  SelectContent,
+  SelectItem,
+} from "@/components/ui/select";
+
 type DialogMode = "manager" | "employeeSelf";
+
+type Team = { id: string; name: string };
 
 interface EmployeeProfileDialogProps {
   isOpen: boolean;
@@ -35,6 +46,9 @@ interface EmployeeProfileDialogProps {
 
   // kept for compatibility, not needed here
   onRequestUpdate?: (updates: Partial<Employee>) => Promise<void>;
+
+  // ✅ NEW: pass settings.teams from ManagerView
+  teams?: Team[];
 }
 
 export function EmployeeProfileDialog({
@@ -44,12 +58,17 @@ export function EmployeeProfileDialog({
   updateEmployee,
   addEmployee,
   mode,
+  teams = [],
 }: EmployeeProfileDialogProps) {
   const { toast } = useToast();
   const isManager = mode === "manager";
   const isSelf = mode === "employeeSelf";
-
   const isNewEmployee = isManager && !employee;
+
+  const sortedTeams = useMemo(
+    () => teams.slice().sort((a, b) => a.name.localeCompare(b.name)),
+    [teams]
+  );
 
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
@@ -65,6 +84,9 @@ export function EmployeeProfileDialog({
   const [bankName, setBankName] = useState("");
   const [accountNumber, setAccountNumber] = useState("");
   const [routingNumber, setRoutingNumber] = useState("");
+
+  // ✅ NEW: team state (manager-only editable)
+  const [teamId, setTeamId] = useState<string>("");
 
   useEffect(() => {
     if (employee) {
@@ -86,6 +108,9 @@ export function EmployeeProfileDialog({
       setBankName(employee.bankInfo?.bankName || "");
       setAccountNumber(employee.bankInfo?.accountNumber || "");
       setRoutingNumber(employee.bankInfo?.routingNumber || "");
+
+      // ✅ NEW: load teamId
+      setTeamId((employee as any).teamId || "");
     } else {
       setFirstName("");
       setLastName("");
@@ -101,6 +126,9 @@ export function EmployeeProfileDialog({
       setBankName("");
       setAccountNumber("");
       setRoutingNumber("");
+
+      // ✅ NEW: default to no team
+      setTeamId("");
     }
   }, [employee]);
 
@@ -172,7 +200,7 @@ export function EmployeeProfileDialog({
     }
 
     try {
-      // ✅ CREATE NEW EMPLOYEE (no unsafe casting)
+      // ✅ CREATE NEW EMPLOYEE
       if (isNewEmployee) {
         if (!addEmployee) {
           toast({
@@ -185,7 +213,7 @@ export function EmployeeProfileDialog({
         }
 
         const newEmployee: Omit<Employee, "id"> = {
-          name: fullName, // ✅ ensures name shows everywhere
+          name: fullName,
           firstName: fn,
           lastName: ln,
           dob: dob || undefined,
@@ -203,6 +231,9 @@ export function EmployeeProfileDialog({
             bankName || accountNumber || routingNumber
               ? { bankName, accountNumber, routingNumber }
               : undefined,
+
+          // ✅ NEW: teamId on create
+          ...(teamId ? ({ teamId } as any) : {}),
         };
 
         const cleanedNew = cleanForFirestore(newEmployee) as Omit<Employee, "id">;
@@ -240,6 +271,9 @@ export function EmployeeProfileDialog({
           bankName || accountNumber || routingNumber
             ? { bankName, accountNumber, routingNumber }
             : undefined,
+
+        // ✅ NEW: teamId on update
+        ...(teamId ? ({ teamId } as any) : ({ teamId: "" } as any)),
       };
 
       const cleanedUpdates = cleanForFirestore(updatedEmployee);
@@ -392,6 +426,35 @@ export function EmployeeProfileDialog({
                   )}
                 </div>
               </div>
+
+              {/* ✅ NEW: TEAM PICKER (manager-only) */}
+              {isManager && (
+                <div className="space-y-2">
+                  <Label>Team</Label>
+                  {sortedTeams.length === 0 ? (
+                    <p className="text-xs text-muted-foreground">
+                      No teams yet. Add teams in Manager Settings → Teams.
+                    </p>
+                  ) : (
+                    <Select value={teamId} onValueChange={setTeamId}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="No team" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="">No team</SelectItem>
+                        {sortedTeams.map((t) => (
+                          <SelectItem key={t.id} value={t.id}>
+                            {t.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
+                  <p className="text-[11px] text-muted-foreground">
+                    Teams are manager-only. Employees won’t see this field.
+                  </p>
+                </div>
+              )}
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
