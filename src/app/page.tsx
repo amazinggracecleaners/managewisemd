@@ -632,200 +632,250 @@ const getSiteStatuses = useCallback(
   [sessions, settings.sites]
 );
  
-  // --- Actions ---
-  const recordEntry = useCallback(
-    async (
-      action: "in" | "out",
-      site: Site,
-      forDate: Date,
-      note?: string,
-      employeeId?: string,
-      isManagerOverride: boolean = false
-    ) => {
-      const targetEmployee =
-        employees.find((e) => e.id === (employeeId || loggedInEmployee?.id)) || null;
+ // --- Actions ---
+const DAY_MS = 24 * 60 * 60 * 1000;
+const MIN_SHIFT_MS = 60 * 1000; // 1 minute minimum so it never shows 00:00 due to rounding/edge cases
 
-      if (!targetEmployee) {
-        toast({ variant: "destructive", title: "No employee selected." });
-        return;
-      }
-      if (!site) {
-        toast({
-          variant: "destructive",
-          title: "No site selected",
-          description: "Please select a site from your schedule to clock in.",
-        });
-        return;
-      }
+// Build a timestamp on the selected calendar day using the current clock time.
+// If that would be <= minTs (ex: clock-in), roll it forward 1 day (cross-midnight fix).
+function buildTsOnDayWithRoll(forDate: Date, now: Date, minTs?: number) {
+  const d = new Date(forDate);
+  d.setHours(now.getHours(), now.getMinutes(), now.getSeconds(), now.getMilliseconds());
+  let ts = d.getTime();
 
-      let entryData: Omit<Entry, "id"> | null = null;
-      let currentCoord = coord;
+  if (typeof minTs === "number" && ts <= minTs) {
+    ts += DAY_MS; // roll into next day
+  }
+  return ts;
+}
 
-      // --- CLOCK-OUT ---
-      if (action === "out") {
-        const openShift = sessions.find(
-          (s) =>
-            s.active && s.employeeId === targetEmployee.id && (s.in?.site || "") === site.name
-        );
+const recordEntry = useCallback(
+  async (
+    action: "in" | "out",
+    site: Site,
+    forDate: Date,
+    note?: string,
+    employeeId?: string,
+    isManagerOverride: boolean = false
+  ) => {
+    const targetEmployee =
+      employees.find((e) => e.id === (employeeId || loggedInEmployee?.id)) || null;
 
-        const now = new Date();
+    if (!targetEmployee) {
+      toast({ variant: "destructive", title: "No employee selected." });
+      return;
+    }
+    if (!site) {
+      toast({
+        variant: "destructive",
+        title: "No site selected",
+        description: "Please select a site from your schedule to clock in.",
+      });
+      return;
+    }
 
-        const candidateTime = isManagerOverride
-          ? (() => {
-              const d = new Date(forDate);
-              d.setHours(now.getHours(), now.getMinutes(), now.getSeconds(), now.getMilliseconds());
-              return d;
-            })()
-          : now;
+    let entryData: Omit<Entry, "id"> | null = null;
+    let currentCoord = coord;
 
-        // Manager-only: manual OUT on a specific day (synthetic IN)
-        if (!openShift && isManagerOverride) {
-          const outTs = buildTsOnDay(forDate, now);
-          const inTs = Math.max(outTs - 1000, startOfDay(new Date(forDate)).getTime());
+    // --- CLOCK-OUT ---
+    if (action === "out") {
+      const openShift = sessions.find(
+        (s) =>
+          s.active &&
+          s.employeeId === targetEmployee.id &&
+          (s.in?.site || "") === site.name
+      );
 
-          const syntheticIn: Omit<Entry, "id"> = {
-            employee: targetEmployee.name,
-            employeeId: targetEmployee.id,
-            action: "in",
-            ts: inTs,
-            site: site.name,
-            note: "[MANUAL] Synthetic IN to pair manual OUT",
-          };
+      const now = new Date();
 
-          const manualOut: Omit<Entry, "id"> = {
-            employee: targetEmployee.name,
-            employeeId: targetEmployee.id,
-            action: "out",
-            ts: outTs,
-            site: site.name,
-            note: note || "[MANUAL] Manual OUT",
-          };
+      // Manager-only: manual OUT on a specific day (synthetic IN)
+      if (!openShift && isManagerOverride) {
+        // Use your existing helper for manual outs, but ensure IN < OUT and at least 1 minute
+        const outTsRaw = buildTsOnDay(forDate, now);
 
-          if (engine === "cloud") {
-            const cId = getCompanyId(settings);
-            const col = collection(db, "companies", cId, "timeclock_entries");
-            await addDoc(col, { ...syntheticIn, createdAt: serverTimestamp() });
-            await addDoc(col, { ...manualOut, createdAt: serverTimestamp() });
-          } else {
-            setEntries((prev) => [
-              ...prev,
-              { id: uuid(), ...syntheticIn } as Entry,
-              { id: uuid(), ...manualOut } as Entry,
-            ]);
-          }
+        // If buildTsOnDay accidentally lands before start-of-day, clamp up.
+        const dayStartTs = startOfDay(new Date(forDate)).getTime();
+        const outTs = Math.max(outTsRaw, dayStartTs + MIN_SHIFT_MS);
 
-          toast({ title: `Clock OUT recorded for ${site.name} (manual).` });
-          return;
-        }
+        const inTs = Math.max(outTs - MIN_SHIFT_MS, dayStartTs);
 
-        if (!openShift) {
-          toast({
-            variant: "destructive",
-            title: "Not clocked in at this site",
-            description: `${targetEmployee.name} is not currently clocked in at ${site.name}.`,
-          });
-          return;
-        }
+        const syntheticIn: Omit<Entry, "id"> = {
+          employee: targetEmployee.name,
+          employeeId: targetEmployee.id,
+          action: "in",
+          ts: inTs,
+          site: site.name,
+          note: "[MANUAL] Synthetic IN to pair manual OUT",
+        };
 
-        const outTs = Math.max(candidateTime.getTime(), (openShift.in?.ts ?? 0) + 1000);
-
-        entryData = {
+        const manualOut: Omit<Entry, "id"> = {
           employee: targetEmployee.name,
           employeeId: targetEmployee.id,
           action: "out",
           ts: outTs,
           site: site.name,
+          note: note || "[MANUAL] Manual OUT",
         };
-      } else {
-        // --- CLOCK-IN ---
-        const anyShiftActive = isClockedIn(undefined, targetEmployee.id);
 
-        if (!isManagerOverride && anyShiftActive) {
+        if (engine === "cloud") {
+          const cId = getCompanyId(settings);
+          const col = collection(db, "companies", cId, "timeclock_entries");
+          await addDoc(col, { ...syntheticIn, createdAt: serverTimestamp() });
+          await addDoc(col, { ...manualOut, createdAt: serverTimestamp() });
+        } else {
+          setEntries((prev) => [
+            ...prev,
+            { id: uuid(), ...syntheticIn } as Entry,
+            { id: uuid(), ...manualOut } as Entry,
+          ]);
+        }
+
+        toast({ title: `Clock OUT recorded for ${site.name} (manual).` });
+        return;
+      }
+
+      if (!openShift) {
+        toast({
+          variant: "destructive",
+          title: "Not clocked in at this site",
+          description: `${targetEmployee.name} is not currently clocked in at ${site.name}.`,
+        });
+        return;
+      }
+
+      const inTs = openShift.in?.ts ?? 0;
+
+      // ✅ FIX: candidate OUT time in manager override is built on forDate,
+      // but if it would fall BEFORE the IN time (cross-midnight), roll to next day.
+      const candidateOutTs = isManagerOverride
+        ? buildTsOnDayWithRoll(forDate, now, inTs)
+        : now.getTime();
+
+      // ✅ Ensure OUT is at least 1 minute after IN (prevents 00:00 display edge cases)
+      const outTs = Math.max(candidateOutTs, inTs + MIN_SHIFT_MS);
+
+      entryData = {
+        employee: targetEmployee.name,
+        employeeId: targetEmployee.id,
+        action: "out",
+        ts: outTs,
+        site: site.name,
+      };
+    } else {
+      // --- CLOCK-IN ---
+      const anyShiftActive = isClockedIn(undefined, targetEmployee.id);
+
+      if (!isManagerOverride && anyShiftActive) {
+        toast({
+          variant: "destructive",
+          title: "Shift already active",
+          description: `${targetEmployee.name} must clock out from their current shift before starting a new one.`,
+        });
+        return;
+      }
+
+      // Only employees must pass GPS / geofence checks
+      if (!isManagerOverride) {
+        if (settings.requireGPS && !currentCoord) {
+          toast({
+            title: "Location required",
+            description: "Getting your location to verify...",
+          });
+          currentCoord = await requestLocation();
+        }
+
+        if (settings.requireGPS && !currentCoord) {
           toast({
             variant: "destructive",
-            title: "Shift already active",
-            description: `${targetEmployee.name} must clock out from their current shift before starting a new one.`,
+            title: "Clock-in denied",
+            description:
+              "Could not get your location. Please enable location services.",
           });
           return;
         }
 
-        // Only employees must pass GPS / geofence checks
-        if (!isManagerOverride) {
-          if (settings.requireGPS && !currentCoord) {
-            toast({ title: "Location required", description: "Getting your location to verify..." });
-            currentCoord = await requestLocation();
-          }
-
-          if (settings.requireGPS && !currentCoord) {
+        if (settings.requireGeofence && currentCoord) {
+          if (!site.lat || !site.lng) {
             toast({
               variant: "destructive",
-              title: "Clock-in denied",
-              description: "Could not get your location. Please enable location services.",
+              title: "Clock-in denied: site location missing",
+              description: `Geofence is required, but the site "${site.name}" does not have GPS coordinates set.`,
+              duration: 7000,
             });
             return;
           }
 
-          if (settings.requireGeofence && currentCoord) {
-            if (!site.lat || !site.lng) {
-              toast({
-                variant: "destructive",
-                title: "Clock-in denied: site location missing",
-                description: `Geofence is required, but the site "${site.name}" does not have GPS coordinates set.`,
-                duration: 7000,
-              });
-              return;
-            }
+          const METERS_TO_FEET = 3.28084;
+          const distanceInMeters = haversineDistance(
+            { lat: site.lat, lng: site.lng },
+            currentCoord
+          );
+          const distanceInFeet = distanceInMeters * METERS_TO_FEET;
 
-            const METERS_TO_FEET = 3.28084;
-            const distanceInMeters = haversineDistance({ lat: site.lat, lng: site.lng }, currentCoord);
-            const distanceInFeet = distanceInMeters * METERS_TO_FEET;
-            const radiusInFeet = settings.geofenceRadius ?? 150;
+          // ⚠️ Note: your settings.geofenceRadius is stored in METERS in ManagerSettingsView (Option 1),
+          // so radiusInFeet should convert meters -> feet.
+          const radiusMeters = settings.geofenceRadius ?? 0;
+          const radiusInFeet = radiusMeters > 0 ? radiusMeters * METERS_TO_FEET : 150;
 
-            if (distanceInFeet > radiusInFeet) {
-              toast({
-                variant: "destructive",
-                title: "Clock-in denied: out of range",
-                description: `You are ${distanceInFeet.toFixed(
-                  0
-                )}ft away. You must be within ${radiusInFeet.toFixed(0)}ft.`,
-                duration: 7000,
-              });
-              return;
-            }
+          if (distanceInFeet > radiusInFeet) {
+            toast({
+              variant: "destructive",
+              title: "Clock-in denied: out of range",
+              description: `You are ${distanceInFeet.toFixed(
+                0
+              )}ft away. You must be within ${radiusInFeet.toFixed(0)}ft.`,
+              duration: 7000,
+            });
+            return;
           }
         }
-
-        const now = new Date();
-        const ts = isManagerOverride ? buildTsOnDay(forDate, now) : now.getTime();
-
-        entryData = {
-          employee: targetEmployee.name,
-          employeeId: targetEmployee.id,
-          action: "in",
-          ts,
-          site: site.name,
-        };
       }
 
-      const dataToSave: any = { ...entryData };
-      if (currentCoord?.lat && currentCoord?.lng) {
-        dataToSave.lat = currentCoord.lat;
-        dataToSave.lng = currentCoord.lng;
-      }
-      if (typeof note === "string" && note.trim()) dataToSave.note = note.trim();
+      const now = new Date();
+      const ts = isManagerOverride ? buildTsOnDay(forDate, now) : now.getTime();
 
-      if (engine === "cloud") {
-        const cId = getCompanyId(settings);
-        const ref = collection(db, "companies", cId, "timeclock_entries");
-        await addDoc(ref, { ...dataToSave, createdAt: serverTimestamp() });
-        toast({ title: `Clock ${action.toUpperCase()} recorded for ${site.name}.` });
-      } else {
-        setEntries((prev) => [...prev, { id: uuid(), ...(dataToSave as any) } as Entry]);
-        toast({ title: `Clock ${action.toUpperCase()} recorded for ${site.name}.` });
-      }
-    },
-    [employees, loggedInEmployee, coord, engine, settings, sessions, toast, isClockedIn, requestLocation]
-  );
+      entryData = {
+        employee: targetEmployee.name,
+        employeeId: targetEmployee.id,
+        action: "in",
+        ts,
+        site: site.name,
+      };
+    }
+
+    const dataToSave: any = { ...entryData };
+    if (currentCoord?.lat && currentCoord?.lng) {
+      dataToSave.lat = currentCoord.lat;
+      dataToSave.lng = currentCoord.lng;
+    }
+    if (typeof note === "string" && note.trim()) dataToSave.note = note.trim();
+
+    if (engine === "cloud") {
+      const cId = getCompanyId(settings);
+      const ref = collection(db, "companies", cId, "timeclock_entries");
+      await addDoc(ref, { ...dataToSave, createdAt: serverTimestamp() });
+      toast({ title: `Clock ${action.toUpperCase()} recorded for ${site.name}.` });
+    } else {
+      setEntries((prev) => [
+        ...prev,
+        { id: uuid(), ...(dataToSave as any) } as Entry,
+      ]);
+      toast({ title: `Clock ${action.toUpperCase()} recorded for ${site.name}.` });
+    }
+  },
+  [
+    employees,
+    loggedInEmployee,
+    coord,
+    engine,
+    settings,
+    sessions,
+    toast,
+    isClockedIn,
+    requestLocation,
+  ]
+);
+
 
   const deleteEntry = useCallback(
     async (id: string) => {
