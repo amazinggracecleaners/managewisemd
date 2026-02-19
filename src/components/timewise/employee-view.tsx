@@ -438,28 +438,43 @@ if (!isAssigned) return false;
   };
 
   /**
-   * ✅ FIX: Use overlap minutes for "Complete (HH:MM)" so cross-midnight shifts count correctly.
-   */
-  const getHoursForSiteDay = useCallback(
-    (siteName: string, forDate: Date) => {
-      const siteEntries = entries
-        .filter((e) => e.employeeId === employee.id && e.site === siteName)
-        .slice()
-        .sort((a, b) => a.ts - b.ts);
+ * ✅ Anchor cross-midnight sessions to the CLOCK-IN day.
+ * If a session starts on `forDate`, count the FULL duration (even after midnight).
+ */
 
-      const siteSessions = groupSessions(siteEntries);
+const getHoursForSiteDay = useCallback(
+  (siteName: string, forDate: Date) => {
+    const dayStart = startOfDay(forDate).getTime();
 
-      let totalMinutes = 0;
+    const siteEntries = entries
+      .filter((e) => e.employeeId === employee.id && e.site === siteName)
+      .slice()
+      .sort((a, b) => a.ts - b.ts);
 
-      for (const s of siteSessions) {
-        if (!s.in || !s.out) continue; // only count closed sessions
-        totalMinutes += sessionMinutesOnDay(s, forDate, s.out.ts);
-      }
+    const siteSessions = groupSessions(siteEntries);
 
-      return minutesToHHMM(totalMinutes);
-    },
-    [entries, employee.id]
-  );
+    let totalMinutes = 0;
+
+    for (const s of siteSessions) {
+      if (!s.in || !s.out) continue; // only closed sessions
+
+      // ✅ Only count sessions that START on this day (clock-in day)
+      const inDayStart = startOfDay(new Date(s.in.ts)).getTime();
+      if (inDayStart !== dayStart) continue;
+
+      const sessionMinutes = Math.max(
+        0,
+        Math.round((s.out.ts - s.in.ts) / 60000)
+      );
+
+      totalMinutes += sessionMinutes;
+    }
+
+    return minutesToHHMM(totalMinutes);
+  },
+  [entries, employee.id]
+);
+
 
   return (
     <>

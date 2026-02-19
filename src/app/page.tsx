@@ -1833,33 +1833,70 @@ const recordEntry = useCallback(
     });
   }, [managerChipDate, settings, entries, employees, mileageLogs, otherExpenses, schedules, invoices]);
 
-  const getDurationsBySite = useCallback(
-    (forDate: Date) => {
-      const map = new Map<string, { minutes: number; byEmployee: Record<string, number> }>();
-      const dayStart = startOfDay(forDate).getTime();
-      const dayEnd = dayStart + 24 * 60 * 60 * 1000;
+ const getDurationsBySite = useCallback(
+  (forDate: Date) => {
+    const map = new Map<
+      string,
+      { minutes: number; byEmployee: Record<string, number> }
+    >();
 
-      for (const s of sessions) {
-        if (!s.in) continue;
-        const sessionStart = s.in.ts;
-        const sessionEnd = s.out?.ts ?? Date.now();
+    const dayStart = startOfDay(forDate).getTime();
+    const dayEnd = dayStart + 24 * 60 * 60 * 1000;
 
-        const overlapStart = Math.max(sessionStart, dayStart);
-        const overlapEnd = Math.min(sessionEnd, dayEnd);
-        if (overlapEnd <= overlapStart) continue;
+    // ✅ Use statuses to decide if we anchor full shifts or use daily overlap
+    const statuses = getSiteStatuses(forDate);
 
-        const minutes = (overlapEnd - overlapStart) / 60000;
-        const site = s.in.site || "Unassigned";
+    for (const s of sessions) {
+      if (!s.in) continue;
 
-        const current = map.get(site) || { minutes: 0, byEmployee: {} };
-        current.minutes += minutes;
-        current.byEmployee[s.employee] = (current.byEmployee[s.employee] || 0) + minutes;
+      const site = s.in.site || "Unassigned";
+      const status = statuses.get(site); // "complete" | "in-process" | "incomplete" | undefined
+
+      const current = map.get(site) || { minutes: 0, byEmployee: {} };
+
+      // ✅ COMPLETE: anchor full session to the clock-in day (includes after midnight)
+      if (status === "complete") {
+        if (!s.out) continue; // if status is complete but session is still active, skip safely
+
+        const inDayStart = startOfDay(new Date(s.in.ts)).getTime();
+        if (inDayStart !== dayStart) continue; // only sessions that START on this day
+
+        const fullMinutes = Math.max(
+          0,
+          Math.round((s.out.ts - s.in.ts) / 60000)
+        );
+
+        current.minutes += fullMinutes;
+        current.byEmployee[s.employee] =
+          (current.byEmployee[s.employee] || 0) + fullMinutes;
+
         map.set(site, current);
+        continue;
       }
-      return map;
-    },
-    [sessions]
-  );
+
+      // ✅ IN-PROCESS / INCOMPLETE: keep overlap logic so it updates live across midnight
+      const sessionStart = s.in.ts;
+      const sessionEnd = s.out?.ts ?? Date.now();
+
+      const overlapStart = Math.max(sessionStart, dayStart);
+      const overlapEnd = Math.min(sessionEnd, dayEnd);
+
+      if (overlapEnd <= overlapStart) continue;
+
+      const overlapMinutes = (overlapEnd - overlapStart) / 60000;
+
+      current.minutes += overlapMinutes;
+      current.byEmployee[s.employee] =
+        (current.byEmployee[s.employee] || 0) + overlapMinutes;
+
+      map.set(site, current);
+    }
+
+    return map;
+  },
+  [sessions, getSiteStatuses]
+);
+
 
   // --- Render guards ---
     // --- Render guards ---
