@@ -420,7 +420,26 @@ if (!isAssigned) return false;
   };
 
   const currentSiteStatuses = useMemo(() => getSiteStatuses(currentDate), [getSiteStatuses, currentDate]);
+// ✅ Daily Site Summary for Employee
+const dailySiteSummary = useMemo(() => {
+  const schedulesToday = scheduleForDay(currentDate);
+  const statuses = getSiteStatuses(currentDate);
 
+  let total = schedulesToday.length;
+  let complete = 0;
+  let inProcess = 0;
+  let incomplete = 0;
+
+  for (const s of schedulesToday) {
+    const status = statuses.get(s.siteName);
+
+    if (status === "complete") complete++;
+    else if (status === "in-process") inProcess++;
+    else incomplete++;
+  }
+
+  return { total, complete, inProcess, incomplete };
+}, [currentDate, schedules, employee.name, getSiteStatuses]);
   const handleViewTimesheet = (periodId: string, employeeId: string) => {
     const period = payrollPeriods.find((p) => p.id === periodId);
     if (!period || employee.id !== employeeId) return;
@@ -592,7 +611,24 @@ const getHoursForSiteDay = useCallback(
                           </Button>
                         </div>
                       </div>
+{/* ✅ Daily Site Summary */}
+<div className="flex flex-wrap gap-3 mb-3">
+  <Badge variant="outline">
+    Total: {dailySiteSummary.total}
+  </Badge>
 
+  <Badge className="bg-green-600 text-white">
+    Complete: {dailySiteSummary.complete}
+  </Badge>
+
+  <Badge className="bg-yellow-500 text-white">
+    In Process: {dailySiteSummary.inProcess}
+  </Badge>
+
+  <Badge className="bg-red-500 text-white">
+    Incomplete: {dailySiteSummary.incomplete}
+  </Badge>
+</div>
                       <ScrollArea className="h-72">
                         {scheduleForDay(currentDate).length > 0 ||
                         (isCurrentDayToday && offScheduleActiveShifts.length > 0) ? (
@@ -838,7 +874,7 @@ const getHoursForSiteDay = useCallback(
         updateEmployee={updateEmployee}
         mode="employeeSelf"
         onRequestUpdate={onRequestUpdate}
-         teams={teams}
+        
       />
 
       {/* Schedule Note Dialog */}
