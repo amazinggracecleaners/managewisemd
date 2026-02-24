@@ -96,7 +96,6 @@ function sessionMinutesOnDay(s: Session, day: Date, nowTs: number = Date.now()):
   return Math.floor((overlapEnd - overlapStart) / 60000);
 }
 
-
 /** companyId is always derived the same way everywhere */
 const getCompanyId = (settings: Settings) =>
   settings.companyId?.trim() || process.env.NEXT_PUBLIC_COMPANY_ID || "amazing-grace-cleaners";
@@ -120,13 +119,11 @@ async function writeThenVerify<T extends DocumentData>(
 }
 
 export default function TimeWisePage() {
-  const { settings, updateSettings } = useSettings();
+  const { settings, updateSettings, cloudReady, authReady, user } = useSettings();
   const { engine, setEngine } = useEngine();
   const { toast } = useToast();
 
-  // --- Auth state (single source of truth) ---
-  const [authReady, setAuthReady] = useState(false);
-  const [user, setUser] = useState<User | null>(null);
+ 
 
   // --- Core data state ---
   const [entries, setEntries] = useState<Entry[]>([]);
@@ -226,64 +223,13 @@ export default function TimeWisePage() {
     }
   }, [loggedInEmployee]);
 
-  /**
-   * AUTH: in cloud mode, ensure we always have a signed-in user (anonymous is fine).
-   * Single auth effect.
-   */
-const didAnonSignInRef = useRef(false);
 
 /**
- * 1) AUTH effect (only auth)
+ * 2) Firestore listener attach function
+ * ✅ Must return a CLEANUP FUNCTION (not an array)
+ * ✅ NO useEffect inside this function
  */
- useEffect(() => {
-    setAuthReady(false);
-    didAnonSignInRef.current = false;
-
-    const unsub = onAuthStateChanged(auth, async (u) => {
-      console.log("[AUTH] state changed user=", u?.uid ?? null, "engine=", engine);
-
-      if (engine !== "cloud") {
-        setUser(null);
-        setAuthReady(true);
-        return;
-      }
-
-      if (u) {
-        setUser(u);
-        setAuthReady(true);
-        return;
-      }
-
-      if (didAnonSignInRef.current) {
-        setAuthReady(true);
-        return;
-      }
-      didAnonSignInRef.current = true;
-
-      try {
-        const cred = await signInAnonymously(auth);
-        console.log("[AUTH] signed in anonymously uid=", cred.user.uid);
-        setUser(cred.user);
-      } catch (e: any) {
-        console.error("[AUTH] anonymous sign-in failed", e?.code, e?.message, e);
-        toast({
-          variant: "destructive",
-          title: "Auth sign-in failed",
-          description: `${e?.code || "error"}: ${e?.message || "unknown"}`,
-          duration: 10000,
-        });
-        setUser(null);
-      } finally {
-        setAuthReady(true);
-      }
-    });
-
-    return () => unsub();
-  }, [engine, toast]);
-/**
- * 2) Firestore listener attach function (MUST return an array)
- */
- const attachFirestoreListeners = useCallback(
+const attachFirestoreListeners = useCallback(
   (cId: string) => {
     const unsubs: Array<() => void> = [];
     const confirmUnsubs: Array<() => void> = [];
@@ -299,7 +245,11 @@ const didAnonSignInRef = useRef(false);
         const code = error?.code || "";
         const msg = String(error?.message || "");
 
-        console.error(`[Firestore] onSnapshot error (${collectionName})`, { code, msg, error });
+        console.error(`[Firestore] onSnapshot error (${collectionName})`, {
+          code,
+          msg,
+          error,
+        });
 
         const looksPerm =
           /permission-denied|insufficient/i.test(code) ||
@@ -331,6 +281,10 @@ const didAnonSignInRef = useRef(false);
         });
       };
 
+    // ===========================
+    // ✅ PUT ALL onSnapshot LISTENERS HERE
+    // ===========================
+
     // payroll periods + nested confirmations
     unsubs.push(
       onSnapshot(
@@ -339,6 +293,7 @@ const didAnonSignInRef = useRef(false);
           const periods = snap.docs.map((d) => ({ id: d.id, ...d.data() } as PayrollPeriod));
           setPayrollPeriods(periods);
 
+          // reset nested confirmations listeners
           resetConfirmListeners();
 
           for (const p of periods) {
@@ -425,7 +380,7 @@ const didAnonSignInRef = useRef(false);
       )
     );
 
-    // ✅ RETURN A CLEANUP FUNCTION (NOT an array)
+    // ✅ CLEANUP FUNCTION
     return () => {
       unsubs.forEach((u) => u());
       resetConfirmListeners();
@@ -434,20 +389,18 @@ const didAnonSignInRef = useRef(false);
   [toast]
 );
 
-
-  useEffect(() => {
+useEffect(() => {
   if (engine !== "cloud") return;
-  if (!authReady) return;
+  if (!cloudReady) return;
   if (!user) return;
 
-  console.log("[APP] Subscribing to Firestore", {
+  console.log("[APP] Attaching Firestore listeners", {
     companyId,
     uid: user.uid,
-    fs: (db as any)?._settings,
   });
 
   return attachFirestoreListeners(companyId);
-}, [engine, authReady, user, companyId, attachFirestoreListeners]);
+}, [engine, cloudReady, user, companyId, attachFirestoreListeners]);
 
 
 
@@ -1899,128 +1852,126 @@ const recordEntry = useCallback(
 
 
   // --- Render guards ---
-    // --- Render guards ---
-  const showConnecting = engine === "cloud" && !authReady;
+const showConnecting = engine === "cloud" && (!authReady || !cloudReady);
 
-  return (
-    <main className="min-h-screen p-4 sm:p-6 lg:p-8">
-      {showConnecting ? (
-        <div className="min-h-[60vh] flex items-center justify-center">
-          <p>Connecting to the cloud...</p>
-        </div>
-      ) : (
-        <div className="max-w-6xl mx-auto">
-          {process.env.NODE_ENV !== "production" && (
-            <div className="mb-2 text-xs text-muted-foreground">
-              Engine: <b>{engine}</b> · Company:{" "}
-              <b>{settings.companyId?.trim() || process.env.NEXT_PUBLIC_COMPANY_ID}</b>
-            </div>
-          )}
+return (
+  <main className="min-h-screen p-4 sm:p-6 lg:p-8">
+    {showConnecting ? (
+      <div className="min-h-[60vh] flex items-center justify-center">
+        <p>Connecting to the cloud...</p>
+      </div>
+    ) : (
+      <div className="max-w-6xl mx-auto">
+        {process.env.NODE_ENV !== "production" && (
+          <div className="mb-2 text-xs text-muted-foreground">
+            Engine: <b>{engine}</b> · Company:{" "}
+            <b>{settings.companyId?.trim() || process.env.NEXT_PUBLIC_COMPANY_ID}</b>
+          </div>
+        )}
 
-          <Header
-            tab={tab}
-            onTabChange={setTab as any}
-            isManager={unlocked && tab === "manager"}
-            isLoggedIn={!!loggedInEmployee}
+        <Header
+          tab={tab}
+          onTabChange={setTab as any}
+          isManager={unlocked && tab === "manager"}
+          isLoggedIn={!!loggedInEmployee}
+        />
+
+        {loggedInEmployee ? (
+          <EmployeeView
+            employee={loggedInEmployee}
+            onLogout={handleLogout}
+            settings={settings}
+            recordEntry={recordEntry}
+            requestLocation={requestLocation}
+            coord={coord}
+            entries={entries ?? []}
+            schedules={schedules ?? []}
+            updateSchedule={updateSchedule}
+            isGettingLocation={isGettingLocation}
+            isClockedIn={isClockedIn}
+            updateEmployee={updateEmployee}
+            payrollPeriods={payrollPeriods ?? []}
+            confirmPayroll={confirmPayroll}
+            payrollConfirmations={payrollConfirmations ?? []}
+            getSiteStatuses={getSiteStatuses}
+            onRequestUpdate={handleEmployeeUpdateRequest}
           />
+        ) : tab === "employee" ? (
+          <EmployeeLogin employees={employees} onLogin={handleLogin} />
+        ) : (
+          <ManagerView
+            unlocked={unlocked}
+            setUnlocked={setUnlocked}
+            settings={settings}
+            setSettings={updateSettings}
+            activeShifts={activeShifts}
+            totalsByEmployee={totalsByEmployee}
+            filteredSessions={filteredSessions}
+            fromDate={fromDate}
+            setFromDate={setFromDate}
+            toDate={toDate}
+            setToDate={setToDate}
+            setSearch={setSearch}
+            search={search}
+            exportCSV={exportCSV}
+            exportSessionsCSV={exportSessionsCSV}
+            setSiteLocationFromHere={setSiteLocationFromHere}
+            onGenerateSummary={handleGenerateSummary}
+            isGenerating={isGenerating}
+            updateEntry={updateEntry}
+            deleteEntry={deleteEntry}
+            sites={settings.sites ?? []}
+            employees={employees ?? []}
+            employeeNames={employeeNames}
+            addEmployee={addEmployee}
+            updateEmployee={updateEmployee}
+            deleteEmployee={deleteEmployee}
+            schedules={schedules ?? []}
+            addSchedule={addSchedule}
+            updateSchedule={updateSchedule}
+            deleteSchedule={deleteSchedule}
+            deleteSite={deleteSite}
+            mileageLogs={mileageLogs ?? []}
+            addMileageLog={addMileageLog}
+            updateMileageLog={updateMileageLog}
+            deleteMileageLog={deleteMileageLog}
+            otherExpenses={otherExpenses ?? []}
+            addOtherExpense={addOtherExpense}
+            updateOtherExpense={updateOtherExpense}
+            deleteOtherExpense={deleteOtherExpense}
+            allEntries={entries}
+            payrollPeriods={payrollPeriods ?? []}
+            savePayrollPeriod={savePayrollPeriod}
+            deletePayrollPeriod={deletePayrollPeriod}
+            payrollConfirmations={payrollConfirmations ?? []}
+            getSiteStatuses={getSiteStatuses}
+            recordEntry={recordEntry}
+            isClockedIn={isClockedIn}
+            invoices={invoices ?? []}
+            addInvoice={addInvoice}
+            updateInvoice={updateInvoice}
+            deleteInvoice={deleteInvoice}
+            testGeofence={testGeofence}
+            profitabilityBySite={profitabilityBySite}
+            getDurationsBySite={getDurationsBySite}
+            employeeUpdateRequests={employeeUpdateRequests}
+            approveEmployeeUpdate={approveEmployeeUpdate}
+            rejectEmployeeUpdate={rejectEmployeeUpdate}
+            engine={engine}
+            setEngine={setEngine}
+          />
+        )}
 
-          {loggedInEmployee ? (
-            <EmployeeView
-              employee={loggedInEmployee}
-              onLogout={handleLogout}
-              settings={settings}
-              recordEntry={recordEntry}
-              requestLocation={requestLocation}
-              coord={coord}
-              entries={entries ?? []}
-              schedules={schedules ?? []}
-              updateSchedule={updateSchedule}
-              isGettingLocation={isGettingLocation}
-              isClockedIn={isClockedIn}
-              updateEmployee={updateEmployee}
-              payrollPeriods={payrollPeriods ?? []}
-              confirmPayroll={confirmPayroll}
-              payrollConfirmations={payrollConfirmations ?? []}
-              getSiteStatuses={getSiteStatuses}
-              onRequestUpdate={handleEmployeeUpdateRequest}
-            />
-          ) : tab === "employee" ? (
-            <EmployeeLogin employees={employees} onLogin={handleLogin} />
-          ) : (
-            <ManagerView
-              unlocked={unlocked}
-              setUnlocked={setUnlocked}
-              settings={settings}
-              setSettings={updateSettings}
-              activeShifts={activeShifts}
-              totalsByEmployee={totalsByEmployee}
-              filteredSessions={filteredSessions}
-              fromDate={fromDate}
-              setFromDate={setFromDate}
-              toDate={toDate}
-              setToDate={setToDate}
-              setSearch={setSearch}
-              search={search}
-              exportCSV={exportCSV}
-              exportSessionsCSV={exportSessionsCSV}
-              setSiteLocationFromHere={setSiteLocationFromHere}
-              onGenerateSummary={handleGenerateSummary}
-              isGenerating={isGenerating}
-              updateEntry={updateEntry}
-              deleteEntry={deleteEntry}
-              sites={settings.sites ?? []}
-              employees={employees ?? []}
-              employeeNames={employeeNames}
-              addEmployee={addEmployee}
-              updateEmployee={updateEmployee}
-              deleteEmployee={deleteEmployee}
-              schedules={schedules ?? []}
-              addSchedule={addSchedule}
-              updateSchedule={updateSchedule}
-              deleteSchedule={deleteSchedule}
-              deleteSite={deleteSite}
-              mileageLogs={mileageLogs ?? []}
-              addMileageLog={addMileageLog}
-              updateMileageLog={updateMileageLog}
-              deleteMileageLog={deleteMileageLog}
-              otherExpenses={otherExpenses ?? []}
-              addOtherExpense={addOtherExpense}
-              updateOtherExpense={updateOtherExpense}
-              deleteOtherExpense={deleteOtherExpense}
-              allEntries={entries}
-              payrollPeriods={payrollPeriods ?? []}
-              savePayrollPeriod={savePayrollPeriod}
-              deletePayrollPeriod={deletePayrollPeriod}
-              payrollConfirmations={payrollConfirmations ?? []}
-              getSiteStatuses={getSiteStatuses}
-              recordEntry={recordEntry}
-              isClockedIn={isClockedIn}
-              invoices={invoices ?? []}
-              addInvoice={addInvoice}
-              updateInvoice={updateInvoice}
-              deleteInvoice={deleteInvoice}
-              testGeofence={testGeofence}
-              profitabilityBySite={profitabilityBySite}
-              getDurationsBySite={getDurationsBySite}
-              employeeUpdateRequests={employeeUpdateRequests}
-              approveEmployeeUpdate={approveEmployeeUpdate}
-              rejectEmployeeUpdate={rejectEmployeeUpdate}
-              engine={engine}
-              setEngine={setEngine}
-            />
-          )}
+        <Footer engine={engine} />
+      </div>
+    )}
 
-          <Footer engine={engine} />
-        </div>
-      )}
-
-      <AISummaryDialog
-        isOpen={isAiSummaryOpen}
-        onOpenChange={setIsAiSummaryOpen}
-        summary={aiSummary}
-        error={aiError}
-        isLoading={isGenerating}
-      />
-    </main>
-  );
-  }
+    <AISummaryDialog
+      isOpen={isAiSummaryOpen}
+      onOpenChange={setIsAiSummaryOpen}
+      summary={aiSummary}
+      error={aiError}
+      isLoading={isGenerating}
+    />
+  </main>
+);}

@@ -92,7 +92,8 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-
+import { useEngine } from "@/providers/EngineProvider";
+import { useSettings } from "@/features/settings/hooks/useSettings";
 interface Team {
   id: string;
   name: string;
@@ -123,7 +124,8 @@ interface ScheduleViewProps {
   // ✅ teams come from settings.teams (passed from ManagerView)
   teams: Team[];
 }
-
+const { engine } = useEngine();
+const { cloudReady } = useSettings();
 const billingFrequencies: BillingFrequency[] = [
   "One-Time",
   "Daily",
@@ -622,9 +624,11 @@ export function ScheduleView({
 
           <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
             <DialogTrigger asChild>
-              <Button onClick={() => handleOpenDialog()}>
-                <PlusCircle className="mr-2 h-4 w-4" /> Add Schedule
-              </Button>
+              <Button disabled={engine === "cloud" && !cloudReady}
+              onClick={() => handleOpenDialog()}>
+                <PlusCircle className="mr-2 h-4 w-4" /> 
+  Add Schedule
+</Button>
             </DialogTrigger>
 
             <DialogContent className="sm:max-w-2xl">
