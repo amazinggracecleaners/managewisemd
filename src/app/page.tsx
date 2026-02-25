@@ -126,6 +126,8 @@ export default function TimeWisePage() {
  
 
   // --- Core data state ---
+  const schedulesHydratedRef = useRef(false);
+  const sitesHydratedRef = useRef(false);
   const [entries, setEntries] = useState<Entry[]>([]);
   const [schedules, setSchedules] = useState<CleaningSchedule[]>([]);
   const [mileageLogs, setMileageLogs] = useState<MileageLog[]>([]);
@@ -222,7 +224,33 @@ export default function TimeWisePage() {
       localStorage.removeItem("ops_last_employee");
     }
   }, [loggedInEmployee]);
+useEffect(() => {
+  if (engine !== "cloud") return;
+  if (!cloudReady) return;
+  if (!authReady) return;
+  if (!user?.uid) return;
 
+  const cId = (companyId || "").trim();
+  if (!cId) return;
+
+  const settingsRef = doc(db, "companies", cId, "settings", "main");
+
+  const unsub = onSnapshot(
+    settingsRef,
+    (snap) => {
+      sitesHydratedRef.current = true;
+
+      const data = (snap.data() || {}) as Partial<Settings>;
+      updateSettings((prev) => ({ ...prev, ...data }));
+    },
+    (err: any) => {
+      console.error("[Firestore] settings/main listener error", err?.code, err?.message);
+      sitesHydratedRef.current = false;
+    }
+  );
+
+  return () => unsub();
+}, [engine, cloudReady, authReady, user, companyId, updateSettings]);
 
 /**
  * 2) Firestore listener attach function
@@ -231,6 +259,13 @@ export default function TimeWisePage() {
  */
 const attachFirestoreListeners = useCallback(
   (cId: string) => {
+    const safeCId = (cId || "").trim();
+
+    if (!safeCId) {
+      console.warn("[Firestore] attachFirestoreListeners called with empty companyId");
+      return () => {};
+    }
+
     const unsubs: Array<() => void> = [];
     const confirmUnsubs: Array<() => void> = [];
 
@@ -245,11 +280,7 @@ const attachFirestoreListeners = useCallback(
         const code = error?.code || "";
         const msg = String(error?.message || "");
 
-        console.error(`[Firestore] onSnapshot error (${collectionName})`, {
-          code,
-          msg,
-          error,
-        });
+        console.error(`[Firestore] onSnapshot error (${collectionName})`, { code, msg, error });
 
         const looksPerm =
           /permission-denied|insufficient/i.test(code) ||
@@ -259,7 +290,7 @@ const attachFirestoreListeners = useCallback(
           errorEmitter.emit(
             "permission-error",
             new FirestorePermissionError({
-              path: `companies/${cId}/${collectionName}`,
+              path: `companies/${safeCId}/${collectionName}`,
               operation: "list",
             })
           );
@@ -267,7 +298,7 @@ const attachFirestoreListeners = useCallback(
           toast({
             variant: "destructive",
             title: `Cloud permissions error on ${collectionName}`,
-            description: `Check Firestore rules & companyId: ${cId}.`,
+            description: `Check Firestore rules & companyId: ${safeCId}.`,
             duration: 10000,
           });
           return;
@@ -288,17 +319,16 @@ const attachFirestoreListeners = useCallback(
     // payroll periods + nested confirmations
     unsubs.push(
       onSnapshot(
-        query(collection(db, "companies", cId, "payroll_periods"), orderBy("endDate", "desc")),
+        query(collection(db, "companies", safeCId, "payroll_periods"), orderBy("endDate", "desc")),
         (snap) => {
           const periods = snap.docs.map((d) => ({ id: d.id, ...d.data() } as PayrollPeriod));
           setPayrollPeriods(periods);
 
-          // reset nested confirmations listeners
           resetConfirmListeners();
 
           for (const p of periods) {
             const cu = onSnapshot(
-              collection(db, "companies", cId, "payroll_periods", p.id, "confirmations"),
+              collection(db, "companies", safeCId, "payroll_periods", p.id, "confirmations"),
               (confSnap) => {
                 const periodConfirmations = confSnap.docs.map((d) => ({
                   ...(d.data() as PayrollConfirmation),
@@ -323,23 +353,31 @@ const attachFirestoreListeners = useCallback(
     // main collections
     unsubs.push(
       onSnapshot(
-        query(collection(db, "companies", cId, "timeclock_entries"), orderBy("ts", "asc")),
+        query(collection(db, "companies", safeCId, "timeclock_entries"), orderBy("ts", "asc")),
         (snap) => setEntries(snap.docs.map((d) => ({ id: d.id, ...d.data() } as Entry))),
         handleSnapshotError("timeclock_entries")
       )
     );
 
+    // ✅ schedules hydration marker
     unsubs.push(
       onSnapshot(
-        query(collection(db, "companies", cId, "schedules")),
-        (snap) => setSchedules(snap.docs.map((d) => ({ id: d.id, ...d.data() } as CleaningSchedule))),
-        handleSnapshotError("schedules")
+        query(collection(db, "companies", safeCId, "schedules")),
+        (snap) => {
+          schedulesHydratedRef.current = true;
+          setSchedules(snap.docs.map((d) => ({ id: d.id, ...d.data() } as CleaningSchedule)));
+        },
+        (err) => {
+          // Do not mark hydrated on error
+          schedulesHydratedRef.current = false;
+          handleSnapshotError("schedules")(err);
+        }
       )
     );
 
     unsubs.push(
       onSnapshot(
-        query(collection(db, "companies", cId, "mileage_logs")),
+        query(collection(db, "companies", safeCId, "mileage_logs")),
         (snap) => setMileageLogs(snap.docs.map((d) => ({ id: d.id, ...d.data() } as MileageLog))),
         handleSnapshotError("mileage_logs")
       )
@@ -347,7 +385,7 @@ const attachFirestoreListeners = useCallback(
 
     unsubs.push(
       onSnapshot(
-        query(collection(db, "companies", cId, "other_expenses"), orderBy("date", "desc")),
+        query(collection(db, "companies", safeCId, "other_expenses"), orderBy("date", "desc")),
         (snap) => setOtherExpenses(snap.docs.map((d) => ({ id: d.id, ...d.data() } as OtherExpense))),
         handleSnapshotError("other_expenses")
       )
@@ -355,7 +393,7 @@ const attachFirestoreListeners = useCallback(
 
     unsubs.push(
       onSnapshot(
-        query(collection(db, "companies", cId, "employees")),
+        query(collection(db, "companies", safeCId, "employees")),
         (snap) => setEmployees(snap.docs.map((d) => ({ id: d.id, ...d.data() } as Employee))),
         handleSnapshotError("employees")
       )
@@ -363,7 +401,7 @@ const attachFirestoreListeners = useCallback(
 
     unsubs.push(
       onSnapshot(
-        query(collection(db, "companies", cId, "invoices"), orderBy("date", "desc")),
+        query(collection(db, "companies", safeCId, "invoices"), orderBy("date", "desc")),
         (snap) => setInvoices(snap.docs.map((d) => ({ id: d.id, ...d.data() } as Invoice))),
         handleSnapshotError("invoices")
       )
@@ -371,7 +409,7 @@ const attachFirestoreListeners = useCallback(
 
     unsubs.push(
       onSnapshot(
-        query(collection(db, "companies", cId, "employee_update_requests"), orderBy("requestedAt", "desc")),
+        query(collection(db, "companies", safeCId, "employee_update_requests"), orderBy("requestedAt", "desc")),
         (snap) =>
           setEmployeeUpdateRequests(
             snap.docs.map((d) => ({ id: d.id, ...d.data() } as EmployeeUpdateRequest))
@@ -392,40 +430,48 @@ const attachFirestoreListeners = useCallback(
 useEffect(() => {
   if (engine !== "cloud") return;
   if (!cloudReady) return;
-  if (!user) return;
+  if (!authReady) return;
+  if (!user?.uid) return;
 
-  console.log("[APP] Attaching Firestore listeners", {
-    companyId,
-    uid: user.uid,
-  });
+  const cId = (companyId || "").trim();
+  if (!cId) return;
 
-  return attachFirestoreListeners(companyId);
-}, [engine, cloudReady, user, companyId, attachFirestoreListeners]);
+  console.log("[APP] Attaching Firestore listeners", { companyId: cId, uid: user.uid });
 
-
-
+  return attachFirestoreListeners(cId);
+}, [engine, cloudReady, authReady, user, companyId, attachFirestoreListeners]);
   // --- Auto-cleanup orphaned schedules (cloud + manager only) ---
-  useEffect(() => {
-    if (engine !== "cloud" || !unlocked) return;
-    if (!schedules.length || !settings.sites?.length) return;
+useEffect(() => {
+  if (engine !== "cloud") return;
+  if (!unlocked) return;
+  if (!cloudReady || !authReady || !user?.uid) return;
 
-    const siteNames = new Set(settings.sites.map((s) => s.name));
-    const orphaned = schedules.filter((s) => !siteNames.has(s.siteName));
+  const cId = (companyId || "").trim();
+  if (!cId) return;
 
-    if (orphaned.length === 0) return;
+  // ✅ DO NOT RUN until BOTH sides are confirmed cloud-loaded
+  if (!sitesHydratedRef.current) return;
+  if (!schedulesHydratedRef.current) return;
 
-    console.warn(
-      "[Cleanup] Removing orphaned schedules:",
-      orphaned.map((s) => `${s.siteName} (${s.id})`)
+  if (!schedules.length) return;
+  if (!settings.sites?.length) return;
+
+  const siteNames = new Set((settings.sites ?? []).map((s) => (s.name || "").trim()));
+  const orphaned = schedules.filter((sch) => !siteNames.has((sch.siteName || "").trim()));
+
+  if (orphaned.length === 0) return;
+
+  console.warn(
+    "[Cleanup] Removing orphaned schedules:",
+    orphaned.map((s) => `${s.siteName} (${s.id})`)
+  );
+
+  orphaned.forEach((s) => {
+    deleteDoc(doc(db, "companies", cId, "schedules", s.id)).catch((err) =>
+      console.warn("Failed to delete orphaned schedule", s.id, err)
     );
-
-    const cId = getCompanyId(settings);
-    orphaned.forEach((s) => {
-      deleteDoc(doc(db, "companies", cId, "schedules", s.id)).catch((err) =>
-        console.warn("Failed to delete orphaned schedule", s.id, err)
-      );
-    });
-  }, [schedules, settings.sites, engine, settings.companyId, unlocked]);
+  });
+}, [engine, unlocked, cloudReady, authReady, user, companyId, schedules, settings.sites]);
 
 
 
