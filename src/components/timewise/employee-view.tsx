@@ -313,17 +313,23 @@ if (!isAssigned) return false;
    * ✅ FIX: Detect open shift for a site on a day by OVERLAP, not by "clock-in day"
    */
   const hasOpenShiftForSiteOnDate = useCallback(
-    (siteName: string, forDate: Date) => {
-      return sessionsForEmployee.some((s) => {
-        if (!s.active || !s.in) return false;
-        if ((s.in.site || "") !== siteName) return false;
+  (siteName: string, forDate: Date) => {
+    const dayStart = startOfDay(forDate).getTime();
+    const dayEnd = dayStart + 24 * 60 * 60 * 1000;
 
-        // If it overlaps the day, it's open "for that day"
-        return sessionMinutesOnDay(s, forDate, Date.now()) > 0;
-      });
-    },
-    [sessionsForEmployee]
-  );
+    return sessionsForEmployee.some((s) => {
+      if (!s.active || !s.in) return false;
+      if ((s.in.site || "") !== siteName) return false;
+
+      const start = s.in.ts;
+      const rawEnd = s.out?.ts ?? Math.max(Date.now(), start);
+      const end = Math.min(rawEnd, dayEnd);
+
+      return end > dayStart && start < dayEnd;
+    });
+  },
+  [sessionsForEmployee]
+);
 
   const handleClockInOut = useCallback(
     (action: "in" | "out", siteName: string) => {
