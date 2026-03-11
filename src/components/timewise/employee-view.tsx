@@ -606,12 +606,13 @@ const getHoursForSiteDay = useCallback(
                             <ChevronLeft />
                           </Button>
                           <Button
-                            variant={isSameDay(currentDate, startOfDay(new Date())) ? "default" : "outline"}
-                            className="h-7"
-                            onClick={() => setCurrentDate(startOfDay(new Date()))}
-                          >
-                            Today
-                          </Button>
+  variant={isSameDay(currentDate, startOfDay(new Date())) ? "default" : "outline"}
+  className="h-7 min-w-[110px]"
+  onClick={() => setCurrentDate(startOfDay(new Date()))}
+  title="Jump back to today"
+>
+  {formatDateHeader(currentDate)}
+</Button>
                           <Button variant="outline" size="icon" className="h-7 w-7" onClick={() => changeDay(1)}>
                             <ChevronRight />
                           </Button>
