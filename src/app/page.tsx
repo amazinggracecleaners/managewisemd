@@ -642,7 +642,8 @@ const getSiteStatuses = useCallback(
         .filter((s) => (s.in?.site || s.out?.site) === siteName)
         .filter((s) => {
           const start = s.in?.ts ?? s.out?.ts ?? 0;
-          const end = s.out?.ts ?? Date.now();
+          const rawEnd = s.out?.ts ?? Math.max(Date.now(), start);
+          const end = Math.min(rawEnd, dayEnd);
           return end > dayStart && start < dayEnd;
         });
 
@@ -779,9 +780,7 @@ const recordEntry = useCallback(
 
       // ✅ FIX: candidate OUT time in manager override is built on forDate,
       // but if it would fall BEFORE the IN time (cross-midnight), roll to next day.
-      const candidateOutTs = isManagerOverride
-        ? buildTsOnDayWithRoll(forDate, now, inTs)
-        : now.getTime();
+     const candidateOutTs = buildTsOnDayWithRoll(forDate, now, inTs);
 
       // ✅ Ensure OUT is at least 1 minute after IN (prevents 00:00 display edge cases)
       const outTs = Math.max(candidateOutTs, inTs + MIN_SHIFT_MS);
@@ -864,7 +863,7 @@ const recordEntry = useCallback(
       }
 
       const now = new Date();
-      const ts = isManagerOverride ? buildTsOnDay(forDate, now) : now.getTime();
+const ts = buildTsOnDay(forDate, now);
 
       entryData = {
         employee: targetEmployee.name,
@@ -1875,23 +1874,23 @@ const recordEntry = useCallback(
     const dayStart = startOfDay(forDate).getTime();
     const dayEnd = dayStart + 24 * 60 * 60 * 1000;
 
-    // ✅ Use statuses to decide if we anchor full shifts or use daily overlap
+    // COMPLETE vs IN-PROCESS/INCOMPLETE comes from site status
     const statuses = getSiteStatuses(forDate);
 
     for (const s of sessions) {
       if (!s.in) continue;
 
       const site = s.in.site || "Unassigned";
-      const status = statuses.get(site); // "complete" | "in-process" | "incomplete" | undefined
-
+      const status = statuses.get(site);
       const current = map.get(site) || { minutes: 0, byEmployee: {} };
 
-      // ✅ COMPLETE: anchor full session to the clock-in day (includes after midnight)
+      // ✅ COMPLETE: anchor the FULL finished shift to the clock-in day
+      // even if the employee clocked out after midnight
       if (status === "complete") {
-        if (!s.out) continue; // if status is complete but session is still active, skip safely
+        if (!s.out) continue;
 
         const inDayStart = startOfDay(new Date(s.in.ts)).getTime();
-        if (inDayStart !== dayStart) continue; // only sessions that START on this day
+        if (inDayStart !== dayStart) continue;
 
         const fullMinutes = Math.max(
           0,
@@ -1906,9 +1905,11 @@ const recordEntry = useCallback(
         continue;
       }
 
-      // ✅ IN-PROCESS / INCOMPLETE: keep overlap logic so it updates live across midnight
+      // ✅ IN-PROCESS / INCOMPLETE:
+      // keep overlap logic so active shifts update live across midnight
+      // but also support future-dated active sessions
       const sessionStart = s.in.ts;
-      const sessionEnd = s.out?.ts ?? Date.now();
+      const sessionEnd = s.out?.ts ?? Math.max(Date.now(), s.in.ts);
 
       const overlapStart = Math.max(sessionStart, dayStart);
       const overlapEnd = Math.min(sessionEnd, dayEnd);
