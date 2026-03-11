@@ -39,6 +39,7 @@ import type {
   MileageLog,
   Entry,
   Settings,
+  Employee,
 } from "@/shared/types/domain";
 import { Label } from "@/components/ui/label";
 import {
@@ -145,6 +146,7 @@ export interface FinancialsViewProps {
   mileageLogs?: MileageLog[] | null;
   payrollPeriods?: PayrollPeriod[] | null;
   entries?: Entry[] | null;
+  employees?: Employee[] | null;
   settings?: Settings | null;
   fromDate?: string;
   toDate?: string;
@@ -178,6 +180,7 @@ export function FinancialsView({
   mileageLogs,
   payrollPeriods,
   entries,
+  employees,
   settings,
   fromDate: customFromDate,
   toDate: customToDate,
@@ -188,6 +191,7 @@ export function FinancialsView({
   const miles = ensureArray(mileageLogs);
   const pays = ensureArray(payrollPeriods);
   const allEntries = ensureArray(entries);
+  const emps = ensureArray(employees);
 
   const [viewType, setViewType] = useState<"custom" | "monthly" | "annually">(
     "custom"
@@ -261,18 +265,43 @@ export function FinancialsView({
       monthly.set(key, row);
     }
 
-    // Payroll (use endDate; only paid)
-    for (const p of pays) {
-      const d = toDateMaybe((p as any).endDate ?? (p as any).date);
-      if (!d || !inRange(d, minDate, maxDate)) continue;
-      if (p.status !== "paid") continue;
-      const key = monthKey(d);
-      const row =
-        monthly.get(key) ??
-        { revenue: 0, other: 0, payroll: 0, mileage: 0 };
-      row.payroll += getPayrollTotal(p);
-      monthly.set(key, row);
-    }
+    // Payroll / labor progress (accrued from worked time, not waiting for paid status)
+if (allEntries.length && emps.length) {
+  const sessions = groupSessions([...allEntries].sort((a, b) => a.ts - b.ts));
+
+  const employeeRateById = new Map(
+    emps.map((e) => [
+      e.id,
+      Number((e as any).payRate ?? (e as any).wage ?? 0) || 0,
+    ])
+  );
+
+  for (const s of sessions) {
+    if (!s.in) continue;
+
+    const sessionStart = s.in.ts;
+    const sessionEnd = s.out?.ts ?? Date.now();
+
+    const overlapStart = Math.max(sessionStart, minMs);
+    const overlapEnd = Math.min(sessionEnd, maxMs);
+
+    if (overlapEnd <= overlapStart) continue;
+
+    const d = new Date(overlapStart);
+    const key = monthKey(d);
+
+    const row =
+      monthly.get(key) ??
+      { revenue: 0, other: 0, payroll: 0, mileage: 0 };
+
+    const employeeId = (s as any).employeeId ?? s.in.employeeId;
+    const rate = employeeRateById.get(employeeId) ?? 0;
+    const hours = (overlapEnd - overlapStart) / (1000 * 60 * 60);
+
+    row.payroll += rate * hours;
+    monthly.set(key, row);
+  }
+}
 
     // Mileage
     for (const m of miles) {
@@ -441,6 +470,7 @@ export function FinancialsView({
     miles,
     pays,
     allEntries,
+     emps,
     settings,
     minDate,
     maxDate,
@@ -703,7 +733,7 @@ export function FinancialsView({
                   <TableHead className="text-right">
                     <span className="inline-flex items-center justify-end w-full">
                       Payroll
-                      <InfoTip text="Total paid payroll whose period ends in this month." />
+                      <InfoTip text="Accrued labor cost from worked employee time in this month, even before payroll is paid." />
                     </span>
                   </TableHead>
                   <TableHead className="text-right">

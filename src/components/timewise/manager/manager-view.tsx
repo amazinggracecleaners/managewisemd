@@ -440,6 +440,7 @@ export function ManagerView(props: ManagerViewProps) {
             mileageLogs={props.mileageLogs}
             payrollPeriods={props.payrollPeriods}
             entries={props.allEntries}
+            employees={props.employees}
             settings={props.settings}
             fromDate={props.fromDate}
             toDate={props.toDate}
