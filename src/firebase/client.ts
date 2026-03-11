@@ -24,6 +24,9 @@ export const auth = getAuth(app);
 export const db = getFirestore(app);
 export const storage = getStorage(app);
 export const functions = getFunctions(app, "us-central1");
+console.log("[Firebase projectId]", firebaseConfig.projectId);
+console.log("[Firebase authDomain]", firebaseConfig.authDomain);
+console.log("[Firebase storageBucket]", firebaseConfig.storageBucket);
 
 // Optional analytics (client-only)
 export let analytics: any = null;

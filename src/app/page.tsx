@@ -224,33 +224,7 @@ export default function TimeWisePage() {
       localStorage.removeItem("ops_last_employee");
     }
   }, [loggedInEmployee]);
-useEffect(() => {
-  if (engine !== "cloud") return;
-  if (!cloudReady) return;
-  if (!authReady) return;
-  if (!user?.uid) return;
 
-  const cId = (companyId || "").trim();
-  if (!cId) return;
-
-  const settingsRef = doc(db, "companies", cId, "settings", "main");
-
-  const unsub = onSnapshot(
-    settingsRef,
-    (snap) => {
-      sitesHydratedRef.current = true;
-
-      const data = (snap.data() || {}) as Partial<Settings>;
-      updateSettings((prev) => ({ ...prev, ...data }));
-    },
-    (err: any) => {
-      console.error("[Firestore] settings/main listener error", err?.code, err?.message);
-      sitesHydratedRef.current = false;
-    }
-  );
-
-  return () => unsub();
-}, [engine, cloudReady, authReady, user, companyId, updateSettings]);
 
 /**
  * 2) Firestore listener attach function
@@ -426,7 +400,66 @@ const attachFirestoreListeners = useCallback(
   },
   [toast]
 );
+// --- DEBUG: verify companyId consistency ---
+useEffect(() => {
+  if (engine !== "cloud") return;
 
+  console.log("[APP DEBUG] companyId prop/state =", companyId);
+  console.log("[APP DEBUG] getCompanyId(settings) =", getCompanyId(settings));
+
+}, [engine, companyId, settings]);
+// --- DEBUG: auth state ---
+useEffect(() => {
+  console.log("[AUTH STATE]", {
+    authReady,
+    uid: user?.uid ?? null,
+    isAnonymous: user?.isAnonymous ?? null,
+  });
+}, [authReady, user]);
+// --- Ensure Firebase user exists ---
+useEffect(() => {
+  if (!authReady) return;
+
+  if (!user) {
+    console.log("[AUTH] signing in anonymously...");
+    signInAnonymously(auth).catch((err) => {
+      console.error("[AUTH] anonymous sign-in failed", err);
+    });
+  }
+}, [authReady, user]);
+useEffect(() => {
+  if (engine !== "cloud") return;
+  if (!cloudReady) return;
+  if (!authReady) return;
+  if (!user?.uid) return;
+
+  const cId = (companyId || "").trim();
+  if (!cId) return;
+
+  const testRef = doc(db, "companies", cId, "settings", "main");
+
+  console.log("[TEST READ] starting", {
+    uid: user.uid,
+    companyId: cId,
+    path: testRef.path,
+  });
+
+  getDoc(testRef)
+    .then((snap) => {
+      console.log("[TEST READ] success", {
+        exists: snap.exists(),
+        path: testRef.path,
+        data: snap.data(),
+      });
+    })
+    .catch((err) => {
+      console.error("[TEST READ] failed", {
+        path: testRef.path,
+        code: err.code,
+        message: err.message,
+      });
+    });
+}, [engine, cloudReady, authReady, user, companyId]);
 useEffect(() => {
   if (engine !== "cloud") return;
   if (!cloudReady) return;

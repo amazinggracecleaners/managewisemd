@@ -1,27 +1,22 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import type { Settings } from "@/shared/types/domain";
-import {
-  loadSettings as loadLocalSettings,
-  saveSettings as saveLocalSettings,
-} from "@/lib/storage";
+import { loadSettings as loadLocalSettings, saveSettings as saveLocalSettings } from "@/lib/storage";
 import { useEngine } from "@/providers/EngineProvider";
 import { db, auth } from "@/firebase/client";
-import {
-  writeCloudSettings,
-  subscribeCloudSettings,
-  ensureCloudSettings,
-} from "@/lib/cloud-settings";
+import { writeCloudSettings, subscribeCloudSettings, ensureCloudSettings } from "@/lib/cloud-settings";
 import { useToast } from "@/hooks/use-toast";
 import { onAuthStateChanged, type User } from "firebase/auth";
 import { ensureAuthedUser } from "@/firebase/ensureAuth";
 
-const FALLBACK_COMPANY_ID =
-  process.env.NEXT_PUBLIC_COMPANY_ID || "amazing-grace-cleaners";
+const FALLBACK_COMPANY_ID = process.env.NEXT_PUBLIC_COMPANY_ID || "amazing-grace-cleaners";
 
-function getCompanyIdFromSettings(s: Settings) {
-  return s.companyId?.trim() || FALLBACK_COMPANY_ID;
+// Prefer env in cloud mode if present. Otherwise fall back to settings/companyId, then fallback.
+function resolveCompanyId(engine: "cloud" | "local", s: Settings) {
+  const envId = process.env.NEXT_PUBLIC_COMPANY_ID?.trim();
+  if (engine === "cloud" && envId) return envId;
+  return s.companyId?.trim() || envId || FALLBACK_COMPANY_ID;
 }
 
 export function useSettings() {
@@ -32,14 +27,17 @@ export function useSettings() {
   const [user, setUser] = useState<User | null>(auth.currentUser);
   const [authReady, setAuthReady] = useState(false);
 
-  // ✅ Gate UI + writes until first snapshot arrives
+  // Gate UI + writes until first snapshot for the ACTIVE company arrives
   const [cloudReady, setCloudReady] = useState(engine !== "cloud");
   const [cloudError, setCloudError] = useState<string | null>(null);
 
-  // Helps prevent double subscribe in React Strict Mode
-  const subscribedRef = useRef(false);
+  // Track the active subscription so we can resubscribe if companyId changes
+  const subRef = useRef<{ companyId: string; unsub: (() => void) | null }>({
+    companyId: "",
+    unsub: null,
+  });
 
-  // 1) Track auth state (single source of truth)
+  // 1) Track auth state
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, (u) => {
       setUser(u);
@@ -50,49 +48,56 @@ export function useSettings() {
 
   // 2) Load local settings immediately (always)
   useEffect(() => {
-    const local = loadLocalSettings();
-    setSettings(local);
+    setSettings(loadLocalSettings());
   }, []);
 
-  // 3) Cloud bootstrap + subscribe (ONLY after ensureAuthedUser)
+  // Derive the companyId we SHOULD be using right now
+  const activeCompanyId = useMemo(() => resolveCompanyId(engine, settings), [engine, settings]);
+
+  // 3) Cloud bootstrap + subscribe (resubscribes if companyId changes)
   useEffect(() => {
-    let unsub: (() => void) | null = null;
     let cancelled = false;
 
-    async function startCloud() {
+    async function startCloudFor(companyId: string) {
       setCloudError(null);
 
-      // default cloudReady depends on engine
       if (engine !== "cloud") {
+        // Local mode: instantly ready
         setCloudReady(true);
+        // Clean up any existing cloud subscription
+        subRef.current.unsub?.();
+        subRef.current = { companyId: "", unsub: null };
         return;
       }
 
-      // Cloud mode: NOT ready until first snapshot arrives
+      const cId = (companyId || "").trim();
+      if (!cId) {
+        setCloudReady(false);
+        setCloudError("Missing companyId");
+        return;
+      }
+
+      // If already subscribed to this companyId, do nothing
+      if (subRef.current.companyId === cId && subRef.current.unsub) return;
+
+      // Switching companyId: unsubscribe old, mark not ready until first snapshot arrives
+      subRef.current.unsub?.();
+      subRef.current = { companyId: cId, unsub: null };
       setCloudReady(false);
 
-      // Reset strict-mode guard when switching engines
-      subscribedRef.current = false;
-
       try {
-        // ✅ Ensure we have a signed-in user BEFORE touching Firestore
         const authed = await ensureAuthedUser();
         if (cancelled) return;
 
-        const baseLocal = loadLocalSettings();
-        const companyId = getCompanyIdFromSettings(baseLocal);
+        // Use local as a seed ONLY for ensuring doc exists (not for overwriting)
+        const seedLocal = loadLocalSettings();
 
-        // ✅ Ensure settings doc exists AFTER auth
-        await ensureCloudSettings(db, companyId, baseLocal, authed.uid);
+        await ensureCloudSettings(db, cId, seedLocal, authed.uid);
         if (cancelled) return;
 
-        // ✅ Subscribe only once
-        if (subscribedRef.current) return;
-        subscribedRef.current = true;
-
-        unsub = subscribeCloudSettings(
+        const unsub = subscribeCloudSettings(
           db,
-          companyId,
+          cId,
           (cloudSettings) => {
             setSettings((current) => {
               const merged = { ...current, ...cloudSettings };
@@ -102,7 +107,7 @@ export function useSettings() {
           },
           {
             uid: authed.uid,
-            onReady: () => setCloudReady(true), // ✅ only after first snapshot
+            onReady: () => setCloudReady(true),
             onError: (error) => {
               console.error("[CloudSettings] subscribe error", error?.code, error?.message);
               setCloudError(`${error?.code || "error"}: ${error?.message || "subscribe failed"}`);
@@ -110,11 +115,12 @@ export function useSettings() {
             },
           }
         );
+
+        subRef.current = { companyId: cId, unsub };
       } catch (e: any) {
         const msg = e?.message || "Failed to initialize cloud settings.";
         setCloudError(msg);
         setCloudReady(false);
-
         toast({
           variant: "destructive",
           title: "Cloud settings not ready",
@@ -124,14 +130,20 @@ export function useSettings() {
       }
     }
 
-    startCloud();
+    startCloudFor(activeCompanyId);
 
     return () => {
       cancelled = true;
-      subscribedRef.current = false;
-      if (unsub) unsub();
     };
-  }, [engine, toast]);
+  }, [engine, activeCompanyId, toast]);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      subRef.current.unsub?.();
+      subRef.current = { companyId: "", unsub: null };
+    };
+  }, []);
 
   // 4) Update settings (local always; cloud ONLY when ready)
   const updateSettings = useCallback(
@@ -145,15 +157,11 @@ export function useSettings() {
         // Cloud write guarded
         if (engine === "cloud") {
           const uid = auth.currentUser?.uid;
+          if (!uid || !cloudReady) return next;
 
-          if (!uid || !cloudReady) {
-            // Don’t write yet — avoids permission-denied + mismatched state
-            return next;
-          }
+          const cId = resolveCompanyId(engine, next);
 
-          const companyId = getCompanyIdFromSettings(next);
-
-          writeCloudSettings(db, companyId, next, uid).catch((error: any) => {
+          writeCloudSettings(db, cId, next, uid).catch((error: any) => {
             if (error?.code === "permission-denied") {
               console.warn("[Settings] Cloud save blocked by rules", error);
               return;

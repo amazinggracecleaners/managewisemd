@@ -1,4 +1,4 @@
-
+"use client";
 import React, { createContext, useContext, useMemo } from "react";
 import { useSettings } from "@/features/settings/hooks/useSettings";
 

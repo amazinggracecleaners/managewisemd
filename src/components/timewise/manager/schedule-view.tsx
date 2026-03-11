@@ -124,8 +124,7 @@ interface ScheduleViewProps {
   // ✅ teams come from settings.teams (passed from ManagerView)
   teams: Team[];
 }
-const { engine } = useEngine();
-const { cloudReady } = useSettings();
+
 const billingFrequencies: BillingFrequency[] = [
   "One-Time",
   "Daily",
@@ -213,6 +212,8 @@ export function ScheduleView({
   getDurationsBySite,
   teams,
 }: ScheduleViewProps) {
+  const { engine } = useEngine();
+const { cloudReady } = useSettings();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingSchedule, setEditingSchedule] =
     useState<CleaningSchedule | null>(null);
@@ -1591,3 +1592,5 @@ export function ScheduleView({
     </TooltipProvider>
   );
 }
+
+
