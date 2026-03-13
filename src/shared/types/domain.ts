@@ -119,13 +119,16 @@ export type Employee = {
   hourlyRate?: number;
   pin: string;
   color?: string;
+
+  // Manager-only organization
+  teamId?: string;
+  teamName?: string;
+
   emergencyContact?: {
     name: string;
     phone: string;
-     // Manager-only organization (NOT shown to employees)
-  teamId?: string;   // stable id
-  teamName?: string; // optional display name (or derive from teamId)
   };
+
   bankInfo?: {
     bankName: string;
     accountNumber: string;
@@ -179,6 +182,7 @@ export type Settings = {
   sites: Site[];
   firebaseConfig?: FirebaseOptions;
   companyId?: string;
+   companyName?: string; 
   weekStartsOn: 0 | 1 | 2 | 3 | 4 | 5 | 6; // 0 = Sunday, 1 = Monday, etc.
   mileageRate: number; // dollars per mile
   taxRate?: number;
@@ -222,7 +226,9 @@ export interface PayrollPeriod {
 
   // NEW FIELDS
   sentForConfirmationAt?: string;
+  sentForConfirmationByUid?: string | null;
   paidAt?: string;
+   paidByUid?: string | null;
 }
 
 export interface PayrollLineItem {
@@ -242,20 +248,42 @@ export interface PayrollLineItem {
 }
 
 export type PayrollConfirmation = {
-   id: string;
+  id?: string;
   periodId: string;
   companyId: string;
   uid: string;
-  employeeId?: string;
-  employeeName?: string;
-  
-  at: number; // Date.now()
-  note?: string;
-  revision: number;
-   confirmed: boolean;
-  confirmedAt?: string;
-}
+  employeeId: string;
+  employeeName: string;
 
+  revision: number;
+  confirmed: boolean;
+
+  at?: any;
+  confirmedAt?: string;
+  note?: string;
+};
+export type AppNotificationType =
+  | "payroll_confirmation"
+  | "general";
+
+export type AppNotification = {
+  id?: string;
+  type: AppNotificationType;
+
+  employeeId: string;
+  employeeName?: string;
+
+  title: string;
+  message: string;
+
+  read: boolean;
+
+  periodId?: string;
+  revision?: number;
+
+  createdAt?: any;
+  readAt?: any;
+};
 // src/lib/job-profitability.ts
 export type JobProfitRow = {
   site: string;

@@ -68,7 +68,9 @@ import {
   isValid,
 } from "date-fns";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-
+import { createPayrollConfirmationNotifications } from "@/lib/payroll-notifications";
+import { httpsCallable } from "firebase/functions";
+import { functions } from "@/firebase/client";
 type PayFrequency =
   | "weekly"
   | "bi-weekly"
@@ -86,6 +88,7 @@ interface PayrollViewProps {
   savePayrollPeriod: (period: PayrollPeriod) => Promise<void>;
   deletePayrollPeriod: (periodId: string) => Promise<void>;
   payrollConfirmations: PayrollConfirmation[];
+ companyId: string;
 }
 
 function getPayrollLineEmployeeIds(period: PayrollPeriod): string[] {
@@ -194,6 +197,7 @@ export function PayrollView({
   savePayrollPeriod,
   deletePayrollPeriod,
   payrollConfirmations = [],
+  companyId,
 }: PayrollViewProps) {
   const [payFrequency, setPayFrequency] = useState<PayFrequency>("monthly");
   const [currentDate, setCurrentDate] = useState(new Date());
@@ -453,30 +457,46 @@ export function PayrollView({
     setLineItems((prev) => prev.filter((item) => item.employeeId !== employeeId));
   };
 
-  const handleSendForConfirmation = async () => {
-    if (!lineItems.length) {
-      alert("No payroll lines exist for this period.");
-      return;
-    }
-    if (!window.confirm("Send this payroll period to employees for confirmation?")) return;
+ const handleSendForConfirmation = async () => {
+  if (!lineItems.length) {
+    alert("No payroll lines exist for this period.");
+    return;
+  }
 
-    const nextRevision = (currentPeriod?.revision ?? 1);
+  if (!window.confirm("Send this payroll period to employees for confirmation?")) {
+    return;
+  }
 
-    const periodToSave: PayrollPeriod = {
-      id: periodId,
-      startDate,
-      endDate,
-      status: "waiting_for_confirmation",
+  const nextRevision = currentPeriod?.revision ?? 1;
+
+  const periodToSave: PayrollPeriod = {
+    id: periodId,
+    startDate,
+    endDate,
+    status: "waiting_for_confirmation",
+    revision: nextRevision,
+    sentForConfirmationAt: new Date().toISOString(),
+    lineItems: lineItems.map((li) => ({
+      ...li,
       revision: nextRevision,
-      sentForConfirmationAt: new Date().toISOString(),
-      lineItems: lineItems.map((li) => ({
-        ...li,
-        revision: nextRevision,
-      })),
-    };
-
-    await savePayrollPeriod(periodToSave);
+    })),
   };
+
+  await savePayrollPeriod(periodToSave);
+
+  await createPayrollConfirmationNotifications({
+    companyId,
+    period: periodToSave,
+    employees,
+  });
+
+  // SMS trigger comes here after Twilio function is added
+  const sendSms = httpsCallable(functions, "sendPayrollConfirmationSms");
+  await sendSms({
+    companyId,
+    periodId: periodToSave.id,
+  });
+};
 
   const handleSaveWaitingOrReady = async () => {
     if (!currentPeriod || isPaid) return;

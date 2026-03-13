@@ -64,6 +64,7 @@ import {
   DialogClose,
 } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
+import { EmployeeNotifications } from "./employee-notifications";
 
 interface EmployeeViewProps {
   employee: Employee;
@@ -517,6 +518,10 @@ const getHoursForSiteDay = useCallback(
                 </Button>
               </div>
             )}
+            <EmployeeNotifications
+  employee={employee}
+  companyId={settings.companyId?.trim() || process.env.NEXT_PUBLIC_COMPANY_ID || "amazing-grace-cleaners"}
+/>
           </div>
           <CardDescription>
             Your base pay rate is ${employee.payRate.toFixed(2)}/hour.

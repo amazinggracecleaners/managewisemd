@@ -494,14 +494,19 @@ export function ManagerView(props: ManagerViewProps) {
         {/* PAYROLL */}
         <TabsContent value="payroll">
           <PayrollView
-            employees={props.employees}
-            timeEntries={props.allEntries}
-            sites={props.sites}
-            payrollPeriods={props.payrollPeriods}
-            savePayrollPeriod={props.savePayrollPeriod}
-            deletePayrollPeriod={props.deletePayrollPeriod}
-            payrollConfirmations={props.payrollConfirmations}
-          />
+  employees={props.employees}
+  timeEntries={props.allEntries}
+  sites={props.sites}
+  payrollPeriods={props.payrollPeriods}
+  savePayrollPeriod={props.savePayrollPeriod}
+  deletePayrollPeriod={props.deletePayrollPeriod}
+  payrollConfirmations={props.payrollConfirmations}
+ companyId={
+  props.settings.companyId?.trim() ||
+  process.env.NEXT_PUBLIC_COMPANY_ID ||
+  "default-company"
+}
+/>
         </TabsContent>
 
         {/* EMPLOYEE VIEWER */}
