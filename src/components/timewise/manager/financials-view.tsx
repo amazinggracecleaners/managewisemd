@@ -84,7 +84,6 @@ function toDateMaybe(x: any): Date | null {
     const d = parseISO(x);
     return isValid(d) ? d : null;
   }
-  // Firestore Timestamp?
   if (x?.toDate) {
     try {
       return x.toDate();
@@ -138,6 +137,42 @@ function getMileageCost(m: any, fallbackRate: number): number {
   const miles = Number(m?.miles ?? m?.distance ?? 0) || 0;
   const rate = Number(m?.rate ?? fallbackRate) || fallbackRate;
   return miles * rate;
+}
+
+function getPayrollProgressForMonth(
+  monthlyRows: Array<{ month: string; payroll: number }>,
+  selectedYear: string,
+  selectedMonth: string
+) {
+  const year = Number(selectedYear);
+  const month = Number(selectedMonth);
+
+  const start = new Date(year, month, 1);
+  const end = new Date(year, month + 1, 0);
+  const today = new Date();
+
+  const monthLabel = start.toLocaleString("en-US", { month: "short" });
+  const key = `${year}-${monthLabel}`;
+
+  const row = monthlyRows.find((r) => r.month === key);
+  const accrued = row?.payroll ?? 0;
+
+  const isCurrentMonth =
+    today.getFullYear() === year && today.getMonth() === month;
+
+  const totalDays = end.getDate();
+  const elapsedDays = isCurrentMonth ? Math.max(1, today.getDate()) : totalDays;
+
+  const projected =
+    elapsedDays > 0 ? (accrued / elapsedDays) * totalDays : accrued;
+
+  return {
+    accrued,
+    projected,
+    elapsedDays,
+    totalDays,
+    isCurrentMonth,
+  };
 }
 
 export interface FinancialsViewProps {
@@ -216,18 +251,11 @@ export function FinancialsView({
       return { minDate: start, maxDate: end };
     }
     const start = customFromDate ? parseISO(customFromDate) : null;
-    const end = customToDate
-      ? parseISO(customToDate + "T23:59:59")
-      : null;
+    const end = customToDate ? parseISO(customToDate + "T23:59:59") : null;
     return { minDate: start, maxDate: end };
   }, [viewType, selectedYear, selectedMonth, customFromDate, customToDate]);
 
-  const {
-    kpis,
-    monthlyRows,
-    chartSeries,
-    expenseBreakdown,
-  } = useMemo(() => {
+  const { kpis, monthlyRows, chartSeries, expenseBreakdown } = useMemo(() => {
     const monthly = new Map<
       MonthKey,
       { revenue: number; other: number; payroll: number; mileage: number }
@@ -236,12 +264,9 @@ export function FinancialsView({
     const minMs = minDate ? minDate.getTime() : -Infinity;
     const maxMs = maxDate ? maxDate.getTime() : Infinity;
 
-    // Revenue (all invoices in range)
     for (const inv of invs) {
       const d = toDateMaybe(
-        (inv as any).date ??
-          (inv as any).issuedAt ??
-          (inv as any).createdAt
+        (inv as any).date ?? (inv as any).issuedAt ?? (inv as any).createdAt
       );
       if (!d || !inRange(d, minDate, maxDate)) continue;
 
@@ -253,7 +278,6 @@ export function FinancialsView({
       monthly.set(key, row);
     }
 
-    // Other expenses
     for (const exp of exps) {
       const d = toDateMaybe((exp as any).date ?? (exp as any).createdAt);
       if (!d || !inRange(d, minDate, maxDate)) continue;
@@ -265,45 +289,44 @@ export function FinancialsView({
       monthly.set(key, row);
     }
 
-    // Payroll / labor progress (accrued from worked time, not waiting for paid status)
-if (allEntries.length && emps.length) {
-  const sessions = groupSessions([...allEntries].sort((a, b) => a.ts - b.ts));
+    // Live accrued payroll from worked time
+    if (allEntries.length && emps.length) {
+      const sessions = groupSessions([...allEntries].sort((a, b) => a.ts - b.ts));
 
-  const employeeRateById = new Map(
-    emps.map((e) => [
-      e.id,
-      Number((e as any).payRate ?? (e as any).wage ?? 0) || 0,
-    ])
-  );
+      const employeeRateById = new Map(
+        emps.map((e) => [
+          e.id,
+          Number((e as any).payRate ?? (e as any).wage ?? 0) || 0,
+        ])
+      );
 
-  for (const s of sessions) {
-    if (!s.in) continue;
+      for (const s of sessions) {
+        if (!s.in) continue;
 
-    const sessionStart = s.in.ts;
-    const sessionEnd = s.out?.ts ?? Date.now();
+        const sessionStart = s.in.ts;
+        const sessionEnd = s.out?.ts ?? Date.now();
 
-    const overlapStart = Math.max(sessionStart, minMs);
-    const overlapEnd = Math.min(sessionEnd, maxMs);
+        const overlapStart = Math.max(sessionStart, minMs);
+        const overlapEnd = Math.min(sessionEnd, maxMs);
 
-    if (overlapEnd <= overlapStart) continue;
+        if (overlapEnd <= overlapStart) continue;
 
-    const d = new Date(overlapStart);
-    const key = monthKey(d);
+        const d = new Date(overlapStart);
+        const key = monthKey(d);
 
-    const row =
-      monthly.get(key) ??
-      { revenue: 0, other: 0, payroll: 0, mileage: 0 };
+        const row =
+          monthly.get(key) ??
+          { revenue: 0, other: 0, payroll: 0, mileage: 0 };
 
-    const employeeId = (s as any).employeeId ?? s.in.employeeId;
-    const rate = employeeRateById.get(employeeId) ?? 0;
-    const hours = (overlapEnd - overlapStart) / (1000 * 60 * 60);
+        const employeeId = (s as any).employeeId ?? s.in.employeeId;
+        const rate = employeeRateById.get(employeeId) ?? 0;
+        const hours = (overlapEnd - overlapStart) / (1000 * 60 * 60);
 
-    row.payroll += rate * hours;
-    monthly.set(key, row);
-  }
-}
+        row.payroll += rate * hours;
+        monthly.set(key, row);
+      }
+    }
 
-    // Mileage
     for (const m of miles) {
       const d = toDateMaybe((m as any).date ?? (m as any).createdAt);
       if (!d || !inRange(d, minDate, maxDate)) continue;
@@ -315,7 +338,6 @@ if (allEntries.length && emps.length) {
       monthly.set(key, row);
     }
 
-    // Service charge (standard rate × serviced days)
     const serviceByMonth = new Map<MonthKey, number>();
 
     if (settings?.sites?.length && allEntries.length) {
@@ -330,14 +352,10 @@ if (allEntries.length && emps.length) {
       }
 
       const sessions = groupSessions(allEntries);
-
-      const daysByMonth = new Map<
-        MonthKey,
-        Map<string, Set<string>>
-      >();
+      const daysByMonth = new Map<MonthKey, Map<string, Set<string>>>();
 
       for (const sess of sessions) {
-        if (!sess.in ||!sess.out) continue;
+        if (!sess.in || !sess.out) continue;
 
         const siteName = sess.in?.site;
         if (!siteName) continue;
@@ -364,6 +382,7 @@ if (allEntries.length && emps.length) {
           perMonth = new Map();
           daysByMonth.set(mk, perMonth);
         }
+
         let daySet = perMonth.get(siteId);
         if (!daySet) {
           daySet = new Set();
@@ -390,16 +409,8 @@ if (allEntries.length && emps.length) {
     const sorted = Array.from(allMonthKeys).sort((a, b) => {
       const [Ay, Am] = a.split("-");
       const [By, Bm] = b.split("-");
-      const A = new Date(
-        Number(Ay),
-        new Date(`${Am} 1, 2000`).getMonth(),
-        1
-      );
-      const B = new Date(
-        Number(By),
-        new Date(`${Bm} 1, 2000`).getMonth(),
-        1
-      );
+      const A = new Date(Number(Ay), new Date(`${Am} 1, 2000`).getMonth(), 1);
+      const B = new Date(Number(By), new Date(`${Bm} 1, 2000`).getMonth(), 1);
       return A.getTime() - B.getTime();
     });
 
@@ -425,10 +436,7 @@ if (allEntries.length && emps.length) {
     });
 
     const totalRevenue = rows.reduce((s, r) => s + r.revenue, 0);
-    const totalServiceCharge = rows.reduce(
-      (s, r) => s + r.serviceCharge,
-      0
-    );
+    const totalServiceCharge = rows.reduce((s, r) => s + r.serviceCharge, 0);
     const totalPayroll = rows.reduce((s, r) => s + r.payroll, 0);
     const totalOther = rows.reduce((s, r) => s + r.other, 0);
     const totalMileage = rows.reduce((s, r) => s + r.mileage, 0);
@@ -470,17 +478,25 @@ if (allEntries.length && emps.length) {
     miles,
     pays,
     allEntries,
-     emps,
+    emps,
     settings,
     minDate,
     maxDate,
     mileageRate,
   ]);
 
+  const payrollProgress = useMemo(() => {
+    if (viewType !== "monthly") return null;
+    return getPayrollProgressForMonth(
+      monthlyRows,
+      selectedYear,
+      selectedMonth
+    );
+  }, [viewType, monthlyRows, selectedYear, selectedMonth]);
+
   return (
     <TooltipProvider>
       <div className="space-y-6">
-        {/* Intro */}
         <Card>
           <CardHeader>
             <CardTitle>Financial summary</CardTitle>
@@ -491,7 +507,6 @@ if (allEntries.length && emps.length) {
           </CardHeader>
         </Card>
 
-        {/* Date Range / View Type */}
         <Card>
           <CardHeader>
             <CardTitle>Reporting period</CardTitle>
@@ -515,13 +530,11 @@ if (allEntries.length && emps.length) {
                 </SelectContent>
               </Select>
             </div>
+
             {viewType !== "custom" && (
               <div className="space-y-2">
                 <Label>Year</Label>
-                <Select
-                  value={selectedYear}
-                  onValueChange={setSelectedYear}
-                >
+                <Select value={selectedYear} onValueChange={setSelectedYear}>
                   <SelectTrigger>
                     <SelectValue placeholder="Select year" />
                   </SelectTrigger>
@@ -535,13 +548,11 @@ if (allEntries.length && emps.length) {
                 </Select>
               </div>
             )}
+
             {viewType === "monthly" && (
               <div className="space-y-2">
                 <Label>Month</Label>
-                <Select
-                  value={selectedMonth}
-                  onValueChange={setSelectedMonth}
-                >
+                <Select value={selectedMonth} onValueChange={setSelectedMonth}>
                   <SelectTrigger>
                     <SelectValue placeholder="Select month" />
                   </SelectTrigger>
@@ -558,7 +569,6 @@ if (allEntries.length && emps.length) {
           </CardContent>
         </Card>
 
-        {/* KPIs */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6 gap-4">
           <Card className="shadow-sm">
             <CardHeader>
@@ -614,6 +624,44 @@ if (allEntries.length && emps.length) {
             </CardContent>
           </Card>
 
+          {viewType === "monthly" && payrollProgress && (
+            <Card className="shadow-sm">
+              <CardHeader>
+                <CardTitle className="flex items-center">
+                  Payroll Progress
+                  <InfoTip text="Accrued labor so far this month compared with a projected full-month payroll based on the current pace." />
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div className="text-2xl font-semibold">
+                  ${payrollProgress.accrued.toFixed(2)} / $
+                  {payrollProgress.projected.toFixed(2)} projected
+                </div>
+
+                <div className="h-2 w-full rounded bg-muted overflow-hidden">
+                  <div
+                    className="h-full bg-blue-600 transition-all"
+                    style={{
+                      width: `${Math.min(
+                        100,
+                        payrollProgress.projected > 0
+                          ? (payrollProgress.accrued /
+                              payrollProgress.projected) *
+                              100
+                          : 0
+                      )}%`,
+                    }}
+                  />
+                </div>
+
+                <p className="text-sm text-muted-foreground">
+                  Day {payrollProgress.elapsedDays} of{" "}
+                  {payrollProgress.totalDays}
+                </p>
+              </CardContent>
+            </Card>
+          )}
+
           <Card className="shadow-sm">
             <CardHeader>
               <CardTitle className="flex items-center">
@@ -623,9 +671,7 @@ if (allEntries.length && emps.length) {
             </CardHeader>
             <CardContent
               className={`text-2xl font-semibold ${
-                kpis.netIncome >= 0
-                  ? "text-emerald-600"
-                  : "text-red-600"
+                kpis.netIncome >= 0 ? "text-emerald-600" : "text-red-600"
               }`}
             >
               ${kpis.netIncome.toFixed(2)}
@@ -657,9 +703,7 @@ if (allEntries.length && emps.length) {
                     ))}
                   </Pie>
                   <RechartsTooltip
-                    formatter={(v: any) =>
-                      `$${Number(v).toFixed(2)}`
-                    }
+                    formatter={(v: any) => `$${Number(v).toFixed(2)}`}
                   />
                 </PieChart>
               </ResponsiveContainer>
@@ -667,12 +711,12 @@ if (allEntries.length && emps.length) {
           </Card>
         </div>
 
-        {/* Revenue vs Expenses + Net */}
         <Card>
           <CardHeader>
             <CardTitle>Revenue vs. expenses</CardTitle>
             <CardDescription>
-              Month-over-month view of billed revenue, operating expenses, and net result.
+              Month-over-month view of billed revenue, operating expenses, and
+              net result.
             </CardDescription>
           </CardHeader>
           <CardContent className="h-80">
@@ -682,29 +726,23 @@ if (allEntries.length && emps.length) {
                 <XAxis dataKey="month" />
                 <YAxis tickFormatter={(v) => `$${v}`} />
                 <RechartsTooltip
-                  formatter={(v: any) =>
-                    `$${Number(v).toFixed(2)}`
-                  }
+                  formatter={(v: any) => `$${Number(v).toFixed(2)}`}
                 />
                 <Legend />
                 <Bar dataKey="Revenue" fill="#82ca9d" />
                 <Bar dataKey="Expenses" fill="#8884d8" />
-                <Line
-                  type="monotone"
-                  dataKey="Net"
-                  stroke="#ff7300"
-                />
+                <Line type="monotone" dataKey="Net" stroke="#ff7300" />
               </BarChart>
             </ResponsiveContainer>
           </CardContent>
         </Card>
 
-        {/* Monthly detail */}
         <Card>
           <CardHeader>
             <CardTitle>Monthly breakdown</CardTitle>
             <CardDescription>
-              Comparison of standard service charges, actual revenue, and expense categories by month.
+              Comparison of standard service charges, actual revenue, and
+              expense categories by month.
             </CardDescription>
           </CardHeader>
           <CardContent className="overflow-x-auto">
@@ -765,19 +803,14 @@ if (allEntries.length && emps.length) {
               <TableBody>
                 {monthlyRows.length === 0 ? (
                   <TableRow>
-                    <TableCell
-                      colSpan={9}
-                      className="h-24 text-center"
-                    >
+                    <TableCell colSpan={9} className="h-24 text-center">
                       No financial data is available for this period.
                     </TableCell>
                   </TableRow>
                 ) : (
                   monthlyRows.map((r) => (
                     <TableRow key={r.month}>
-                      <TableCell className="font-medium">
-                        {r.month}
-                      </TableCell>
+                      <TableCell className="font-medium">{r.month}</TableCell>
                       <TableCell className="text-right">
                         ${r.serviceCharge.toFixed(2)}
                       </TableCell>
@@ -807,9 +840,7 @@ if (allEntries.length && emps.length) {
                       </TableCell>
                       <TableCell
                         className={`text-right ${
-                          r.net >= 0
-                            ? "text-emerald-600"
-                            : "text-red-600"
+                          r.net >= 0 ? "text-emerald-600" : "text-red-600"
                         }`}
                       >
                         ${r.net.toFixed(2)}

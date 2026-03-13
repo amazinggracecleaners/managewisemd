@@ -202,39 +202,58 @@ export type Session = {
 export type SiteStatus = 'incomplete' | 'in-process' | 'complete';
 
 
-export type PayrollPeriod = {
-  id: string; // e.g., "2024-07-01_2024-07-15"
-  startDate: string; // ISO
-  endDate: string;   // ISO
-  status: 'draft'|'final'|'locked'|'paid';
+export type PayrollStatus =
+  | "draft"
+  | "waiting_for_confirmation"
+  | "ready_to_pay"
+  | "paid";
+
+export interface PayrollPeriod {
+  id: string;
+
+  startDate: string;
+  endDate: string;
+
+  status: PayrollStatus;
+
   revision: number;
+
   lineItems: PayrollLineItem[];
+
+  // NEW FIELDS
+  sentForConfirmationAt?: string;
+  paidAt?: string;
 }
 
-export type PayrollLineItem = {
-    employeeId: string;
-    employeeName: string;
-    revision: number;
-    userUid?: string;
-    minutes: number;
-    regularMinutes: number;
-    bonusMinutes: number;
-    flatBonus: number;
-    gross: number;
-    deductions: number;
-    net: number;
-};
+export interface PayrollLineItem {
+  employeeId: string;
+  employeeName: string;
+
+  minutes?: number;
+  regularMinutes?: number;
+  bonusMinutes?: number;
+
+  gross?: number;
+  flatBonus?: number;
+  deductions?: number;
+  net?: number;
+
+  revision: number;
+}
 
 export type PayrollConfirmation = {
+   id: string;
   periodId: string;
   companyId: string;
   uid: string;
   employeeId?: string;
   employeeName?: string;
-  confirmed: true;
+  
   at: number; // Date.now()
   note?: string;
   revision: number;
+   confirmed: boolean;
+  confirmedAt?: string;
 }
 
 // src/lib/job-profitability.ts
