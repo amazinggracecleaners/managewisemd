@@ -27,7 +27,20 @@ export default function RootLayout({
       <body className="font-body antialiased" suppressHydrationWarning>
         <Providers>
           <FirebaseErrorListener />
-          {children}
+
+          <div className="min-h-screen flex flex-col">
+            <div className="flex-1">{children}</div>
+
+            <footer className="border-t text-sm text-center py-6 text-muted-foreground">
+              <a href="/privacy" className="mr-4 underline underline-offset-4">
+                Privacy Policy
+              </a>
+              <a href="/terms" className="underline underline-offset-4">
+                Terms &amp; Conditions
+              </a>
+            </footer>
+          </div>
+
           <Toaster />
         </Providers>
       </body>

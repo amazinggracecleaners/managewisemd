@@ -68,9 +68,10 @@ import {
   isValid,
 } from "date-fns";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+
+import { getFunctions, httpsCallable } from "firebase/functions";
 import { createPayrollConfirmationNotifications } from "@/lib/payroll-notifications";
-import { httpsCallable } from "firebase/functions";
-import { functions } from "@/firebase/client";
+import { app } from "@/firebase/client";
 type PayFrequency =
   | "weekly"
   | "bi-weekly"
@@ -430,7 +431,33 @@ export function PayrollView({
   const isEditable = currentStatus === "draft";
   const canEditFinalNumbers =
     currentStatus === "waiting_for_confirmation" || currentStatus === "ready_to_pay";
+const sendPayrollNotifications = async (periodToNotify: PayrollPeriod) => {
+  try {
+    await createPayrollConfirmationNotifications({
+      companyId,
+      period: periodToNotify,
+      employees,
+    });
+  } catch (error) {
+    console.error("Failed to create in-app payroll notifications:", error);
+  }
 
+  try {
+    const fn = getFunctions(app, "us-central1");
+
+    const sendPayrollConfirmationSms = httpsCallable<
+      { companyId: string; periodId: string },
+      { success: boolean; count: number; results: any[] }
+    >(fn, "sendPayrollConfirmationSms");
+
+    await sendPayrollConfirmationSms({
+      companyId,
+      periodId: periodToNotify.id,
+    });
+  } catch (error) {
+    console.error("Failed to send payroll SMS:", error);
+  }
+};
   const handleLineItemChange = (
     employeeId: string,
     field: "deductions" | "flatBonus",
@@ -484,38 +511,31 @@ export function PayrollView({
 
   await savePayrollPeriod(periodToSave);
 
-  await createPayrollConfirmationNotifications({
-    companyId,
-    period: periodToSave,
-    employees,
-  });
+ 
+    await sendPayrollNotifications(periodToSave);
 
-  // SMS trigger comes here after Twilio function is added
-  const sendSms = httpsCallable(functions, "sendPayrollConfirmationSms");
-  await sendSms({
-    companyId,
-    periodId: periodToSave.id,
-  });
+  
 };
 
   const handleSaveWaitingOrReady = async () => {
-    if (!currentPeriod || isPaid) return;
+  if (!currentPeriod || isPaid) return;
 
-    const nextRevision = (currentPeriod.revision ?? 1) + 1;
+  const nextRevision = (currentPeriod.revision ?? 0) + 1;
 
-    const next: PayrollPeriod = {
-      ...currentPeriod,
-      status: "waiting_for_confirmation",
+  const next: PayrollPeriod = {
+    ...currentPeriod,
+    status: "waiting_for_confirmation",
+    revision: nextRevision,
+    sentForConfirmationAt: new Date().toISOString(),
+    lineItems: lineItems.map((li) => ({
+      ...li,
       revision: nextRevision,
-      sentForConfirmationAt: new Date().toISOString(),
-      lineItems: lineItems.map((li) => ({
-        ...li,
-        revision: nextRevision,
-      })),
-    };
-
-    await savePayrollPeriod(next);
+    })),
   };
+
+  await savePayrollPeriod(next);
+  await sendPayrollNotifications(next);
+};
 
   const handleMarkAsPaid = async () => {
     if (!currentPeriod) return;
@@ -693,7 +713,7 @@ export function PayrollView({
                 {(currentStatus === "waiting_for_confirmation" ||
                   currentStatus === "ready_to_pay") && (
                   <Button variant="secondary" onClick={handleSaveWaitingOrReady} disabled={isPaid}>
-                    Save Changes
+                    Save & Re-send confirmation
                   </Button>
                 )}
 

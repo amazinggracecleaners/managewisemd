@@ -317,9 +317,7 @@ export function EmployeePayrollView({
                       </div>
 
                       <div className="flex items-center gap-3">
-                        <span className="text-xs text-muted-foreground">
-                          Confirmed {summary.confirmedCount}/{summary.totalEmployees}
-                        </span>
+                        
                         <PayrollStatusBadge status={status} />
                         {isPaid ? (
                           <span className="flex items-center gap-2 text-green-700 font-semibold">
@@ -427,7 +425,7 @@ export function EmployeePayrollView({
                           className="text-center mt-4 p-2 bg-blue-100 text-blue-800 rounded-md"
                           aria-live="polite"
                         >
-                          Your confirmation has been recorded. Waiting for payroll payment.
+                          Your confirmation has been recorded.
                         </div>
                       )}
 
@@ -447,7 +445,7 @@ export function EmployeePayrollView({
                             className="text-center mt-4 p-2 bg-blue-100 text-blue-800 rounded-md"
                             aria-live="polite"
                           >
-                            This payroll period is ready to be paid.
+                            This payroll period is pending payment.
                           </div>
                         )}
 
