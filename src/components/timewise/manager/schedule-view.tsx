@@ -108,13 +108,20 @@ interface ScheduleViewProps {
   deleteSchedule: (id: string) => void;
   weekStartsOn: 0 | 1 | 2 | 3 | 4 | 5 | 6;
   getSiteStatuses: (forDate: Date) => Map<string, SiteStatus>;
-  recordEntry: (
+    recordEntry: (
     action: "in" | "out",
     site: Site,
     forDate: Date,
     note?: string,
     employeeId?: string,
-    isManagerOverride?: boolean
+    isManagerOverride?: boolean,
+    context?: {
+      source:
+        | "employee-clock"
+        | "manager-schedule-view"
+        | "manager-manual-entry";
+      initiatedBy?: string;
+    }
   ) => Promise<void>;
   isClockedIn: (siteName?: string, employeeId?: string) => boolean;
   getDurationsBySite: (
@@ -1315,15 +1322,19 @@ const { cloudReady } = useSettings();
                                           variant="destructive"
                                           size="sm"
                                           onClick={() =>
-                                            recordEntry(
-                                              "out",
-                                              site,
-                                              currentDate,
-                                              undefined,
-                                              emp.id,
-                                              true
-                                            )
-                                          }
+  recordEntry(
+    "out",
+    site,
+    currentDate,
+    undefined,
+    emp.id,
+    true,
+    {
+      source: "manager-schedule-view",
+      initiatedBy: "manager",
+    }
+  )
+}
                                         >
                                           <LogOut className="mr-1 h-4 w-4" />
                                           Clock Out
@@ -1333,15 +1344,19 @@ const { cloudReady } = useSettings();
                                           variant="default"
                                           size="sm"
                                           onClick={() =>
-                                            recordEntry(
-                                              "in",
-                                              site,
-                                              currentDate,
-                                              undefined,
-                                              emp.id,
-                                              true
-                                            )
-                                          }
+  recordEntry(
+    "in",
+    site,
+    currentDate,
+    undefined,
+    emp.id,
+    true,
+    {
+      source: "manager-schedule-view",
+      initiatedBy: "manager",
+    }
+  )
+}
                                           disabled={status === "complete"}
                                         >
                                           <LogIn className="mr-1 h-4 w-4" />

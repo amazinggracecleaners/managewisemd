@@ -35,6 +35,7 @@ import type {
   AiEntry,
   EmployeeUpdateRequest,
   Session,
+  ManagerNotification,
 } from "@/shared/types/domain";
 
 import {
@@ -95,7 +96,7 @@ function sessionMinutesOnDay(s: Session, day: Date, nowTs: number = Date.now()):
   if (overlapEnd <= overlapStart) return 0;
   return Math.floor((overlapEnd - overlapStart) / 60000);
 }
-
+const [notifications, setNotifications] = useState<ManagerNotification[]>([]);
 /** companyId is always derived the same way everywhere */
 const getCompanyId = (settings: Settings) =>
   settings.companyId?.trim() || process.env.NEXT_PUBLIC_COMPANY_ID || "amazing-grace-cleaners";
@@ -225,7 +226,59 @@ export default function TimeWisePage() {
     }
   }, [loggedInEmployee]);
 
+  const markNotificationRead = useCallback(
+    async (id: string) => {
+      if (engine !== "cloud") {
+        setNotifications((prev) =>
+          prev.map((n) => (n.id === id ? { ...n, read: true } : n))
+        );
+        return;
+      }
 
+      const cId = getCompanyId(settings);
+      const docRef = doc(db, "companies", cId, "notifications", id);
+
+      try {
+        await updateDoc(docRef, { read: true });
+      } catch (e: any) {
+        toast({
+          variant: "destructive",
+          title: "Could not mark notification read",
+          description: e.message,
+        });
+      }
+    },
+    [engine, settings, toast]
+  );
+
+  const markAllNotificationsRead = useCallback(async () => {
+    if (notifications.length === 0) return;
+
+    if (engine !== "cloud") {
+      setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
+      return;
+    }
+
+    const cId = getCompanyId(settings);
+    const unread = notifications.filter((n) => !n.read);
+    if (unread.length === 0) return;
+
+    try {
+      const batch = writeBatch(db);
+      unread.forEach((n) => {
+        batch.update(doc(db, "companies", cId, "notifications", n.id), {
+          read: true,
+        });
+      });
+      await batch.commit();
+    } catch (e: any) {
+      toast({
+        variant: "destructive",
+        title: "Could not mark all notifications read",
+        description: e.message,
+      });
+    }
+  }, [engine, notifications, settings, toast]);
 /**
  * 2) Firestore listener attach function
  * ✅ Must return a CLEANUP FUNCTION (not an array)
@@ -391,7 +444,43 @@ const attachFirestoreListeners = useCallback(
         handleSnapshotError("employee_update_requests")
       )
     );
+unsubs.push(
+  onSnapshot(
+    query(
+      collection(db, "companies", safeCId, "notifications"),
+      orderBy("createdAt", "desc")
+    ),
+    (snap) => {
+      const notifications = snap.docs.map((d) => ({
+        id: d.id,
+        ...d.data(),
+      }));
 
+      console.log("[NOTIFICATIONS]", notifications);
+      // later: setNotifications(notifications)
+    },
+    handleSnapshotError("notifications")
+  )
+);
+    unsubs.push(
+      onSnapshot(
+        query(
+          collection(db, "companies", safeCId, "notifications"),
+          orderBy("createdAt", "desc")
+        ),
+        (snap) =>
+          setNotifications(
+            snap.docs.map(
+              (d) =>
+                ({
+                  id: d.id,
+                  ...d.data(),
+                } as ManagerNotification)
+            )
+          ),
+        handleSnapshotError("notifications")
+      )
+    );
     // ✅ CLEANUP FUNCTION
     return () => {
       unsubs.forEach((u) => u());
@@ -544,7 +633,10 @@ useEffect(() => {
   }, [settings]);
 // --- Derived data ---
 const orderedEntries = useMemo(() => [...entries].sort((a, b) => a.ts - b.ts), [entries]);
-
+  const unreadNotificationCount = useMemo(
+    () => notifications.filter((n) => !n.read).length,
+    [notifications]
+  );
 // Make TS happy: Session[] is explicit, so `s` is NOT implicit any
 const sessions = useMemo<Session[]>(() => groupSessions(orderedEntries), [orderedEntries]);
 
@@ -885,6 +977,20 @@ const ts = buildTsOnDay(forDate, now);
       const cId = getCompanyId(settings);
       const ref = collection(db, "companies", cId, "timeclock_entries");
       await addDoc(ref, { ...dataToSave, createdAt: serverTimestamp() });
+      // ✅ CREATE NOTIFICATION
+await addDoc(
+  collection(db, "companies", cId, "notifications"),
+  {
+    type: "clock",
+    employeeId: targetEmployee.id,
+    employeeName: targetEmployee.name,
+    action, // "in" | "out"
+    site: site.name,
+    ts: dataToSave.ts,
+    createdAt: serverTimestamp(),
+    read: false,
+  }
+);
       toast({ title: `Clock ${action.toUpperCase()} recorded for ${site.name}.` });
     } else {
       setEntries((prev) => [
@@ -1659,6 +1765,20 @@ const ts = buildTsOnDay(forDate, now);
         const docRef = doc(db, `companies/${cId}/payroll_periods/${periodId}/confirmations`, docId);
         try {
           await setDoc(docRef, cleanForFirestore(confirmation), { merge: true });
+          // ✅ CREATE PAYROLL NOTIFICATION
+await addDoc(
+  collection(db, "companies", cId, "notifications"),
+  {
+    type: "payroll",
+    employeeId,
+    employeeName:
+      employees.find((e) => e.id === employeeId)?.name || "Unknown",
+    periodId,
+    revision,
+    createdAt: serverTimestamp(),
+    read: false,
+  }
+);
           toast({ title: "Payroll confirmed!" });
         } catch (e: any) {
           errorEmitter.emit(
@@ -2039,6 +2159,10 @@ return (
             rejectEmployeeUpdate={rejectEmployeeUpdate}
             engine={engine}
             setEngine={setEngine}
+            notifications={notifications}
+  unreadNotificationCount={unreadNotificationCount}
+  markNotificationRead={markNotificationRead}
+  markAllNotificationsRead={markAllNotificationsRead}
           />
         )}
 

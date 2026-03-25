@@ -111,8 +111,34 @@ export function EmployeeViewer({
   }, [allEntries, selectedEmployee?.id]);
 
   // typed no-ops (manager preview should not write entries)
+   // typed no-ops (manager preview stays read-only)
   const noOp = () => {};
-  const recordEntryNoOp = async () => {};
+
+  const recordEntryNoOp = async (
+    action?: "in" | "out",
+    site?: any,
+    forDate?: Date,
+    note?: string,
+    employeeId?: string,
+    isManagerOverride?: boolean,
+    context?: {
+      source?:
+        | "employee-clock"
+        | "manager-schedule-view"
+        | "manager-manual-entry";
+      initiatedBy?: string;
+    }
+  ) => {
+    return;
+  };
+
+  const confirmPayrollNoOp = async (
+    periodId?: string,
+    employeeId?: string,
+    revision?: number
+  ) => {
+    return;
+  };
 
   return (
     <>
@@ -177,7 +203,7 @@ export function EmployeeViewer({
                 }
                 updateEmployee={updateEmployee}
                 payrollPeriods={payrollPeriods}
-                confirmPayroll={async () => {}}
+                                confirmPayroll={confirmPayrollNoOp}
                 payrollConfirmations={payrollConfirmations}
                 getSiteStatuses={getSiteStatuses}
               />

@@ -310,3 +310,36 @@ export type EmployeeUpdateRequest = {
   rejectedByUid?: string | null;
   reason?: string | null;
 };
+
+export type ManagerNotificationType =
+  | "clock-in"
+  | "clock-out"
+  | "payroll-confirmed";
+
+
+export type ManagerNotification =
+  | ClockNotification
+  | PayrollNotification;
+
+export interface ClockNotification {
+  id: string;
+  type: "clock";
+  employeeId: string;
+  employeeName: string;
+  action: "in" | "out";
+  site: string;
+  ts: number;
+  createdAt?: any;
+  read: boolean;
+}
+
+export interface PayrollNotification {
+  id: string;
+  type: "payroll";
+  employeeId: string;
+  employeeName: string;
+  periodId: string;
+  revision: number;
+  createdAt?: any;
+  read: boolean;
+}

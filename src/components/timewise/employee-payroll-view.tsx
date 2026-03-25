@@ -6,6 +6,7 @@ import type {
   PayrollPeriod,
   PayrollConfirmation,
   PayrollLineItem,
+  Settings,
 } from "@/shared/types/domain";
 import {
   Card,
@@ -43,6 +44,7 @@ interface EmployeePayrollViewProps {
   payrollConfirmations: PayrollConfirmation[];
   onViewTimesheet?: (periodId: string, employeeId: string) => void;
   companyName?: string;
+  settings: Settings;
 }
 
 function getPayrollLineEmployeeIds(period: PayrollPeriod): string[] {
@@ -172,6 +174,7 @@ export function EmployeePayrollView({
   payrollConfirmations = [],
   onViewTimesheet,
   companyName,
+  settings,
 }: EmployeePayrollViewProps) {
   const [submittingFor, setSubmittingFor] = useState<string | null>(null);
   const [pdfFor, setPdfFor] = useState<string | null>(null);

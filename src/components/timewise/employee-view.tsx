@@ -70,13 +70,20 @@ interface EmployeeViewProps {
   employee: Employee;
   onLogout: () => void;
   settings: Settings;
-  recordEntry: (
+    recordEntry: (
     action: "in" | "out",
     site: Site,
     entryTime: Date,
     note: string,
     employeeId?: string,
-    isManagerOverride?: boolean
+    isManagerOverride?: boolean,
+    context?: {
+      source:
+        | "employee-clock"
+        | "manager-schedule-view"
+        | "manager-manual-entry";
+      initiatedBy?: string;
+    }
   ) => void;
   requestLocation: () => void;
   coord: { lat: number; lng: number } | null;
@@ -359,13 +366,35 @@ if (!isAssigned) return false;
 
         const isOverrideForIn = isPastDay || isFutureDay || isManagerPreview;
 
-        recordEntry("in", site, currentDate, "", employee.id, isOverrideForIn);
+        recordEntry(
+  "in",
+  site,
+  currentDate,
+  "",
+  employee.id,
+  isOverrideForIn,
+  {
+    source: "employee-clock",
+    initiatedBy: employee.id,
+  }
+);
         return;
       }
 
       // action === "out"
       const isOverrideForOut = isPastDay || isFutureDay || isManagerPreview;
-      recordEntry("out", site, currentDate, "", employee.id, isOverrideForOut);
+     recordEntry(
+  "out",
+  site,
+  currentDate,
+  "",
+  employee.id,
+  isOverrideForOut,
+  {
+    source: "employee-clock",
+    initiatedBy: employee.id,
+  }
+);
     },
     [settings.sites, isClockedIn, employee.id, currentDate, recordEntry, toast, isManagerPreview]
   );
@@ -873,6 +902,7 @@ const getHoursForSiteDay = useCallback(
             confirmPayroll={confirmPayroll}
             payrollConfirmations={payrollConfirmations}
             companyName={settings.companyId}
+              settings={settings}
             onViewTimesheet={handleViewTimesheet}
           />
         </TabsContent>

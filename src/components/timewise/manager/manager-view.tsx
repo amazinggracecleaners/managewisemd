@@ -15,8 +15,9 @@ import type {
   PayrollPeriod,
   PayrollConfirmation,
   EmployeeUpdateRequest,
+  ManagerNotification,
 } from "@/shared/types/domain";
-
+import { ManagerNotificationsPanel } from "./manager-notifications-panel";
 import { ManagerPinForm } from "./manager-pin-form";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
@@ -96,8 +97,8 @@ interface ManagerViewProps {
   employees: Employee[];
   employeeNames: string[];
   addEmployee: (employee: Omit<Employee, "id">) => void;
-  updateEmployee: (id: string, updates: Partial<Employee>) => void; // NOTE: void in props
-  deleteEmployee: (id: string) => void; // NOTE: void in props
+  updateEmployee: (id: string, updates: Partial<Employee>) => void;
+  deleteEmployee: (id: string) => void;
 
   // Full data
   allEntries: Entry[];
@@ -114,6 +115,10 @@ interface ManagerViewProps {
   deletePayrollPeriod: (periodId: string) => Promise<void>;
   payrollConfirmations: PayrollConfirmation[];
 
+  notifications: ManagerNotification[];
+  unreadNotificationCount: number;
+  markNotificationRead: (id: string) => Promise<void> | void;
+  markAllNotificationsRead: () => Promise<void> | void;
   // Helpers
   getSiteStatuses: (forDate: Date) => Map<string, SiteStatus>;
   recordEntry: (
@@ -122,13 +127,22 @@ interface ManagerViewProps {
     forDate: Date,
     note?: string,
     employeeId?: string,
-    isManagerOverride?: boolean
+    isManagerOverride?: boolean,
+    context?: {
+      source:
+        | "employee-clock"
+        | "manager-schedule-view"
+        | "manager-manual-entry";
+      initiatedBy?: string;
+    }
   ) => Promise<void>;
   isClockedIn: (siteName?: string, employeeId?: string) => boolean;
   testGeofence: (site: Site) => Promise<void>;
 
   profitabilityBySite: Map<string, JobProfitRow>;
-  getDurationsBySite: (forDate: Date) => Map<string, { minutes: number; byEmployee: Record<string, number> }>;
+  getDurationsBySite: (
+    forDate: Date
+  ) => Map<string, { minutes: number; byEmployee: Record<string, number> }>;
 
   employeeUpdateRequests: EmployeeUpdateRequest[];
   approveEmployeeUpdate: (requestId: string) => Promise<void> | void;
@@ -154,21 +168,24 @@ export function ManagerView(props: ManagerViewProps) {
     | "settings"
   >("dashboard");
 
-  const employeeById = useMemo(() => new Map(props.employees.map((e) => [e.id, e])), [props.employees]);
+  const employeeById = useMemo(
+    () => new Map(props.employees.map((e) => [e.id, e])),
+    [props.employees]
+  );
 
   const pendingRequests = useMemo(
     () => props.employeeUpdateRequests.filter((r) => r.status === "pending"),
     [props.employeeUpdateRequests]
   );
 
-  // --- Settings helpers ---
   const onRecoverSites = async () => {
-    // placeholder: your actual implementation should live in page.tsx and be passed down
     console.log("Recovering sites...");
   };
 
   const onExportSettings = () => {
-    const blob = new Blob([JSON.stringify(props.settings, null, 2)], { type: "application/json" });
+    const blob = new Blob([JSON.stringify(props.settings, null, 2)], {
+      type: "application/json",
+    });
     const url = URL.createObjectURL(blob);
 
     const a = document.createElement("a");
@@ -185,12 +202,15 @@ export function ManagerView(props: ManagerViewProps) {
     props.setSettings(() => data);
   };
 
-  // --- Auth gate ---
   if (!props.unlocked) {
-    return <ManagerPinForm managerPIN={props.settings.managerPIN} setUnlocked={props.setUnlocked} />;
+    return (
+      <ManagerPinForm
+        managerPIN={props.settings.managerPIN}
+        setUnlocked={props.setUnlocked}
+      />
+    );
   }
 
-  // --- Manager clock-in/out wrapper ---
   const recordEntryAsManager = (
     action: "in" | "out",
     site: Site,
@@ -198,7 +218,18 @@ export function ManagerView(props: ManagerViewProps) {
     note?: string,
     employeeId?: string
   ) => {
-    return props.recordEntry(action, site, forDate, note, employeeId, true);
+    return props.recordEntry(
+      action,
+      site,
+      forDate,
+      note,
+      employeeId,
+      true,
+      {
+        source: "manager-schedule-view",
+        initiatedBy: "manager",
+      }
+    );
   };
 
   const FIELD_LABELS: Partial<Record<keyof Employee, string>> = {
@@ -243,67 +274,80 @@ export function ManagerView(props: ManagerViewProps) {
           <TabsTrigger value="settings">Settings</TabsTrigger>
         </TabsList>
 
-        {/* DASHBOARD */}
-        <TabsContent value="dashboard">
-          <ManagerDashboard
-            activeShifts={props.activeShifts}
-            totalsByEmployee={props.totalsByEmployee}
-            filteredSessions={props.filteredSessions}
-            fromDate={props.fromDate}
-            setFromDate={props.setFromDate}
-            toDate={props.toDate}
-            setToDate={props.setToDate}
-            setSearch={props.setSearch}
-            search={props.search}
-            exportCSV={props.exportCSV}
-            exportSessionsCSV={props.exportSessionsCSV}
-            onGenerateSummary={props.onGenerateSummary}
-            isGenerating={props.isGenerating}
-            updateEntry={props.updateEntry}
-            deleteEntry={props.deleteEntry}
-            employees={props.employees}
-            sites={props.sites}
-            mileageLogs={props.mileageLogs}
-            otherExpenses={props.otherExpenses}
-            allEntries={props.allEntries}
-            invoices={props.invoices}
-            durationsBySite={props.getDurationsBySite(new Date())}
-            deleteSite={props.deleteSite}
-            settings={props.settings}
-          />
+                <TabsContent value="dashboard">
+          <div className="space-y-4">
+            <ManagerNotificationsPanel
+              notifications={props.notifications}
+              unreadCount={props.unreadNotificationCount}
+              markNotificationRead={props.markNotificationRead}
+              markAllNotificationsRead={props.markAllNotificationsRead}
+            />
+
+            <ManagerDashboard
+              activeShifts={props.activeShifts}
+              totalsByEmployee={props.totalsByEmployee}
+              filteredSessions={props.filteredSessions}
+              fromDate={props.fromDate}
+              setFromDate={props.setFromDate}
+              toDate={props.toDate}
+              setToDate={props.setToDate}
+              setSearch={props.setSearch}
+              search={props.search}
+              exportCSV={props.exportCSV}
+              exportSessionsCSV={props.exportSessionsCSV}
+              onGenerateSummary={props.onGenerateSummary}
+              isGenerating={props.isGenerating}
+              updateEntry={props.updateEntry}
+              deleteEntry={props.deleteEntry}
+              employees={props.employees}
+              sites={props.sites}
+              mileageLogs={props.mileageLogs}
+              otherExpenses={props.otherExpenses}
+              allEntries={props.allEntries}
+              invoices={props.invoices}
+              durationsBySite={props.getDurationsBySite(new Date())}
+              deleteSite={props.deleteSite}
+              settings={props.settings}
+            />
+          </div>
         </TabsContent>
 
-        {/* REQUESTS */}
         <TabsContent value="requests">
           <Card>
             <CardHeader>
               <CardTitle>Profile Change Requests</CardTitle>
-              <CardDescription>Employees’ self-updates waiting for your approval.</CardDescription>
+              <CardDescription>
+                Employees’ self-updates waiting for your approval.
+              </CardDescription>
             </CardHeader>
 
             <CardContent>
               {pendingRequests.length === 0 ? (
-                <p className="text-sm text-muted-foreground">No pending profile change requests.</p>
+                <p className="text-sm text-muted-foreground">
+                  No pending profile change requests.
+                </p>
               ) : (
                 <div className="space-y-3">
                   {pendingRequests.map((req) => {
                     const employee = employeeById.get(req.employeeId);
 
-                    const changedEntries = Object.entries(req.updates || {}).filter(([field, value]) => {
-                      if (!employee) return true;
-                      const key = field as keyof Employee;
-                      const current = employee[key];
+                    const changedEntries = Object.entries(req.updates || {}).filter(
+                      ([field, value]) => {
+                        if (!employee) return true;
+                        const key = field as keyof Employee;
+                        const current = employee[key];
 
-                      if (
-                        typeof current === "object" &&
-                        current !== null &&
-                        typeof value === "object" &&
-                        value !== null
-                      ) {
-                        return JSON.stringify(current) !== JSON.stringify(value);
+                        if (
+                          typeof current === "object" &&
+                          current !== null &&
+                          typeof value === "object" &&
+                          value !== null
+                        ) {
+                          return JSON.stringify(current) !== JSON.stringify(value);
+                        }
+                        return current !== value;
                       }
-                      return current !== value;
-                    });
+                    );
 
                     return (
                       <div
@@ -313,7 +357,9 @@ export function ManagerView(props: ManagerViewProps) {
                         <div>
                           <p className="font-medium text-sm">
                             {req.employeeName}{" "}
-                            <span className="text-xs text-muted-foreground">({req.employeeId})</span>
+                            <span className="text-xs text-muted-foreground">
+                              ({req.employeeId})
+                            </span>
                           </p>
 
                           {changedEntries.length === 0 ? (
@@ -322,12 +368,16 @@ export function ManagerView(props: ManagerViewProps) {
                             </p>
                           ) : (
                             <>
-                              <p className="text-xs text-muted-foreground mb-1">Requested changes:</p>
+                              <p className="text-xs text-muted-foreground mb-1">
+                                Requested changes:
+                              </p>
                               <ul className="text-xs list-disc list-inside space-y-0.5">
                                 {changedEntries.flatMap(([field, value]) => {
                                   const key = field as keyof Employee;
                                   const label = FIELD_LABELS[key] ?? field;
-                                  const currentValue = employee ? (employee as any)[key] : undefined;
+                                  const currentValue = employee
+                                    ? (employee as any)[key]
+                                    : undefined;
 
                                   if (
                                     typeof currentValue === "object" &&
@@ -350,7 +400,9 @@ export function ManagerView(props: ManagerViewProps) {
                                               {String(oldNestedValue ?? "N/A")}
                                             </span>{" "}
                                             →{" "}
-                                            <span className="text-primary font-medium">{String(nestedValue)}</span>
+                                            <span className="text-primary font-medium">
+                                              {String(nestedValue)}
+                                            </span>
                                           </li>
                                         );
                                       })
@@ -363,7 +415,10 @@ export function ManagerView(props: ManagerViewProps) {
                                       <span className="line-through text-muted-foreground">
                                         {String(currentValue ?? "N/A")}
                                       </span>{" "}
-                                      → <span className="text-primary font-medium">{String(value ?? "")}</span>
+                                      →{" "}
+                                      <span className="text-primary font-medium">
+                                        {String(value ?? "")}
+                                      </span>
                                     </li>
                                   );
                                 })}
@@ -377,14 +432,20 @@ export function ManagerView(props: ManagerViewProps) {
                             size="sm"
                             variant="outline"
                             onClick={() => {
-                              const reason = window.prompt("Optional: Reason for rejecting this change?");
+                              const reason = window.prompt(
+                                "Optional: Reason for rejecting this change?"
+                              );
                               props.rejectEmployeeUpdate(req.id, reason || undefined);
                             }}
                           >
                             Reject
                           </Button>
 
-                          <Button size="sm" variant="default" onClick={() => props.approveEmployeeUpdate(req.id)}>
+                          <Button
+                            size="sm"
+                            variant="default"
+                            onClick={() => props.approveEmployeeUpdate(req.id)}
+                          >
                             Approve
                           </Button>
                         </div>
@@ -397,7 +458,6 @@ export function ManagerView(props: ManagerViewProps) {
           </Card>
         </TabsContent>
 
-        {/* SCHEDULE */}
         <TabsContent value="schedule">
           <ScheduleView
             sites={props.sites}
@@ -415,7 +475,6 @@ export function ManagerView(props: ManagerViewProps) {
           />
         </TabsContent>
 
-        {/* SITES */}
         <TabsContent value="sites">
           <SiteListView
             sites={props.sites}
@@ -427,12 +486,10 @@ export function ManagerView(props: ManagerViewProps) {
           />
         </TabsContent>
 
-        {/* INVOICES */}
         <TabsContent value="invoices">
           <InvoiceView sites={props.sites} />
         </TabsContent>
 
-        {/* FINANCIALS */}
         <TabsContent value="financials">
           <FinancialsView
             invoices={props.invoices}
@@ -448,7 +505,6 @@ export function ManagerView(props: ManagerViewProps) {
           />
         </TabsContent>
 
-        {/* MILEAGE */}
         <TabsContent value="mileage">
           <MileageView
             mileageLogs={props.mileageLogs}
@@ -461,7 +517,6 @@ export function ManagerView(props: ManagerViewProps) {
           />
         </TabsContent>
 
-        {/* EXPENSES */}
         <TabsContent value="otherExpenses">
           <OtherExpensesView
             otherExpenses={props.otherExpenses}
@@ -474,42 +529,37 @@ export function ManagerView(props: ManagerViewProps) {
           />
         </TabsContent>
 
-        {/* EMPLOYEES */}
         <TabsContent value="employees">
-  <EmployeeManagerView
-    employees={props.employees}
-    teams={props.settings.teams ?? []}
-    addEmployee={props.addEmployee}
-    updateEmployee={async (id, updates) => {
-      props.updateEmployee(id, updates);
-    }}
-    deleteEmployee={async (id) => {
-      props.deleteEmployee(id);
-    }}
-    
-  />
-</TabsContent>
-
-
-        {/* PAYROLL */}
-        <TabsContent value="payroll">
-          <PayrollView
-  employees={props.employees}
-  timeEntries={props.allEntries}
-  sites={props.sites}
-  payrollPeriods={props.payrollPeriods}
-  savePayrollPeriod={props.savePayrollPeriod}
-  deletePayrollPeriod={props.deletePayrollPeriod}
-  payrollConfirmations={props.payrollConfirmations}
- companyId={
-  props.settings.companyId?.trim() ||
-  process.env.NEXT_PUBLIC_COMPANY_ID ||
-  "default-company"
-}
-/>
+          <EmployeeManagerView
+            employees={props.employees}
+            teams={props.settings.teams ?? []}
+            addEmployee={props.addEmployee}
+            updateEmployee={async (id, updates) => {
+              props.updateEmployee(id, updates);
+            }}
+            deleteEmployee={async (id) => {
+              props.deleteEmployee(id);
+            }}
+          />
         </TabsContent>
 
-        {/* EMPLOYEE VIEWER */}
+        <TabsContent value="payroll">
+          <PayrollView
+            employees={props.employees}
+            timeEntries={props.allEntries}
+            sites={props.sites}
+            payrollPeriods={props.payrollPeriods}
+            savePayrollPeriod={props.savePayrollPeriod}
+            deletePayrollPeriod={props.deletePayrollPeriod}
+            payrollConfirmations={props.payrollConfirmations}
+            companyId={
+              props.settings.companyId?.trim() ||
+              process.env.NEXT_PUBLIC_COMPANY_ID ||
+              "default-company"
+            }
+          />
+        </TabsContent>
+
         <TabsContent value="employeeView">
           <EmployeeViewer
             allEntries={props.allEntries}
@@ -526,7 +576,6 @@ export function ManagerView(props: ManagerViewProps) {
           />
         </TabsContent>
 
-        {/* SETTINGS */}
         <TabsContent value="settings">
           <ManagerSettingsView
             settings={props.settings}
