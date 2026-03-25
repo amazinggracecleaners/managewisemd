@@ -17,7 +17,7 @@ import type {
   EmployeeUpdateRequest,
   ManagerNotification,
 } from "@/shared/types/domain";
-import { ManagerNotificationsPanel } from "./manager-notifications-panel";
+import { ManagerNotificationsCard } from "./ManagerNotificationsCard";
 import { ManagerPinForm } from "./manager-pin-form";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
@@ -115,10 +115,7 @@ interface ManagerViewProps {
   deletePayrollPeriod: (periodId: string) => Promise<void>;
   payrollConfirmations: PayrollConfirmation[];
 
-  notifications: ManagerNotification[];
-  unreadNotificationCount: number;
-  markNotificationRead: (id: string) => Promise<void> | void;
-  markAllNotificationsRead: () => Promise<void> | void;
+ 
   // Helpers
   getSiteStatuses: (forDate: Date) => Map<string, SiteStatus>;
   recordEntry: (
@@ -276,12 +273,7 @@ export function ManagerView(props: ManagerViewProps) {
 
                 <TabsContent value="dashboard">
           <div className="space-y-4">
-            <ManagerNotificationsPanel
-              notifications={props.notifications}
-              unreadCount={props.unreadNotificationCount}
-              markNotificationRead={props.markNotificationRead}
-              markAllNotificationsRead={props.markAllNotificationsRead}
-            />
+             <ManagerNotificationsCard companyId={props.settings.companyId} />
 
             <ManagerDashboard
               activeShifts={props.activeShifts}

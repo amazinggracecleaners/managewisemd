@@ -1,5 +1,5 @@
 // src/firebase/client.ts
-"use client";
+
 
 import { initializeApp, getApps, getApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
@@ -37,4 +37,4 @@ if (typeof window !== "undefined") {
 
   console.log("[Firebase] target=PROD");
 }
-console.log("[AUTH] emulator config =", (auth as any)?._config?.emulator);
+

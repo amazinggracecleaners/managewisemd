@@ -96,7 +96,7 @@ function sessionMinutesOnDay(s: Session, day: Date, nowTs: number = Date.now()):
   if (overlapEnd <= overlapStart) return 0;
   return Math.floor((overlapEnd - overlapStart) / 60000);
 }
-const [notifications, setNotifications] = useState<ManagerNotification[]>([]);
+
 /** companyId is always derived the same way everywhere */
 const getCompanyId = (settings: Settings) =>
   settings.companyId?.trim() || process.env.NEXT_PUBLIC_COMPANY_ID || "amazing-grace-cleaners";
@@ -123,7 +123,7 @@ export default function TimeWisePage() {
   const { settings, updateSettings, cloudReady, authReady, user } = useSettings();
   const { engine, setEngine } = useEngine();
   const { toast } = useToast();
-
+const [notifications, setNotifications] = useState<ManagerNotification[]>([]);
  
 
   // --- Core data state ---
@@ -446,19 +446,17 @@ const attachFirestoreListeners = useCallback(
     );
 unsubs.push(
   onSnapshot(
-    query(
-      collection(db, "companies", safeCId, "notifications"),
-      orderBy("createdAt", "desc")
-    ),
-    (snap) => {
-      const notifications = snap.docs.map((d) => ({
-        id: d.id,
-        ...d.data(),
-      }));
-
-      console.log("[NOTIFICATIONS]", notifications);
-      // later: setNotifications(notifications)
-    },
+    query(collection(db, "companies", safeCId, "notifications"), orderBy("createdAt", "desc")),
+    (snap) =>
+      setNotifications(
+        snap.docs.map(
+          (d) =>
+            ({
+              id: d.id,
+              ...d.data(),
+            } as ManagerNotification)
+        )
+      ),
     handleSnapshotError("notifications")
   )
 );
@@ -2159,10 +2157,7 @@ return (
             rejectEmployeeUpdate={rejectEmployeeUpdate}
             engine={engine}
             setEngine={setEngine}
-            notifications={notifications}
-  unreadNotificationCount={unreadNotificationCount}
-  markNotificationRead={markNotificationRead}
-  markAllNotificationsRead={markAllNotificationsRead}
+           
           />
         )}
 
