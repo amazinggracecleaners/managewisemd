@@ -64,67 +64,22 @@ export function ManagerNotificationsCard({
   const { notifications, loading } = useManagerNotifications(companyId, 50);
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Manager Notifications</CardTitle>
-        <CardDescription>
-          Employee clock activity and payroll confirmations
-        </CardDescription>
-      </CardHeader>
+  <Card className="h-full flex flex-col">
+    <CardHeader className="sticky top-0 bg-background z-10">
+      <CardTitle>Manager Notifications</CardTitle>
+      <CardDescription>
+        Employee clock activity and payroll confirmations
+      </CardDescription>
+    </CardHeader>
 
-      <CardContent className="space-y-3">
-        {loading ? (
-          <p className="text-sm text-muted-foreground">Loading notifications...</p>
-        ) : notifications.length === 0 ? (
-          <p className="text-sm text-muted-foreground">No notifications yet.</p>
-        ) : (
-          notifications.map((n) => {
-            if (n.type === "clock") {
-              return (
-                <div
-                  key={n.id}
-                  className="rounded-xl border p-3 flex items-start justify-between gap-3"
-                >
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-2 font-medium">
-                      {getTypeIcon(n)}
-                      <span className="truncate">
-                        {n.action === "in"
-                          ? `${n.employeeName} clocked in at ${n.site}`
-                          : `${n.employeeName} clocked out from ${n.site}`}
-                      </span>
-                    </div>
-
-                    <div className="mt-2 text-sm text-muted-foreground space-y-1">
-                      <div>
-                        <span className="font-medium text-foreground">Employee:</span>{" "}
-                        {n.employeeName}
-                      </div>
-
-                      <div>
-                        <span className="font-medium text-foreground">Site:</span>{" "}
-                        {n.site || "—"}
-                      </div>
-
-                      <div>
-                        <span className="font-medium text-foreground">Action:</span>{" "}
-                        {n.action === "in" ? "Clock In" : "Clock Out"}
-                      </div>
-
-                      <div>
-                        <span className="font-medium text-foreground">Time:</span>{" "}
-                        {formatStamp(n.ts)}
-                      </div>
-                    </div>
-                  </div>
-
-                  <Badge variant={n.read ? "secondary" : "default"}>
-                    {n.read ? "Read" : "New"}
-                  </Badge>
-                </div>
-              );
-            }
-
+    <CardContent className="flex-1 overflow-y-auto space-y-3 max-h-[400px]">
+      {loading ? (
+        <p className="text-sm text-muted-foreground">Loading notifications...</p>
+      ) : notifications.length === 0 ? (
+        <p className="text-sm text-muted-foreground">No notifications yet.</p>
+      ) : (
+        notifications.map((n) => {
+          if (n.type === "clock") {
             return (
               <div
                 key={n.id}
@@ -134,7 +89,9 @@ export function ManagerNotificationsCard({
                   <div className="flex items-center gap-2 font-medium">
                     {getTypeIcon(n)}
                     <span className="truncate">
-                      {n.employeeName} confirmed payroll
+                      {n.action === "in"
+                        ? `${n.employeeName} clocked in at ${n.site}`
+                        : `${n.employeeName} clocked out from ${n.site}`}
                     </span>
                   </div>
 
@@ -143,20 +100,17 @@ export function ManagerNotificationsCard({
                       <span className="font-medium text-foreground">Employee:</span>{" "}
                       {n.employeeName}
                     </div>
-
                     <div>
-                      <span className="font-medium text-foreground">Period:</span>{" "}
-                      {n.periodId}
+                      <span className="font-medium text-foreground">Site:</span>{" "}
+                      {n.site || "—"}
                     </div>
-
                     <div>
-                      <span className="font-medium text-foreground">Revision:</span>{" "}
-                      {n.revision}
+                      <span className="font-medium text-foreground">Action:</span>{" "}
+                      {n.action === "in" ? "Clock In" : "Clock Out"}
                     </div>
-
                     <div>
-                      <span className="font-medium text-foreground">Confirmed:</span>{" "}
-                      {formatStamp(n.createdAt)}
+                      <span className="font-medium text-foreground">Time:</span>{" "}
+                      {formatStamp(n.ts)}
                     </div>
                   </div>
                 </div>
@@ -166,9 +120,49 @@ export function ManagerNotificationsCard({
                 </Badge>
               </div>
             );
-          })
-        )}
-      </CardContent>
-    </Card>
-  );
+          }
+
+          return (
+            <div
+              key={n.id}
+              className="rounded-xl border p-3 flex items-start justify-between gap-3"
+            >
+              <div className="min-w-0">
+                <div className="flex items-center gap-2 font-medium">
+                  {getTypeIcon(n)}
+                  <span className="truncate">
+                    {n.employeeName} confirmed payroll
+                  </span>
+                </div>
+
+                <div className="mt-2 text-sm text-muted-foreground space-y-1">
+                  <div>
+                    <span className="font-medium text-foreground">Employee:</span>{" "}
+                    {n.employeeName}
+                  </div>
+                  <div>
+                    <span className="font-medium text-foreground">Period:</span>{" "}
+                    {n.periodId}
+                  </div>
+                  <div>
+                    <span className="font-medium text-foreground">Revision:</span>{" "}
+                    {n.revision}
+                  </div>
+                  <div>
+                    <span className="font-medium text-foreground">Confirmed:</span>{" "}
+                    {formatStamp(n.createdAt)}
+                  </div>
+                </div>
+              </div>
+
+              <Badge variant={n.read ? "secondary" : "default"}>
+                {n.read ? "Read" : "New"}
+              </Badge>
+            </div>
+          );
+        })
+      )}
+    </CardContent>
+  </Card>
+);
 }
