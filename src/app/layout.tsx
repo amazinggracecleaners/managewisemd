@@ -5,8 +5,8 @@ import { FirebaseErrorListener } from "@/components/FirebaseErrorListener";
 import Providers from "./providers";
 
 export const metadata: Metadata = {
-  title: "TimeWise Employee Time Clock",
-  description: "A smart time clock application for employees and managers.",
+  title: "ManageWise Business Operations",
+  description: "A smart Business management application for employees and managers.",
 };
 
 export default function RootLayout({

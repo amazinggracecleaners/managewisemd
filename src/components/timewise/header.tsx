@@ -16,7 +16,7 @@ export function Header({ tab, onTabChange, isManager, isLoggedIn }: HeaderProps)
       <div className="flex items-center gap-3">
         <Clock className="w-8 h-8 text-primary" />
         <h1 className="text-2xl sm:text-3xl font-bold text-foreground font-headline">
-          TimeWise
+          ManageWise
         </h1>
       </div>
       {!isLoggedIn && (
