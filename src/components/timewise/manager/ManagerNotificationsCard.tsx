@@ -12,7 +12,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { CheckCircle2, LogIn, LogOut } from "lucide-react";
 import { useManagerNotifications } from "@/hooks/use-manager-notifications";
-
+import { Button } from "@/components/ui/button";
 interface ManagerNotificationsCardProps {
   companyId?: string;
 }
@@ -61,16 +61,39 @@ function formatStamp(value: unknown) {
 export function ManagerNotificationsCard({
   companyId,
 }: ManagerNotificationsCardProps) {
-  const { notifications, loading } = useManagerNotifications(companyId, 50);
+  const {
+  notifications,
+  loading,
+  unreadCount,
+  markAllAsRead,
+  markOneAsRead,
+} = useManagerNotifications(companyId, 50);
 
   return (
   <Card className="h-full flex flex-col">
-    <CardHeader className="sticky top-0 bg-background z-10">
-      <CardTitle>Manager Notifications</CardTitle>
-      <CardDescription>
-        Employee clock activity and payroll confirmations
-      </CardDescription>
-    </CardHeader>
+    <CardHeader className="sticky top-0 bg-background z-10 flex flex-row items-center justify-between">
+  <div>
+    <CardTitle className="flex items-center gap-2">
+      Manager Notifications
+
+      {unreadCount > 0 && (
+        <Badge variant="destructive" className="text-xs">
+          {unreadCount}
+        </Badge>
+      )}
+    </CardTitle>
+
+    <CardDescription>
+      Employee clock activity and payroll confirmations
+    </CardDescription>
+  </div>
+
+  {unreadCount > 0 && (
+    <Button size="sm" variant="outline" onClick={markAllAsRead}>
+      Mark all as read
+    </Button>
+  )}
+</CardHeader>
 
     <CardContent className="flex-1 overflow-y-auto space-y-3 max-h-[400px]">
       {loading ? (
@@ -82,9 +105,12 @@ export function ManagerNotificationsCard({
           if (n.type === "clock") {
             return (
               <div
-                key={n.id}
-                className="rounded-xl border p-3 flex items-start justify-between gap-3"
-              >
+  key={n.id}
+  onClick={() => !n.read && markOneAsRead(n.id)}
+  className={`rounded-xl border p-3 flex items-start justify-between gap-3 cursor-pointer transition hover:bg-muted ${
+  !n.read ? "bg-muted/40" : ""
+}`}
+>
                 <div className="min-w-0">
                   <div className="flex items-center gap-2 font-medium">
                     {getTypeIcon(n)}
@@ -122,44 +148,47 @@ export function ManagerNotificationsCard({
             );
           }
 
-          return (
-            <div
-              key={n.id}
-              className="rounded-xl border p-3 flex items-start justify-between gap-3"
-            >
-              <div className="min-w-0">
-                <div className="flex items-center gap-2 font-medium">
-                  {getTypeIcon(n)}
-                  <span className="truncate">
-                    {n.employeeName} confirmed payroll
-                  </span>
-                </div>
+        return (
+  <div
+    key={n.id}
+    onClick={() => !n.read && markOneAsRead(n.id)}
+    className={`rounded-xl border p-3 flex items-start justify-between gap-3 cursor-pointer transition hover:bg-muted ${
+  !n.read ? "bg-muted/40" : ""
+}`}
+  >
+    <div className="min-w-0">
+      <div className="flex items-center gap-2 font-medium">
+        {getTypeIcon(n)}
+        <span className="truncate">
+          {n.employeeName} confirmed payroll
+        </span>
+      </div>
 
-                <div className="mt-2 text-sm text-muted-foreground space-y-1">
-                  <div>
-                    <span className="font-medium text-foreground">Employee:</span>{" "}
-                    {n.employeeName}
-                  </div>
-                  <div>
-                    <span className="font-medium text-foreground">Period:</span>{" "}
-                    {n.periodId}
-                  </div>
-                  <div>
-                    <span className="font-medium text-foreground">Revision:</span>{" "}
-                    {n.revision}
-                  </div>
-                  <div>
-                    <span className="font-medium text-foreground">Confirmed:</span>{" "}
-                    {formatStamp(n.createdAt)}
-                  </div>
-                </div>
-              </div>
+      <div className="mt-2 text-sm text-muted-foreground space-y-1">
+        <div>
+          <span className="font-medium text-foreground">Employee:</span>{" "}
+          {n.employeeName}
+        </div>
+        <div>
+          <span className="font-medium text-foreground">Period:</span>{" "}
+          {n.periodId}
+        </div>
+        <div>
+          <span className="font-medium text-foreground">Revision:</span>{" "}
+          {n.revision}
+        </div>
+        <div>
+          <span className="font-medium text-foreground">Confirmed:</span>{" "}
+          {formatStamp(n.createdAt)}
+        </div>
+      </div>
+    </div>
 
-              <Badge variant={n.read ? "secondary" : "default"}>
-                {n.read ? "Read" : "New"}
-              </Badge>
-            </div>
-          );
+    <Badge variant={n.read ? "secondary" : "default"}>
+      {n.read ? "Read" : "New"}
+    </Badge>
+  </div>
+);
         })
       )}
     </CardContent>

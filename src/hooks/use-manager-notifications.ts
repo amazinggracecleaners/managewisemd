@@ -1,10 +1,18 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { collection, query, orderBy, limit, onSnapshot } from "firebase/firestore";
+import {
+  collection,
+  query,
+  orderBy,
+  limit,
+  onSnapshot,
+  doc,
+  updateDoc,
+  writeBatch,
+} from "firebase/firestore";
 import { db } from "@/firebase/client";
 
-// 👇 1. RAW FIRESTORE TYPE
 type RawNotification = {
   type?: unknown;
   employeeId?: unknown;
@@ -18,7 +26,6 @@ type RawNotification = {
   read?: unknown;
 };
 
-// 👇 2. PARSED TYPES (PUT THEM HERE)
 type ClockNotificationShape = {
   id: string;
   type: "clock";
@@ -44,10 +51,38 @@ type PayrollNotificationShape = {
 
 type ParsedNotification = ClockNotificationShape | PayrollNotificationShape;
 
-// 👇 3. HOOK STARTS HERE
 export function useManagerNotifications(companyId?: string, max = 50) {
   const [notifications, setNotifications] = useState<ParsedNotification[]>([]);
   const [loading, setLoading] = useState(true);
+
+  const unreadCount = notifications.filter((n) => !n.read).length;
+
+  const markAllAsRead = async () => {
+    if (!companyId) return;
+
+    const batch = writeBatch(db);
+
+    notifications.forEach((n) => {
+      if (!n.read) {
+        const ref = doc(db, "companies", companyId, "notifications", n.id);
+        batch.update(ref, {
+          read: true,
+          readAt: new Date().toISOString(),
+        });
+      }
+    });
+
+    await batch.commit();
+  };
+
+  const markOneAsRead = async (id: string) => {
+    if (!companyId) return;
+
+    await updateDoc(doc(db, "companies", companyId, "notifications", id), {
+      read: true,
+      readAt: new Date().toISOString(),
+    });
+  };
 
   useEffect(() => {
     if (!companyId) {
@@ -63,67 +98,73 @@ export function useManagerNotifications(companyId?: string, max = 50) {
     );
 
     const unsub = onSnapshot(
-  q,
-  (snap) => {
-    const mapped = snap.docs.map((doc): ParsedNotification | null => {
-      const data = doc.data() as RawNotification;
+      q,
+      (snap) => {
+        const mapped = snap.docs.map((doc): ParsedNotification | null => {
+          const data = doc.data() as RawNotification;
 
-      if (data.type === "clock") {
-        return {
-          id: doc.id,
-          type: "clock" as const,
-          employeeId:
-            typeof data.employeeId === "string" ? data.employeeId : "",
-          employeeName:
-            typeof data.employeeName === "string"
-              ? data.employeeName
-              : "Unknown",
-          action: data.action === "out" ? "out" : "in",
-          site: typeof data.site === "string" ? data.site : "",
-          ts: typeof data.ts === "number" ? data.ts : 0,
-          createdAt: data.createdAt,
-          read: !!data.read,
-        };
+          if (data.type === "clock") {
+            return {
+              id: doc.id,
+              type: "clock" as const,
+              employeeId:
+                typeof data.employeeId === "string" ? data.employeeId : "",
+              employeeName:
+                typeof data.employeeName === "string"
+                  ? data.employeeName
+                  : "Unknown",
+              action: data.action === "out" ? "out" : "in",
+              site: typeof data.site === "string" ? data.site : "",
+              ts: typeof data.ts === "number" ? data.ts : 0,
+              createdAt: data.createdAt,
+              read: !!data.read,
+            };
+          }
+
+          if (data.type === "payroll") {
+            return {
+              id: doc.id,
+              type: "payroll" as const,
+              employeeId:
+                typeof data.employeeId === "string" ? data.employeeId : "",
+              employeeName:
+                typeof data.employeeName === "string"
+                  ? data.employeeName
+                  : "Unknown",
+              periodId:
+                typeof data.periodId === "string" ? data.periodId : "",
+              revision:
+                typeof data.revision === "number" ? data.revision : 0,
+              createdAt: data.createdAt,
+              read: !!data.read,
+            };
+          }
+
+          return null;
+        });
+
+        const next: ParsedNotification[] = mapped.filter(
+          (item): item is ParsedNotification => item !== null
+        );
+
+        setNotifications(next);
+        setLoading(false);
+      },
+      (error) => {
+        console.error("Failed to load notifications:", error);
+        setNotifications([]);
+        setLoading(false);
       }
-
-      if (data.type === "payroll") {
-        return {
-          id: doc.id,
-          type: "payroll" as const,
-          employeeId:
-            typeof data.employeeId === "string" ? data.employeeId : "",
-          employeeName:
-            typeof data.employeeName === "string"
-              ? data.employeeName
-              : "Unknown",
-          periodId:
-            typeof data.periodId === "string" ? data.periodId : "",
-          revision:
-            typeof data.revision === "number" ? data.revision : 0,
-          createdAt: data.createdAt,
-          read: !!data.read,
-        };
-      }
-
-      return null;
-    });
-
-    const next: ParsedNotification[] = mapped.filter(
-      (item): item is ParsedNotification => item !== null
     );
-
-    setNotifications(next);
-    setLoading(false);
-  },
-  (error) => {
-    console.error("Failed to load notifications:", error);
-    setNotifications([]);
-    setLoading(false);
-  }
-);
 
     return () => unsub();
   }, [companyId, max]);
 
-  return { notifications, loading };
+  return {
+    notifications,
+    loading,
+    unreadCount,
+    markAllAsRead,
+    markOneAsRead,
+  };
 }
