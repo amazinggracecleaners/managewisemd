@@ -38,6 +38,12 @@ export function EmployeeNotifications({
   companyId,
 }: EmployeeNotificationsProps) {
   const [notifications, setNotifications] = useState<EmployeeNotification[]>([]);
+useEffect(() => {
+  console.log("[EMPLOYEE NOTIFICATIONS]", {
+    employeeId: employee?.id,
+    companyId,
+  });
+}, [employee?.id, companyId]);
 
   useEffect(() => {
     if (!employee?.id || !companyId) return;
@@ -49,6 +55,7 @@ export function EmployeeNotifications({
     );
 
     const unsub = onSnapshot(q, (snap) => {
+      console.log("[EMPLOYEE NOTIFICATIONS SNAPSHOT]", snap.size);
       const items = snap.docs.map((d) => ({
         id: d.id,
         ...d.data(),
