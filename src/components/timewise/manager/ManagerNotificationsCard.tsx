@@ -77,9 +77,12 @@ export function ManagerNotificationsCard({
       Manager Notifications
 
       {unreadCount > 0 && (
-        <Badge variant="destructive" className="text-xs">
-          {unreadCount}
-        </Badge>
+        <Badge
+  variant="destructive"
+  className={`text-xs ${unreadCount > 0 ? "animate-pulse" : ""}`}
+>
+  {unreadCount}
+</Badge>
       )}
     </CardTitle>
 
@@ -107,7 +110,7 @@ export function ManagerNotificationsCard({
               <div
   key={n.id}
   onClick={() => !n.read && markOneAsRead(n.id)}
-  className={`rounded-xl border p-3 flex items-start justify-between gap-3 cursor-pointer transition hover:bg-muted ${
+  className={`rounded-xl border p-3 flex items-start justify-between gap-3 cursor-pointer transition hover:shadow-sm ${
   !n.read ? "bg-muted/40" : ""
 }`}
 >
@@ -138,6 +141,10 @@ export function ManagerNotificationsCard({
                       <span className="font-medium text-foreground">Time:</span>{" "}
                       {formatStamp(n.ts)}
                     </div>
+                    <div>
+  <span className="font-medium text-foreground">Device:</span>{" "}
+  {n.deviceLabel || "—"}
+</div>
                   </div>
                 </div>
 

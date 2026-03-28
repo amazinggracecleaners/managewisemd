@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
+import { getDeviceLabel } from "@/lib/device-info";
 import {
   onSnapshot,
   query,
@@ -788,6 +789,7 @@ const recordEntry = useCallback(
       toast({ variant: "destructive", title: "No employee selected." });
       return;
     }
+    const deviceLabel = isManagerOverride ? "Manager override" : getDeviceLabel();
     if (!site) {
       toast({
         variant: "destructive",
@@ -985,6 +987,7 @@ await addDoc(
     action, // "in" | "out"
     site: site.name,
     ts: dataToSave.ts,
+    deviceLabel,
     createdAt: serverTimestamp(),
     read: false,
   }
@@ -1058,6 +1061,44 @@ await addDoc(
   );
 
   // --- Schedule ---
+  const notifyEmployeesAboutSchedule = useCallback(
+  async (
+    schedule: Partial<CleaningSchedule> & { id?: string; siteName?: string },
+    action: "added" | "updated" | "deleted"
+  ) => {
+    if (engine !== "cloud") return;
+
+    const cId = getCompanyId(settings);
+    const assignedNames = schedule.assignedTo ?? [];
+    if (!assignedNames.length) return;
+
+    const assignedEmployees = employees.filter((e) => assignedNames.includes(e.name));
+    if (!assignedEmployees.length) return;
+
+    const actionLabel =
+      action === "added"
+        ? "added"
+        : action === "updated"
+        ? "updated"
+        : "deleted";
+
+    await Promise.all(
+      assignedEmployees.map((emp) =>
+        addDoc(collection(db, "companies", cId, "employee_notifications"), {
+          employeeId: emp.id,
+          type: "schedule-change",
+          title: "Schedule changed",
+          message: `Your schedule for ${schedule.siteName || "a site"} was ${actionLabel}.`,
+          siteName: schedule.siteName || "",
+          scheduleId: schedule.id || "",
+          createdAt: serverTimestamp(),
+          read: false,
+        })
+      )
+    );
+  },
+  [engine, settings, employees]
+);
   const addSchedule = useCallback(
     async (scheduleData: Omit<CleaningSchedule, "id">) => {
       if (engine === "cloud") {
@@ -1068,6 +1109,10 @@ await addDoc(
         try {
           await writeThenVerify(newDocRef as any, cleanForFirestore(dataToSave) as any, "ADD_SCHEDULE");
           toast({ title: "Schedule added" });
+          await notifyEmployeesAboutSchedule(
+  { ...scheduleData, id: newDocRef.id },
+  "added"
+);
         } catch (e: any) {
           errorEmitter.emit(
             "permission-error",
@@ -1096,6 +1141,11 @@ await addDoc(
         try {
           await updateDoc(docRef, cleanForFirestore(updates));
           toast({ title: "Schedule updated" });
+          const existing = schedules.find((s) => s.id === id);
+          await notifyEmployeesAboutSchedule(
+  { ...(existing || {}), ...updates, id },
+  "updated"
+);
         } catch (e: any) {
           errorEmitter.emit(
             "permission-error",
@@ -1106,6 +1156,7 @@ await addDoc(
       } else {
         setSchedules((prev) => prev.map((s) => (s.id === id ? ({ ...s, ...updates } as CleaningSchedule) : s)));
         toast({ title: "Schedule updated" });
+        
       }
     },
     [engine, settings, toast]
@@ -1121,6 +1172,10 @@ await addDoc(
         try {
           await deleteDoc(docRef);
           toast({ title: "Schedule deleted" });
+          const existing = schedules.find((s) => s.id === id);
+          if (existing) {
+  await notifyEmployeesAboutSchedule(existing, "deleted");
+}
         } catch (e: any) {
           errorEmitter.emit("permission-error", new FirestorePermissionError({ path: docRef.path, operation: "delete" }));
           toast({ variant: "destructive", title: "Cloud delete failed", description: e.message, duration: 9000 });

@@ -12,7 +12,7 @@ import {
   writeBatch,
 } from "firebase/firestore";
 import { db } from "@/firebase/client";
-
+import { useToast } from "@/hooks/use-toast";
 type RawNotification = {
   type?: unknown;
   employeeId?: unknown;
@@ -20,6 +20,7 @@ type RawNotification = {
   action?: unknown;
   site?: unknown;
   ts?: unknown;
+   deviceLabel?: unknown;
   periodId?: unknown;
   revision?: unknown;
   createdAt?: unknown;
@@ -34,6 +35,7 @@ type ClockNotificationShape = {
   action: "in" | "out";
   site: string;
   ts: number;
+  deviceLabel?: string;
   createdAt?: unknown;
   read: boolean;
 };
@@ -54,7 +56,8 @@ type ParsedNotification = ClockNotificationShape | PayrollNotificationShape;
 export function useManagerNotifications(companyId?: string, max = 50) {
   const [notifications, setNotifications] = useState<ParsedNotification[]>([]);
   const [loading, setLoading] = useState(true);
-
+const [prevCount, setPrevCount] = useState(0);
+const { toast } = useToast();
   const unreadCount = notifications.filter((n) => !n.read).length;
 
   const markAllAsRead = async () => {
@@ -116,6 +119,8 @@ export function useManagerNotifications(companyId?: string, max = 50) {
               action: data.action === "out" ? "out" : "in",
               site: typeof data.site === "string" ? data.site : "",
               ts: typeof data.ts === "number" ? data.ts : 0,
+              deviceLabel:
+  typeof data.deviceLabel === "string" ? data.deviceLabel : undefined,
               createdAt: data.createdAt,
               read: !!data.read,
             };
@@ -159,7 +164,74 @@ export function useManagerNotifications(companyId?: string, max = 50) {
 
     return () => unsub();
   }, [companyId, max]);
+  const playNotificationSound = () => {
+  if (typeof window === "undefined") return;
 
+  try {
+    const AudioCtx =
+      window.AudioContext ||
+      (window as typeof window & {
+        webkitAudioContext?: typeof AudioContext;
+      }).webkitAudioContext;
+
+    if (!AudioCtx) return;
+
+    const ctx = new AudioCtx();
+    const oscillator = ctx.createOscillator();
+    const gainNode = ctx.createGain();
+
+    oscillator.type = "sine";
+    oscillator.frequency.setValueAtTime(880, ctx.currentTime);
+
+    gainNode.gain.setValueAtTime(0.0001, ctx.currentTime);
+    gainNode.gain.exponentialRampToValueAtTime(0.08, ctx.currentTime + 0.01);
+    gainNode.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.18);
+
+    oscillator.connect(gainNode);
+    gainNode.connect(ctx.destination);
+
+    oscillator.start();
+    oscillator.stop(ctx.currentTime + 0.18);
+
+    oscillator.onended = () => {
+      void ctx.close();
+    };
+  } catch (error) {
+    console.warn("Notification sound failed:", error);
+  }
+};
+const vibrateNotification = () => {
+  if (typeof navigator === "undefined") return;
+  if (!("vibrate" in navigator)) return;
+
+  try {
+    navigator.vibrate?.([120, 60, 120]);
+  } catch (error) {
+    console.warn("Vibration failed:", error);
+  }
+};
+useEffect(() => {
+  if (!loading && notifications.length > prevCount) {
+    const newest = notifications[0];
+
+    if (newest && !newest.read) {
+      toast({
+        title: "New activity",
+        description:
+          newest.type === "clock"
+            ? newest.action === "in"
+              ? `${newest.employeeName} clocked in`
+              : `${newest.employeeName} clocked out`
+            : `${newest.employeeName} confirmed payroll`,
+      });
+
+      playNotificationSound();
+      vibrateNotification();
+    }
+
+    setPrevCount(notifications.length);
+  }
+}, [notifications, loading, prevCount, toast]);
   return {
     notifications,
     loading,

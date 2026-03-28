@@ -11,10 +11,22 @@ import {
   doc,
 } from "firebase/firestore";
 import { db } from "@/firebase/client";
-import type { AppNotification, Employee } from "@/shared/types/domain";
+import type { Employee } from "@/shared/types/domain";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+type EmployeeNotification = {
+  id: string;
+  employeeId: string;
+  type: "schedule-change";
+  title: string;
+  message: string;
+  siteName?: string;
+  scheduleId?: string;
+  createdAt?: unknown;
+  read: boolean;
+  readAt?: string;
+};
 
 interface EmployeeNotificationsProps {
   employee: Employee;
@@ -25,13 +37,13 @@ export function EmployeeNotifications({
   employee,
   companyId,
 }: EmployeeNotificationsProps) {
-  const [notifications, setNotifications] = useState<AppNotification[]>([]);
+  const [notifications, setNotifications] = useState<EmployeeNotification[]>([]);
 
   useEffect(() => {
     if (!employee?.id || !companyId) return;
 
     const q = query(
-      collection(db, "companies", companyId, "notifications"),
+      collection(db, "companies", companyId, "employee_notifications"),
       where("employeeId", "==", employee.id),
       orderBy("createdAt", "desc")
     );
@@ -40,7 +52,7 @@ export function EmployeeNotifications({
       const items = snap.docs.map((d) => ({
         id: d.id,
         ...d.data(),
-      })) as AppNotification[];
+      })) as EmployeeNotification[];
 
       setNotifications(items);
     });
@@ -50,7 +62,7 @@ export function EmployeeNotifications({
 
   const markRead = async (notificationId: string) => {
     await updateDoc(
-      doc(db, "companies", companyId, "notifications", notificationId),
+      doc(db, "companies", companyId, "employee_notifications", notificationId),
       {
         read: true,
         readAt: new Date().toISOString(),
