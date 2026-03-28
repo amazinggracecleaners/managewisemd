@@ -1130,7 +1130,7 @@ await addDoc(
         toast({ title: "Schedule added" });
       }
     },
-    [engine, settings, toast]
+    [engine, settings, toast, notifyEmployeesAboutSchedule]
   );
 
   const updateSchedule = useCallback(
@@ -1159,7 +1159,7 @@ await addDoc(
         
       }
     },
-    [engine, settings, toast]
+    [engine, settings, toast, schedules, notifyEmployeesAboutSchedule]
   );
 
   const deleteSchedule = useCallback(
@@ -1169,10 +1169,11 @@ await addDoc(
       if (engine === "cloud") {
         const cId = getCompanyId(settings);
         const docRef = doc(db, "companies", cId, "schedules", id);
+         const existing = schedules.find((s) => s.id === id);
         try {
           await deleteDoc(docRef);
           toast({ title: "Schedule deleted" });
-          const existing = schedules.find((s) => s.id === id);
+         
           if (existing) {
   await notifyEmployeesAboutSchedule(existing, "deleted");
 }
@@ -1185,7 +1186,7 @@ await addDoc(
         toast({ title: "Schedule deleted" });
       }
     },
-    [engine, settings, toast]
+    [engine, settings, toast, schedules, notifyEmployeesAboutSchedule]
   );
 
   // --- Sites ---
