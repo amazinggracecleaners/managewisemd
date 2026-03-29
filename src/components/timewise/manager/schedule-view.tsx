@@ -83,6 +83,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+
 import {
   Table,
   TableBody,
@@ -108,7 +109,7 @@ interface ScheduleViewProps {
   deleteSchedule: (id: string) => void;
   weekStartsOn: 0 | 1 | 2 | 3 | 4 | 5 | 6;
   getSiteStatuses: (forDate: Date) => Map<string, SiteStatus>;
-    recordEntry: (
+  recordEntry: (
     action: "in" | "out",
     site: Site,
     forDate: Date,
@@ -127,10 +128,9 @@ interface ScheduleViewProps {
   getDurationsBySite: (
     forDate: Date
   ) => Map<string, { minutes: number; byEmployee: Record<string, number> }>;
-
-  // ✅ teams come from settings.teams (passed from ManagerView)
   teams: Team[];
 }
+
 
 const billingFrequencies: BillingFrequency[] = [
   "One-Time",
@@ -264,7 +264,18 @@ const { cloudReady } = useSettings();
     () => new Map(employees.map((e) => [e.name, e])),
     [employees]
   );
+const employeeById = useMemo(
+  () => new Map(employees.map((e) => [e.id, e])),
+  [employees]
+);
 
+const resolveAssignedEmployeeIds = (names: string[]): string[] => {
+  const ids = names
+    .map((name) => employeeMap.get(name)?.id)
+    .filter((id): id is string => !!id);
+
+  return Array.from(new Set(ids));
+};
   const weekDays: DayOfWeek[] = useMemo(() => {
     const start = startOfWeek(new Date(), { weekStartsOn });
     return Array.from({ length: 7 }).map(
@@ -381,15 +392,17 @@ const { cloudReady } = useSettings();
       );
       return;
     }
+const assignedEmployeeIds =
+  assignMode === "team" ? [] : resolveAssignedEmployeeIds(assignedTo);
 
-    const baseData: Omit<CleaningSchedule, "id"> = {
-      siteName,
-      tasks,
-      note,
+const baseData: Omit<CleaningSchedule, "id"> = {
+  siteName,
+  tasks,
+  note,
 
-      // ✅ mutually exclusive assignment
-      assignedTeamId: assignMode === "team" ? assignedTeamId : undefined,
-      assignedTo: assignMode === "team" ? [] : assignedTo,
+  assignedTeamId: assignMode === "team" ? assignedTeamId : undefined,
+  assignedTo: assignMode === "team" ? [] : assignedTo,
+  assignedEmployeeIds,
 
       startDate: format(startDate, "yyyy-MM-dd"),
       repeatFrequency,
@@ -538,27 +551,35 @@ const { cloudReady } = useSettings();
   };
 
   const handleRemoveEmployeeFromSchedule = (
-    scheduleId: string,
-    employeeName: string
-  ) => {
-    if (
-      !window.confirm(
-        `Are you sure you want to remove ${employeeName} from this schedule?`
-      )
+  scheduleId: string,
+  employeeName: string
+) => {
+  if (
+    !window.confirm(
+      `Are you sure you want to remove ${employeeName} from this schedule?`
     )
-      return;
+  ) {
+    return;
+  }
 
-    const schedule = schedules.find((s) => s.id === scheduleId);
-    if (!schedule) return;
+  const schedule = schedules.find((s) => s.id === scheduleId);
+  if (!schedule) return;
 
-    const updatedAssignedTo = (schedule.assignedTo || []).filter(
-      (name) => name !== employeeName
-    );
-    updateSchedule(scheduleId, { assignedTo: updatedAssignedTo });
-  };
+  const updatedAssignedTo = (schedule.assignedTo || []).filter(
+    (name) => name !== employeeName
+  );
 
-  const dailySchedules = getSchedulesForDate(currentDate);
-  const dailySiteCount = new Set(dailySchedules.map((s) => s.siteName)).size;
+  const updatedAssignedEmployeeIds =
+    resolveAssignedEmployeeIds(updatedAssignedTo);
+
+  updateSchedule(scheduleId, {
+    assignedTo: updatedAssignedTo,
+    assignedEmployeeIds: updatedAssignedEmployeeIds,
+  });
+};
+
+const dailySchedules = getSchedulesForDate(currentDate);
+const dailySiteCount = new Set(dailySchedules.map((s) => s.siteName)).size;
 
   const dailyStatuses = useMemo(
     () => getSiteStatuses(currentDate),
@@ -587,38 +608,41 @@ const { cloudReady } = useSettings();
   }, [dailySchedules, dailyStatuses]);
 
   const renderAssignmentBadges = (s: CleaningSchedule) => {
-    if (s.assignedTeamId) {
-      const team = teamsById.get(s.assignedTeamId);
-      return (
-        <Badge variant="secondary" className="text-xs">
-          Team: {team?.name ?? s.assignedTeamId}
-        </Badge>
-      );
-    }
-
+  if (s.assignedTeamId) {
+    const team = teamsById.get(s.assignedTeamId);
     return (
-      <div className="flex flex-wrap gap-1">
-        {(s.assignedTo || []).map((name) => {
-          const emp = employeeMap.get(name);
-          return (
-            <Badge
-              key={name}
-              variant="secondary"
-              className="text-xs"
-              style={
-                emp?.color
-                  ? { backgroundColor: emp.color, color: "white" }
-                  : {}
-              }
-            >
-              {name}
-            </Badge>
-          );
-        })}
-      </div>
+      <Badge variant="secondary" className="text-xs">
+        Team: {team?.name ?? s.assignedTeamId}
+      </Badge>
     );
-  };
+  }
 
+  return (
+    <div className="flex flex-wrap gap-1">
+      {(s.assignedEmployeeIds?.length
+        ? s.assignedEmployeeIds
+            .map((id) => employeeById.get(id))
+            .filter((emp): emp is Employee => !!emp)
+        : (s.assignedTo || []).map((name) =>
+            employees.find((e) => e.name === name)
+          ).filter((emp): emp is Employee => !!emp)
+      ).map((emp) => (
+        <Badge
+          key={emp.id}
+          variant="secondary"
+          className="text-xs"
+          style={
+            emp.color
+              ? { backgroundColor: emp.color, color: "white" }
+              : {}
+          }
+        >
+          {emp.name}
+        </Badge>
+      ))}
+    </div>
+  );
+};
   return (
     <TooltipProvider>
       <Tabs defaultValue="list" className="w-full">
@@ -1607,5 +1631,3 @@ const { cloudReady } = useSettings();
     </TooltipProvider>
   );
 }
-
-

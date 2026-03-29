@@ -62,20 +62,25 @@ export type CleaningSchedule = {
   id: string;
   siteName: string;
   tasks: string;
+
+  // Legacy display names; keep during migration/backward compatibility
   assignedTo: string[];
+
+  // Stable source of truth for permissions, filtering, and notifications
+  assignedEmployeeIds: string[];
+
   note?: string;
-  
+
   // New recurrence model
   startDate: string; // YYYY-MM-DD, the anchor date for the recurrence
   repeatFrequency: RepeatFrequency;
   daysOfWeek?: DayOfWeek[]; // Only for 'weekly', 'every-2-weeks', 'every-3-weeks'
-  
+
   repeatUntil?: string; // yyyy-MM-dd, optional end date
   servicePrice?: number;
   billingFrequency?: BillingFrequency;
   exceptionDates?: string[];
   assignedTeamId?: string; // references settings.teams[].id
-
 };
 
 

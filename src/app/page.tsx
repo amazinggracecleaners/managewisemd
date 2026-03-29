@@ -69,7 +69,7 @@ import { EmployeeLogin } from "@/components/timewise/employee-login";
 import { getAiSummary } from "@/app/actions";
 import { errorEmitter } from "@/firebase/error-emitter";
 import { FirestorePermissionError } from "@/firebase/errors";
-
+import { where } from "firebase/firestore";
 // ✅ Import singletons
 import { db, auth } from "@/firebase/client";
 
@@ -388,20 +388,35 @@ const attachFirestoreListeners = useCallback(
     );
 
     // ✅ schedules hydration marker
-    unsubs.push(
-      onSnapshot(
-        query(collection(db, "companies", safeCId, "schedules")),
-        (snap) => {
-          schedulesHydratedRef.current = true;
-          setSchedules(snap.docs.map((d) => ({ id: d.id, ...d.data() } as CleaningSchedule)));
-        },
-        (err) => {
-          // Do not mark hydrated on error
-          schedulesHydratedRef.current = false;
-          handleSnapshotError("schedules")(err);
-        }
+   
+     const schedulesRef = collection(db, "companies", safeCId, "schedules");
+
+const schedulesQuery =
+  !unlocked && loggedInEmployee?.id
+    ? query(
+        schedulesRef,
+        where("assignedEmployeeIds", "array-contains", loggedInEmployee.id )
       )
-    );
+    : query(schedulesRef);
+
+unsubs.push(
+  onSnapshot(
+    schedulesQuery,
+    (snap) => {
+      schedulesHydratedRef.current = true;
+      setSchedules(
+        snap.docs.map((d) => ({
+          id: d.id,
+          ...d.data(),
+        })) as CleaningSchedule[]
+      );
+    },
+    (err) => {
+      schedulesHydratedRef.current = false;
+      handleSnapshotError("schedules")(err);
+    }
+  )
+);
 
     unsubs.push(
       onSnapshot(
@@ -461,25 +476,7 @@ unsubs.push(
     handleSnapshotError("notifications")
   )
 );
-    unsubs.push(
-      onSnapshot(
-        query(
-          collection(db, "companies", safeCId, "notifications"),
-          orderBy("createdAt", "desc")
-        ),
-        (snap) =>
-          setNotifications(
-            snap.docs.map(
-              (d) =>
-                ({
-                  id: d.id,
-                  ...d.data(),
-                } as ManagerNotification)
-            )
-          ),
-        handleSnapshotError("notifications")
-      )
-    );
+ 
     // ✅ CLEANUP FUNCTION
     return () => {
       unsubs.forEach((u) => u());
@@ -713,7 +710,7 @@ const requestLocation = useCallback((): Promise<{ lat: number; lng: number } | n
       { enableHighAccuracy: true, maximumAge: 0, timeout: 10000 }
     );
   });
-}, [toast]);
+}, [toast, unlocked, loggedInEmployee]);
 
 type SiteStatus = "complete" | "in-process" | "incomplete";
 
@@ -1069,35 +1066,66 @@ await addDoc(
 
   // --- Schedule ---
   const notifyEmployeesAboutSchedule = useCallback(
-  async (
-    schedule: Partial<CleaningSchedule> & { id?: string; siteName?: string },
-    action: "added" | "updated" | "deleted"
-  ) => {
+  async ({
+    before,
+    after,
+    action,
+  }: {
+    before?: Partial<CleaningSchedule> & { id?: string; siteName?: string };
+    after?: Partial<CleaningSchedule> & { id?: string; siteName?: string };
+    action: "added" | "updated" | "deleted";
+  }) => {
     if (engine !== "cloud") return;
 
     const cId = getCompanyId(settings);
-    const assignedNames = schedule.assignedTo ?? [];
-    if (!assignedNames.length) return;
 
-    const assignedEmployees = employees.filter((e) => assignedNames.includes(e.name));
-    if (!assignedEmployees.length) return;
+    const beforeIds = new Set(before?.assignedEmployeeIds ?? []);
+    const afterIds = new Set(after?.assignedEmployeeIds ?? []);
 
-    const actionLabel =
-      action === "added"
-        ? "added"
-        : action === "updated"
-        ? "updated"
-        : "deleted";
+    let idsToNotify = new Set<string>();
+
+    if (action === "added") {
+      idsToNotify = afterIds;
+    } else if (action === "deleted") {
+      idsToNotify = beforeIds;
+    } else {
+      const allIds = new Set([...beforeIds, ...afterIds]);
+
+      for (const id of allIds) {
+        const wasAssigned = beforeIds.has(id);
+        const isAssigned = afterIds.has(id);
+
+        if (!wasAssigned && isAssigned) idsToNotify.add(id);
+        else if (wasAssigned && !isAssigned) idsToNotify.add(id);
+        else if (wasAssigned && isAssigned) idsToNotify.add(id);
+      }
+    }
+
+    if (!idsToNotify.size) return;
+
+    const affectedEmployees = employees.filter((e) =>
+      idsToNotify.has(e.id)
+    );
+
+    if (!affectedEmployees.length) return;
+
+    const siteName = after?.siteName || before?.siteName || "a site";
+    const scheduleId = after?.id || before?.id || "";
 
     await Promise.all(
-      assignedEmployees.map((emp) =>
+      affectedEmployees.map((emp) =>
         addDoc(collection(db, "companies", cId, "employee_notifications"), {
           employeeId: emp.id,
           type: "schedule-change",
           title: "Schedule changed",
-          message: `Your schedule for ${schedule.siteName || "a site"} was ${actionLabel}.`,
-          siteName: schedule.siteName || "",
-          scheduleId: schedule.id || "",
+          message:
+            action === "added"
+              ? `You were assigned to ${siteName}.`
+              : action === "deleted"
+              ? `Your schedule for ${siteName} was removed.`
+              : `Your schedule for ${siteName} was updated.`,
+          siteName,
+          scheduleId,
           createdAt: serverTimestamp(),
           read: false,
         })
@@ -1116,10 +1144,10 @@ await addDoc(
         try {
           await writeThenVerify(newDocRef as any, cleanForFirestore(dataToSave) as any, "ADD_SCHEDULE");
           toast({ title: "Schedule added" });
-          await notifyEmployeesAboutSchedule(
-  { ...scheduleData, id: newDocRef.id },
-  "added"
-);
+          await notifyEmployeesAboutSchedule({
+  after: { ...scheduleData, id: newDocRef.id },
+  action: "added",
+});
         } catch (e: any) {
           errorEmitter.emit(
             "permission-error",
@@ -1149,10 +1177,11 @@ await addDoc(
           await updateDoc(docRef, cleanForFirestore(updates));
           toast({ title: "Schedule updated" });
           const existing = schedules.find((s) => s.id === id);
-          await notifyEmployeesAboutSchedule(
-  { ...(existing || {}), ...updates, id },
-  "updated"
-);
+          await notifyEmployeesAboutSchedule({
+  before: existing,
+  after: { ...(existing || {}), ...updates, id },
+  action: "updated",
+});
         } catch (e: any) {
           errorEmitter.emit(
             "permission-error",
@@ -1182,7 +1211,10 @@ await addDoc(
           toast({ title: "Schedule deleted" });
          
           if (existing) {
-  await notifyEmployeesAboutSchedule(existing, "deleted");
+  await notifyEmployeesAboutSchedule({
+  before: existing,
+  action: "deleted",
+});
 }
         } catch (e: any) {
           errorEmitter.emit("permission-error", new FirestorePermissionError({ path: docRef.path, operation: "delete" }));

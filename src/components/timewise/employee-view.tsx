@@ -222,7 +222,8 @@ export function EmployeeView({
       if (!s.startDate) return false;
 
       const isAssignedDirect =
-  s.assignedTo?.includes(employee.name) ?? false;
+  (s.assignedEmployeeIds ?? []).includes(employee.id) ||
+  (s.assignedTo ?? []).includes(employee.name);
 
 const employeeTeamId =
   (employee as any).teamId as string | undefined;
@@ -289,7 +290,7 @@ if (!isAssigned) return false;
     const scheduledSiteNames = new Set(scheduleForDay(currentDate).map((s) => s.siteName));
 
     return sessionsForEmployee.filter((s) => s.active && s.in?.site && !scheduledSiteNames.has(s.in.site));
-  }, [sessionsForEmployee, currentDate, schedules]);
+  }, [schedules, employee.id, today, settings.weekStartsOn]);
 
   const weeklySchedule = useMemo(() => {
     const startOfUserWeek = startOfWeek(today, { weekStartsOn: settings.weekStartsOn });
@@ -300,7 +301,7 @@ if (!isAssigned) return false;
       week.push({ date: day, schedules: scheduleForDay(day) });
     }
     return week;
-  }, [schedules, employee.name, today, settings.weekStartsOn]);
+  }, [schedules, employee.id, today, settings.weekStartsOn]);
 
   const handleOpenNoteDialog = (schedule: CleaningSchedule) => {
     setEditingNoteForSchedule(schedule);
@@ -454,7 +455,7 @@ const dailySiteSummary = useMemo(() => {
   }
 
   return { total, complete, inProcess, incomplete };
-}, [currentDate, schedules, employee.name, getSiteStatuses]);
+}, [currentDate, schedules, employee.id, getSiteStatuses]);
   const handleViewTimesheet = (periodId: string, employeeId: string) => {
     const period = payrollPeriods.find((p) => p.id === periodId);
     if (!period || employee.id !== employeeId) return;
