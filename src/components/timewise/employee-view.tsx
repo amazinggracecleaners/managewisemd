@@ -74,7 +74,7 @@ interface EmployeeViewProps {
     action: "in" | "out",
     site: Site,
     entryTime: Date,
-    note: string,
+    note?: string,
     employeeId?: string,
     isManagerOverride?: boolean,
     context?: {
@@ -339,65 +339,44 @@ if (!isAssigned) return false;
   [sessionsForEmployee]
 );
 
-  const handleClockInOut = useCallback(
-    (action: "in" | "out", siteName: string) => {
-      const site = settings.sites.find((s) => s.name === siteName);
-      if (!site) {
-        toast({ variant: "destructive", title: "Site not found." });
-        return;
-      }
-
-      const isPastDay = isBefore(startOfDay(currentDate), startOfToday());
+ const handleClockInOut = useCallback(
+  (action: "in" | "out", siteName: string) => {
+    const site = settings.sites.find((s) => s.name === siteName);
+    if (!site) {
+      toast({ variant: "destructive", title: "Site not found." });
+      return;
+    }
+    
+const isPastDay = isBefore(startOfDay(currentDate), startOfToday());
       const isFutureDay = isBefore(startOfToday(), startOfDay(currentDate));
 
-      if (action === "in") {
-        // Always enforce no overlapping shifts
-        const activeSomewhere = isClockedIn(undefined, employee.id);
-        const activeHere = isClockedIn(siteName, employee.id);
+    if (action === "in") {
+      const activeSomewhere = isClockedIn(undefined, employee.id);
+      const activeHere = isClockedIn(siteName, employee.id);
 
-        if (!isManagerPreview && activeSomewhere && !activeHere) {
-          toast({
-            variant: "destructive",
-            title: "You are already clocked in.",
-            description: "Please clock out from your current job before starting another.",
-          });
-          return;
-        }
-
-        const isOverrideForIn = isPastDay || isFutureDay || isManagerPreview;
-
-        recordEntry(
-  "in",
-  site,
-  currentDate,
-  "",
-  employee.id,
-  isOverrideForIn,
-  {
-    source: "employee-clock",
-    initiatedBy: employee.id,
-  }
-);
+      if (!isManagerPreview && activeSomewhere && !activeHere) {
+        toast({
+          variant: "destructive",
+          title: "You are already clocked in.",
+          description: "Please clock out from your current job before starting another.",
+        });
         return;
       }
 
-      // action === "out"
-      const isOverrideForOut = isPastDay || isFutureDay || isManagerPreview;
-     recordEntry(
-  "out",
-  site,
-  currentDate,
-  "",
-  employee.id,
-  isOverrideForOut,
-  {
-    source: "employee-clock",
-    initiatedBy: employee.id,
-  }
+      recordEntry("in", site, new Date(), undefined, employee.id, false, {
+        source: "employee-clock",
+        initiatedBy: employee.id,
+      });
+      return;
+    }
+
+    recordEntry("out", site, new Date(), undefined, employee.id, false, {
+      source: "employee-clock",
+      initiatedBy: employee.id,
+    });
+  },
+  [settings.sites, isClockedIn, employee.id, recordEntry, toast, isManagerPreview]
 );
-    },
-    [settings.sites, isClockedIn, employee.id, currentDate, recordEntry, toast, isManagerPreview]
-  );
 
   const calculateHoursForPeriod = useCallback(
     (startDate: Date, endDate: Date) => {

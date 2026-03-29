@@ -780,7 +780,14 @@ const recordEntry = useCallback(
     forDate: Date,
     note?: string,
     employeeId?: string,
-    isManagerOverride: boolean = false
+    isManagerOverride: boolean = false,
+    context?: {
+      source:
+        | "employee-clock"
+        | "manager-schedule-view"
+        | "manager-manual-entry";
+      initiatedBy?: string;
+    }
   ) => {
     const targetEmployee =
       employees.find((e) => e.id === (employeeId || loggedInEmployee?.id)) || null;
@@ -789,7 +796,7 @@ const recordEntry = useCallback(
       toast({ variant: "destructive", title: "No employee selected." });
       return;
     }
-    const deviceLabel = isManagerOverride ? "Manager override" : getDeviceLabel();
+
     if (!site) {
       toast({
         variant: "destructive",
@@ -803,168 +810,160 @@ const recordEntry = useCallback(
     let currentCoord = coord;
 
     // --- CLOCK-OUT ---
-    if (action === "out") {
-      const openShift = sessions.find(
-        (s) =>
-          s.active &&
-          s.employeeId === targetEmployee.id &&
-          (s.in?.site || "") === site.name
-      );
+ if (action === "out") {
+  const openShift = sessions.find(
+    (s) =>
+      s.active &&
+      s.employeeId === targetEmployee.id &&
+      (s.in?.site || "") === site.name
+  );
 
-      const now = new Date();
+  const now = new Date();
 
-      // Manager-only: manual OUT on a specific day (synthetic IN)
-      if (!openShift && isManagerOverride) {
-        // Use your existing helper for manual outs, but ensure IN < OUT and at least 1 minute
-        const outTsRaw = buildTsOnDay(forDate, now);
+  // Manager-only: manual OUT on a specific day (synthetic IN)
+  if (!openShift && isManagerOverride) {
+    const manualOutTsRaw = buildTsOnDay(forDate, now);
 
-        // If buildTsOnDay accidentally lands before start-of-day, clamp up.
-        const dayStartTs = startOfDay(new Date(forDate)).getTime();
-        const outTs = Math.max(outTsRaw, dayStartTs + MIN_SHIFT_MS);
+    const dayStartTs = startOfDay(new Date(forDate)).getTime();
+    const manualOutTs = Math.max(manualOutTsRaw, dayStartTs + MIN_SHIFT_MS);
 
-        const inTs = Math.max(outTs - MIN_SHIFT_MS, dayStartTs);
+    const manualInTs = Math.max(manualOutTs - MIN_SHIFT_MS, dayStartTs);
 
-        const syntheticIn: Omit<Entry, "id"> = {
-          employee: targetEmployee.name,
-          employeeId: targetEmployee.id,
-          action: "in",
-          ts: inTs,
-          site: site.name,
-          note: "[MANUAL] Synthetic IN to pair manual OUT",
-        };
+    const syntheticIn: Omit<Entry, "id"> = {
+      employee: targetEmployee.name,
+      employeeId: targetEmployee.id,
+      action: "in",
+      ts: manualInTs,
+      site: site.name,
+      note: "[MANUAL] Synthetic IN to pair manual OUT",
+    };
 
-        const manualOut: Omit<Entry, "id"> = {
-          employee: targetEmployee.name,
-          employeeId: targetEmployee.id,
-          action: "out",
-          ts: outTs,
-          site: site.name,
-          note: note || "[MANUAL] Manual OUT",
-        };
+    const manualOut: Omit<Entry, "id"> = {
+      employee: targetEmployee.name,
+      employeeId: targetEmployee.id,
+      action: "out",
+      ts: manualOutTs,
+      site: site.name,
+      note: note || "[MANUAL] Manual OUT",
+    };
 
-        if (engine === "cloud") {
-          const cId = getCompanyId(settings);
-          const col = collection(db, "companies", cId, "timeclock_entries");
-          await addDoc(col, { ...syntheticIn, createdAt: serverTimestamp() });
-          await addDoc(col, { ...manualOut, createdAt: serverTimestamp() });
-        } else {
-          setEntries((prev) => [
-            ...prev,
-            { id: uuid(), ...syntheticIn } as Entry,
-            { id: uuid(), ...manualOut } as Entry,
-          ]);
-        }
+    if (engine === "cloud") {
+      const cId = getCompanyId(settings);
+      const col = collection(db, "companies", cId, "timeclock_entries");
 
-        toast({ title: `Clock OUT recorded for ${site.name} (manual).` });
-        return;
-      }
-
-      if (!openShift) {
-        toast({
-          variant: "destructive",
-          title: "Not clocked in at this site",
-          description: `${targetEmployee.name} is not currently clocked in at ${site.name}.`,
-        });
-        return;
-      }
-
-      const inTs = openShift.in?.ts ?? 0;
-
-      // ✅ FIX: candidate OUT time in manager override is built on forDate,
-      // but if it would fall BEFORE the IN time (cross-midnight), roll to next day.
-     const candidateOutTs = buildTsOnDayWithRoll(forDate, now, inTs);
-
-      // ✅ Ensure OUT is at least 1 minute after IN (prevents 00:00 display edge cases)
-      const outTs = Math.max(candidateOutTs, inTs + MIN_SHIFT_MS);
-
-      entryData = {
-        employee: targetEmployee.name,
-        employeeId: targetEmployee.id,
-        action: "out",
-        ts: outTs,
-        site: site.name,
-      };
+      await addDoc(col, { ...syntheticIn, createdAt: serverTimestamp() });
+      await addDoc(col, { ...manualOut, createdAt: serverTimestamp() });
     } else {
-      // --- CLOCK-IN ---
-      const anyShiftActive = isClockedIn(undefined, targetEmployee.id);
+      setEntries((prev) => [
+        ...prev,
+        { id: uuid(), ...syntheticIn } as Entry,
+        { id: uuid(), ...manualOut } as Entry,
+      ]);
+    }
 
-      if (!isManagerOverride && anyShiftActive) {
+    toast({ title: `Clock OUT recorded for ${site.name} (manual).` });
+    return;
+  }
+
+  if (!openShift) {
+    toast({
+      variant: "destructive",
+      title: "Not clocked in at this site",
+      description: `${targetEmployee.name} is not currently clocked in at ${site.name}.`,
+    });
+    return;
+  }
+
+  const openInTs = openShift.in?.ts ?? 0;
+
+  const candidateOutTs = buildTsOnDayWithRoll(forDate, now, openInTs);
+  const finalOutTs = Math.max(candidateOutTs, openInTs + MIN_SHIFT_MS);
+
+  entryData = {
+    employee: targetEmployee.name,
+    employeeId: targetEmployee.id,
+    action: "out",
+    ts: finalOutTs,
+    site: site.name,
+  };
+} else {
+  // --- CLOCK-IN ---
+  const anyShiftActive = isClockedIn(undefined, targetEmployee.id);
+
+  if (!isManagerOverride && anyShiftActive) {
+    toast({
+      variant: "destructive",
+      title: "Shift already active",
+      description: `${targetEmployee.name} must clock out from their current shift before starting a new one.`,
+    });
+    return;
+  }
+
+  if (!isManagerOverride) {
+    if (settings.requireGPS && !currentCoord) {
+      toast({
+        title: "Location required",
+        description: "Getting your location to verify...",
+      });
+      currentCoord = await requestLocation();
+    }
+
+    if (settings.requireGPS && !currentCoord) {
+      toast({
+        variant: "destructive",
+        title: "Clock-in denied",
+        description:
+          "Could not get your location. Please enable location services.",
+      });
+      return;
+    }
+
+    if (settings.requireGeofence && currentCoord) {
+      if (!site.lat || !site.lng) {
         toast({
           variant: "destructive",
-          title: "Shift already active",
-          description: `${targetEmployee.name} must clock out from their current shift before starting a new one.`,
+          title: "Clock-in denied: site location missing",
+          description: `Geofence is required, but the site "${site.name}" does not have GPS coordinates set.`,
+          duration: 7000,
         });
         return;
       }
 
-      // Only employees must pass GPS / geofence checks
-      if (!isManagerOverride) {
-        if (settings.requireGPS && !currentCoord) {
-          toast({
-            title: "Location required",
-            description: "Getting your location to verify...",
-          });
-          currentCoord = await requestLocation();
-        }
+      const METERS_TO_FEET = 3.28084;
+      const distanceInMeters = haversineDistance(
+        { lat: site.lat, lng: site.lng },
+        currentCoord
+      );
+      const distanceInFeet = distanceInMeters * METERS_TO_FEET;
 
-        if (settings.requireGPS && !currentCoord) {
-          toast({
-            variant: "destructive",
-            title: "Clock-in denied",
-            description:
-              "Could not get your location. Please enable location services.",
-          });
-          return;
-        }
+      const radiusMeters = settings.geofenceRadius ?? 0;
+      const radiusInFeet = radiusMeters > 0 ? radiusMeters * METERS_TO_FEET : 150;
 
-        if (settings.requireGeofence && currentCoord) {
-          if (!site.lat || !site.lng) {
-            toast({
-              variant: "destructive",
-              title: "Clock-in denied: site location missing",
-              description: `Geofence is required, but the site "${site.name}" does not have GPS coordinates set.`,
-              duration: 7000,
-            });
-            return;
-          }
-
-          const METERS_TO_FEET = 3.28084;
-          const distanceInMeters = haversineDistance(
-            { lat: site.lat, lng: site.lng },
-            currentCoord
-          );
-          const distanceInFeet = distanceInMeters * METERS_TO_FEET;
-
-          // ⚠️ Note: your settings.geofenceRadius is stored in METERS in ManagerSettingsView (Option 1),
-          // so radiusInFeet should convert meters -> feet.
-          const radiusMeters = settings.geofenceRadius ?? 0;
-          const radiusInFeet = radiusMeters > 0 ? radiusMeters * METERS_TO_FEET : 150;
-
-          if (distanceInFeet > radiusInFeet) {
-            toast({
-              variant: "destructive",
-              title: "Clock-in denied: out of range",
-              description: `You are ${distanceInFeet.toFixed(
-                0
-              )}ft away. You must be within ${radiusInFeet.toFixed(0)}ft.`,
-              duration: 7000,
-            });
-            return;
-          }
-        }
+      if (distanceInFeet > radiusInFeet) {
+        toast({
+          variant: "destructive",
+          title: "Clock-in denied: out of range",
+          description: `You are ${distanceInFeet.toFixed(
+            0
+          )}ft away. You must be within ${radiusInFeet.toFixed(0)}ft.`,
+          duration: 7000,
+        });
+        return;
       }
-
-      const now = new Date();
-const ts = buildTsOnDay(forDate, now);
-
-      entryData = {
-        employee: targetEmployee.name,
-        employeeId: targetEmployee.id,
-        action: "in",
-        ts,
-        site: site.name,
-      };
     }
+  }
+
+  const now = new Date();
+  const ts = buildTsOnDay(forDate, now);
+
+  entryData = {
+    employee: targetEmployee.name,
+    employeeId: targetEmployee.id,
+    action: "in",
+    ts,
+    site: site.name,
+  };
+}
 
     const dataToSave: any = { ...entryData };
     if (currentCoord?.lat && currentCoord?.lng) {
@@ -977,6 +976,14 @@ const ts = buildTsOnDay(forDate, now);
       const cId = getCompanyId(settings);
       const ref = collection(db, "companies", cId, "timeclock_entries");
       await addDoc(ref, { ...dataToSave, createdAt: serverTimestamp() });
+      const isManagerAction =
+  context?.source === "manager-schedule-view" ||
+  context?.source === "manager-manual-entry" ||
+  isManagerOverride === true;
+
+const deviceLabel = isManagerAction
+  ? "Manager override"
+  : getDeviceLabel();
       // ✅ CREATE NOTIFICATION
 await addDoc(
   collection(db, "companies", cId, "notifications"),
