@@ -416,11 +416,37 @@ const resolveAssignedEmployeeIds = (names: string[]): string[] => {
     "id"
   >;
 
-  if (editingSchedule) {
-    updateSchedule(editingSchedule.id, cleanedData);
+ if (editingSchedule) {
+  const hasOccurrenceContext =
+    !!editingOccurrenceDate &&
+    editingSchedule.repeatFrequency !== "does-not-repeat";
+
+  if (hasOccurrenceContext && applyScope === "single") {
+    const dateStr = format(editingOccurrenceDate!, "yyyy-MM-dd");
+
+    const existingExceptions =
+      (editingSchedule.exceptionDates as string[] | undefined) || [];
+    const newExceptions = Array.from(new Set([...existingExceptions, dateStr]));
+
+    updateSchedule(editingSchedule.id, { exceptionDates: newExceptions });
+
+    const singleOccurrenceData: Omit<CleaningSchedule, "id"> = {
+      ...baseData,
+      startDate: dateStr,
+      repeatFrequency: "does-not-repeat",
+      daysOfWeek: undefined,
+      repeatUntil: undefined,
+    };
+
+    addSchedule(
+      cleanForFirestore(singleOccurrenceData) as Omit<CleaningSchedule, "id">
+    );
   } else {
-    addSchedule(cleanedData);
+    updateSchedule(editingSchedule.id, cleanedData);
   }
+} else {
+  addSchedule(cleanedData);
+}
 
   setIsDialogOpen(false);
   setEditingOccurrenceDate(undefined);

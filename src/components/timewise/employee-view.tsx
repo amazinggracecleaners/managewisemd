@@ -221,9 +221,10 @@ export function EmployeeView({
     return schedules.filter((s) => {
       if (!s.startDate) return false;
 
-      const isAssignedDirect =
-  (s.assignedEmployeeIds ?? []).includes(employee.id) ||
-  (s.assignedTo ?? []).includes(employee.name);
+     const isAssignedDirect =
+  (s.assignedEmployeeIds?.length
+    ? s.assignedEmployeeIds.includes(employee.id)
+    : (s.assignedTo ?? []).includes(employee.name));
 
 const employeeTeamId =
   (employee as any).teamId as string | undefined;
