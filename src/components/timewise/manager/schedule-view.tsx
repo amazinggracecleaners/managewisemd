@@ -373,92 +373,59 @@ const resolveAssignedEmployeeIds = (names: string[]): string[] => {
     setIsDialogOpen(true);
   };
 
-  const handleSubmit = () => {
-    if (!siteName || !tasks || !startDate || !validateAssignment()) {
-      alert(
-        "Please fill out required fields: Site, Start Date, Tasks, and Assignment (Team or Employees)."
-      );
-      return;
-    }
+ const handleSubmit = () => {
+  if (!siteName || !tasks || !startDate || !validateAssignment()) {
+    alert(
+      "Please fill out required fields: Site, Start Date, Tasks, and Assignment (Team or Employees)."
+    );
+    return;
+  }
 
-    if (
-      (repeatFrequency === "weekly" ||
-        repeatFrequency === "every-2-weeks" ||
-        repeatFrequency === "every-3-weeks") &&
-      daysOfWeek.length === 0
-    ) {
-      alert(
-        "Please select at least one day of the week for weekly repeating schedules."
-      );
-      return;
-    }
-const assignedEmployeeIds =
-  assignMode === "team" ? [] : resolveAssignedEmployeeIds(assignedTo);
+  if (
+    (repeatFrequency === "weekly" ||
+      repeatFrequency === "every-2-weeks" ||
+      repeatFrequency === "every-3-weeks") &&
+    daysOfWeek.length === 0
+  ) {
+    alert(
+      "Please select at least one day of the week for weekly repeating schedules."
+    );
+    return;
+  }
 
-const baseData: Omit<CleaningSchedule, "id"> = {
-  siteName,
-  tasks,
-  note,
+  const assignedEmployeeIds =
+    assignMode === "team" ? [] : resolveAssignedEmployeeIds(assignedTo);
 
-  assignedTeamId: assignMode === "team" ? assignedTeamId : undefined,
-  assignedTo: assignMode === "team" ? [] : assignedTo,
-  assignedEmployeeIds,
-
-      startDate: format(startDate, "yyyy-MM-dd"),
-      repeatFrequency,
-      daysOfWeek: repeatFrequency.includes("week") ? daysOfWeek : undefined,
-      repeatUntil: repeatUntil ? format(repeatUntil, "yyyy-MM-dd") : undefined,
-
-      servicePrice,
-      billingFrequency,
-    };
-
-    const cleanedData = cleanForFirestore(baseData) as Omit<
-      CleaningSchedule,
-      "id"
-    >;
-
-    if (editingSchedule) {
-      const hasOccurrenceContext =
-        !!editingOccurrenceDate &&
-        editingSchedule.repeatFrequency !== "does-not-repeat";
-
-      // 🧩 “This day only” = add exception + create one-off schedule
-      if (hasOccurrenceContext && applyScope === "single") {
-        const dateStr = format(editingOccurrenceDate!, "yyyy-MM-dd");
-
-        const existingExceptions =
-          (editingSchedule.exceptionDates as string[] | undefined) || [];
-        const newExceptions = Array.from(
-          new Set([...existingExceptions, dateStr])
-        );
-
-        updateSchedule(editingSchedule.id, { exceptionDates: newExceptions });
-
-        const singleOccurrenceData: Omit<CleaningSchedule, "id"> = {
-          ...baseData,
-          startDate: dateStr,
-          repeatFrequency: "does-not-repeat",
-          daysOfWeek: undefined,
-          repeatUntil: undefined,
-        };
-
-        addSchedule(
-          cleanForFirestore(singleOccurrenceData) as Omit<CleaningSchedule, "id">
-        );
-      } else {
-        // 🔁 entire series
-        updateSchedule(editingSchedule.id, cleanedData);
-      }
-    } else {
-      // ➕ new schedule
-      addSchedule(cleanedData);
-    }
-
-    setIsDialogOpen(false);
-    setEditingOccurrenceDate(undefined);
-    setApplyScope("series");
+  const baseData: Omit<CleaningSchedule, "id"> = {
+    siteName,
+    tasks,
+    note,
+    assignedTeamId: assignMode === "team" ? assignedTeamId : undefined,
+    assignedTo: assignMode === "team" ? [] : assignedTo,
+    assignedEmployeeIds,
+    startDate: format(startDate, "yyyy-MM-dd"),
+    repeatFrequency,
+    daysOfWeek: repeatFrequency.includes("week") ? daysOfWeek : undefined,
+    repeatUntil: repeatUntil ? format(repeatUntil, "yyyy-MM-dd") : undefined,
+    servicePrice,
+    billingFrequency,
   };
+
+  const cleanedData = cleanForFirestore(baseData) as Omit<
+    CleaningSchedule,
+    "id"
+  >;
+
+  if (editingSchedule) {
+    updateSchedule(editingSchedule.id, cleanedData);
+  } else {
+    addSchedule(cleanedData);
+  }
+
+  setIsDialogOpen(false);
+  setEditingOccurrenceDate(undefined);
+  setApplyScope("series");
+};
 
   const getSchedulesForDate = (date: Date) => {
     const dateStr = format(date, "yyyy-MM-dd");
@@ -990,44 +957,8 @@ const dailySiteCount = new Set(dailySchedules.map((s) => s.siteName)).size;
                       onChange={(e) => setNote(e.target.value)}
                       placeholder="e.g., Use the back entrance after 5 PM."
                     />
-                  </div>
-
-                  {/* scope selector (only when editing a single occurrence of a repeating schedule) */}
-                  {editingSchedule &&
-                    editingOccurrenceDate &&
-                    editingSchedule.repeatFrequency !== "does-not-repeat" && (
-                      <div className="space-y-2">
-                        <Label>Apply changes to</Label>
-                        <RadioGroup
-                          value={applyScope}
-                          onValueChange={(v) =>
-                            setApplyScope(v as "single" | "series")
-                          }
-                          className="flex flex-col gap-2 sm:flex-row"
-                        >
-                          <Label
-                            htmlFor="scope-single"
-                            className="flex items-center space-x-2 rounded-md border px-3 py-2 cursor-pointer"
-                          >
-                            <RadioGroupItem id="scope-single" value="single" />
-                            <span className="text-sm">
-                              This day only (
-                              {format(editingOccurrenceDate, "yyyy-MM-dd")})
-                            </span>
-                          </Label>
-
-                          <Label
-                            htmlFor="scope-series"
-                            className="flex items-center space-x-2 rounded-md border px-3 py-2 cursor-pointer"
-                          >
-                            <RadioGroupItem id="scope-series" value="series" />
-                            <span className="text-sm">
-                              All future days in this schedule
-                            </span>
-                          </Label>
-                        </RadioGroup>
-                      </div>
-                    )}
+                   </div>
+                     
                 </div>
               </ScrollArea>
 
