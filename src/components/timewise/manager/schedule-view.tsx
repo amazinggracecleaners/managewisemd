@@ -454,73 +454,85 @@ const resolveAssignedEmployeeIds = (names: string[]): string[] => {
 };
 
   const getSchedulesForDate = (date: Date) => {
-    const dateStr = format(date, "yyyy-MM-dd");
+  const dateStr = format(date, "yyyy-MM-dd");
 
-    return schedules.filter((s) => {
-      if (!s.startDate) return false;
-      const schStart = parseISO(s.startDate);
+  // 1. overrides (single-day)
+  const overrides = schedules.filter(
+    (s) =>
+      s.repeatFrequency === "does-not-repeat" &&
+      s.startDate === dateStr
+  );
 
-      // 🚫 skip exception dates
-      if (s.exceptionDates?.includes(dateStr)) return false;
+  // 2. recurring
+  const recurring = schedules.filter(
+    (s) => s.repeatFrequency !== "does-not-repeat"
+  );
 
-      if (date < startOfDay(schStart)) return false;
-      if (s.repeatUntil && date > parseISO(s.repeatUntil)) return false;
+  const resolvedRecurring = recurring.filter((s) => {
+    if (!s.startDate) return false;
 
-      const monthDiff =
-        (getYear(date) - getYear(schStart)) * 12 +
-        (getMonth(date) - getMonth(schStart));
+    const schStart = parseISO(s.startDate);
 
-      switch (s.repeatFrequency) {
-        case "does-not-repeat":
-          return isSameDay(date, schStart);
+    // ❌ skip exception
+    if (s.exceptionDates?.includes(dateStr)) return false;
 
-        case "weekly":
-        case "every-2-weeks":
-        case "every-3-weeks": {
-          const dayName = format(date, "EEEE") as DayOfWeek;
-          if (!s.daysOfWeek?.includes(dayName)) return false;
+    if (date < startOfDay(schStart)) return false;
+    if (s.repeatUntil && date > parseISO(s.repeatUntil)) return false;
 
-          const weekDiff = differenceInCalendarWeeks(date, schStart, {
-            weekStartsOn,
-          });
+    const monthDiff =
+      (getYear(date) - getYear(schStart)) * 12 +
+      (getMonth(date) - getMonth(schStart));
 
-          if (s.repeatFrequency === "weekly") return weekDiff >= 0;
-          if (s.repeatFrequency === "every-2-weeks")
-            return weekDiff >= 0 && weekDiff % 2 === 0;
-          if (s.repeatFrequency === "every-3-weeks")
-            return weekDiff >= 0 && weekDiff % 3 === 0;
-          return false;
-        }
+    switch (s.repeatFrequency) {
+      case "weekly":
+      case "every-2-weeks":
+      case "every-3-weeks": {
+        const dayName = format(date, "EEEE") as DayOfWeek;
+        if (!s.daysOfWeek?.includes(dayName)) return false;
 
-        case "monthly":
-          return getDate(date) === getDate(schStart) && monthDiff >= 0;
+        const weekDiff = differenceInCalendarWeeks(date, schStart, {
+          weekStartsOn,
+        });
 
-        case "every-2-months":
-          return (
-            getDate(date) === getDate(schStart) &&
-            monthDiff >= 0 &&
-            monthDiff % 2 === 0
-          );
-
-        case "quarterly":
-          return (
-            getDate(date) === getDate(schStart) &&
-            monthDiff >= 0 &&
-            monthDiff % 3 === 0
-          );
-
-        case "yearly":
-          return (
-            getDate(date) === getDate(schStart) &&
-            getMonth(date) === getMonth(schStart) &&
-            monthDiff >= 0
-          );
-
-        default:
-          return false;
+        if (s.repeatFrequency === "weekly") return weekDiff >= 0;
+        if (s.repeatFrequency === "every-2-weeks")
+          return weekDiff >= 0 && weekDiff % 2 === 0;
+        if (s.repeatFrequency === "every-3-weeks")
+          return weekDiff >= 0 && weekDiff % 3 === 0;
+        return false;
       }
-    });
-  };
+
+      case "monthly":
+        return getDate(date) === getDate(schStart) && monthDiff >= 0;
+
+      case "every-2-months":
+        return getDate(date) === getDate(schStart) && monthDiff >= 0 && monthDiff % 2 === 0;
+
+      case "quarterly":
+        return getDate(date) === getDate(schStart) && monthDiff >= 0 && monthDiff % 3 === 0;
+
+      case "yearly":
+        return (
+          getDate(date) === getDate(schStart) &&
+          getMonth(date) === getMonth(schStart) &&
+          monthDiff >= 0
+        );
+
+      default:
+        return false;
+    }
+  });
+
+  // 🚨 KEY: override wins over recurring
+  const filteredRecurring = resolvedRecurring.filter((base) => {
+    const hasOverride = overrides.some(
+      (o) => o.siteName === base.siteName
+    );
+    return !hasOverride;
+  });
+
+  return [...filteredRecurring, ...overrides];
+};
 
   // calendar view
   const startOfCurrentMonth = startOfMonth(currentDate);
@@ -599,7 +611,23 @@ const dailySiteCount = new Set(dailySchedules.map((s) => s.siteName)).size;
       inProcessCount: inProcess,
     };
   }, [dailySchedules, dailyStatuses]);
+  const listSchedules = useMemo(() => {
+  return schedules.filter((s) => {
+    // hide one-off overrides from the main list
+    if (s.repeatFrequency === "does-not-repeat" && s.startDate) {
+      const isOverride = schedules.some(
+        (base) =>
+          base.repeatFrequency !== "does-not-repeat" &&
+          base.exceptionDates?.includes(s.startDate) &&
+          base.siteName === s.siteName
+      );
 
+      if (isOverride) return false;
+    }
+
+    return true;
+  });
+}, [schedules]);
   const renderAssignmentBadges = (s: CleaningSchedule) => {
   if (s.assignedTeamId) {
     const team = teamsById.get(s.assignedTeamId);
@@ -1026,78 +1054,76 @@ const dailySiteCount = new Set(dailySchedules.map((s) => s.siteName)).size;
                   </TableHeader>
 
                   <TableBody>
-                    {schedules.length > 0 ? (
-                      schedules
-                        .slice()
-                        .sort((a, b) => a.siteName.localeCompare(b.siteName))
-                        .map((schedule) => {
-                          const repeatFreq =
-                            schedule.repeatFrequency || "does-not-repeat";
+  {listSchedules.length > 0 ? (
+    listSchedules
+      .slice()
+      .sort((a, b) => a.siteName.localeCompare(b.siteName))
+      .map((schedule) => {
+        const repeatFreq =
+          schedule.repeatFrequency || "does-not-repeat";
 
-                          return (
-                            <TableRow key={schedule.id}>
-                              <TableCell>{schedule.siteName}</TableCell>
-                              <TableCell className="capitalize">
-                                {repeatFreq.replace(/-/g, " ")}
-                                {repeatFreq.includes("week")
-                                  ? ` on ${schedule.daysOfWeek
-                                      ?.map((d) => d.substring(0, 3))
-                                      .join(", ")}`
-                                  : ""}
-                              </TableCell>
-                              <TableCell>{schedule.startDate}</TableCell>
-                              <TableCell>
-                                {schedule.repeatUntil
-                                  ? schedule.repeatUntil
-                                  : "Ongoing"}
-                              </TableCell>
-                              <TableCell className="max-w-[14rem]">
-                                {renderAssignmentBadges(schedule)}
-                              </TableCell>
-                              <TableCell className="max-w-sm truncate">
-                                {schedule.tasks}
-                              </TableCell>
-                              <TableCell
-                                className="max-w-xs truncate"
-                                title={schedule.note}
-                              >
-                                {schedule.note || "-"}
-                              </TableCell>
-                              <TableCell>
-                                {schedule.servicePrice
-                                  ? `$${schedule.servicePrice.toFixed(2)}`
-                                  : "-"}
-                              </TableCell>
-                              <TableCell>
-                                {schedule.billingFrequency || "-"}
-                              </TableCell>
-                              <TableCell className="text-right">
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  onClick={() => handleOpenDialog(schedule)}
-                                >
-                                  <Edit className="h-4 w-4" />
-                                </Button>
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  onClick={() => deleteSchedule(schedule.id)}
-                                >
-                                  <Trash2 className="h-4 w-4 text-destructive" />
-                                </Button>
-                              </TableCell>
-                            </TableRow>
-                          );
-                        })
-                    ) : (
-                      <TableRow>
-                        <TableCell colSpan={10} className="h-24 text-center">
-                          No schedules yet.
-                        </TableCell>
-                      </TableRow>
-                    )}
-                  </TableBody>
+        return (
+          <TableRow key={schedule.id}>
+            <TableCell>{schedule.siteName}</TableCell>
+            <TableCell className="capitalize">
+              {repeatFreq.replace(/-/g, " ")}
+              {repeatFreq.includes("week")
+                ? ` on ${schedule.daysOfWeek
+                    ?.map((d) => d.substring(0, 3))
+                    .join(", ")}`
+                : ""}
+            </TableCell>
+            <TableCell>{schedule.startDate}</TableCell>
+            <TableCell>
+              {schedule.repeatUntil ? schedule.repeatUntil : "Ongoing"}
+            </TableCell>
+            <TableCell className="max-w-[14rem]">
+              {renderAssignmentBadges(schedule)}
+            </TableCell>
+            <TableCell className="max-w-sm truncate">
+              {schedule.tasks}
+            </TableCell>
+            <TableCell
+              className="max-w-xs truncate"
+              title={schedule.note}
+            >
+              {schedule.note || "-"}
+            </TableCell>
+            <TableCell>
+              {schedule.servicePrice
+                ? `$${schedule.servicePrice.toFixed(2)}`
+                : "-"}
+            </TableCell>
+            <TableCell>
+              {schedule.billingFrequency || "-"}
+            </TableCell>
+            <TableCell className="text-right">
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => handleOpenDialog(schedule)}
+              >
+                <Edit className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => deleteSchedule(schedule.id)}
+              >
+                <Trash2 className="h-4 w-4 text-destructive" />
+              </Button>
+            </TableCell>
+          </TableRow>
+        );
+      })
+  ) : (
+    <TableRow>
+      <TableCell colSpan={10} className="h-24 text-center">
+        No schedules yet.
+      </TableCell>
+    </TableRow>
+  )}
+</TableBody>
                 </Table>
               </ScrollArea>
             </CardContent>

@@ -348,9 +348,13 @@ if (!isAssigned) return false;
       toast({ variant: "destructive", title: "Site not found." });
       return;
     }
-    
-const isPastDay = isBefore(startOfDay(currentDate), startOfToday());
-      const isFutureDay = isBefore(startOfToday(), startOfDay(currentDate));
+
+    const selectedDay = startOfDay(currentDate);
+    const today = startOfToday();
+
+    const isPastDay = isBefore(selectedDay, today);
+    const isFutureDay = isBefore(today, selectedDay);
+    const isDateOverride = isPastDay || isFutureDay || !!isManagerPreview;
 
     if (action === "in") {
       const activeSomewhere = isClockedIn(undefined, employee.id);
@@ -360,24 +364,49 @@ const isPastDay = isBefore(startOfDay(currentDate), startOfToday());
         toast({
           variant: "destructive",
           title: "You are already clocked in.",
-          description: "Please clock out from your current job before starting another.",
+          description:
+            "Please clock out from your current job before starting another.",
         });
         return;
       }
 
-      recordEntry("in", site, new Date(), undefined, employee.id, false, {
-        source: "employee-clock",
-        initiatedBy: employee.id,
-      });
+      recordEntry(
+        "in",
+        site,
+        currentDate,
+        undefined,
+        employee.id,
+        isDateOverride,
+        {
+          source: "employee-clock",
+          initiatedBy: employee.id,
+        }
+      );
       return;
     }
 
-    recordEntry("out", site, new Date(), undefined, employee.id, false, {
-      source: "employee-clock",
-      initiatedBy: employee.id,
-    });
+    recordEntry(
+      "out",
+      site,
+      currentDate,
+      undefined,
+      employee.id,
+      isDateOverride,
+      {
+        source: "employee-clock",
+        initiatedBy: employee.id,
+      }
+    );
   },
-  [settings.sites, isClockedIn, employee.id, recordEntry, toast, isManagerPreview]
+  [
+    settings.sites,
+    isClockedIn,
+    employee.id,
+    currentDate,
+    recordEntry,
+    toast,
+    isManagerPreview,
+  ]
 );
 
   const calculateHoursForPeriod = useCallback(
