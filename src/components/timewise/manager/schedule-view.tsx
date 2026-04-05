@@ -1,7 +1,7 @@
 // src/components/timewise/manager/schedule-view.tsx
 "use client";
 
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useEffect, useState } from "react";
 import type {
   Site,
   CleaningSchedule,
@@ -582,17 +582,70 @@ const resolveAssignedEmployeeIds = (names: string[]): string[] => {
     assignedEmployeeIds: updatedAssignedEmployeeIds,
   });
 };
+const [dailySearch, setDailySearch] = useState("");
+const [statusFilter, setStatusFilter] = useState<
+  "all" | "complete" | "in-process" | "incomplete"
+>("all");
 
-const dailySchedules = getSchedulesForDate(currentDate);
-const dailySiteCount = new Set(dailySchedules.map((s) => s.siteName)).size;
+useEffect(() => {
+  setDailySearch("");
+  setStatusFilter("all");
+}, [currentDate]);
 
-  const dailyStatuses = useMemo(
+const dailySchedules = useMemo(() => {
+  return getSchedulesForDate(currentDate);
+}, [currentDate, schedules]);
+
+const dailyStatuses = useMemo(
     () => getSiteStatuses(currentDate),
     [getSiteStatuses, currentDate]
   );
+const filteredDailySchedules = useMemo(() => {
+  const q = dailySearch.trim().toLowerCase();
+
+  return dailySchedules.filter((s) => {
+    const assignedEmployeeNames =
+      s.assignedEmployeeIds?.length
+        ? s.assignedEmployeeIds
+            .map((id) => employeeById.get(id)?.name ?? "")
+            .filter(Boolean)
+        : s.assignedTo ?? [];
+
+    const teamName = s.assignedTeamId
+      ? teamsById.get(s.assignedTeamId)?.name ?? ""
+      : "";
+
+    const matchesSearch =
+      !q ||
+      s.siteName.toLowerCase().includes(q) ||
+      s.tasks.toLowerCase().includes(q) ||
+      (s.note ?? "").toLowerCase().includes(q) ||
+      assignedEmployeeNames.some((name) => name.toLowerCase().includes(q)) ||
+      teamName.toLowerCase().includes(q);
+
+    const status = dailyStatuses.get(s.siteName);
+    const matchesStatus =
+      statusFilter === "all" ? true : status === statusFilter;
+
+    return matchesSearch && matchesStatus;
+  });
+}, [
+  dailySchedules,
+  dailySearch,
+  statusFilter,
+  employeeById,
+  teamsById,
+  dailyStatuses,
+]);
+
+const dailySiteCount = new Set(
+  filteredDailySchedules.map((s) => s.siteName)
+).size;
+
+  
 
   const { completeCount, incompleteCount, inProcessCount } = useMemo(() => {
-    const siteNamesForToday = new Set(dailySchedules.map((s) => s.siteName));
+    const siteNamesForToday = new Set(filteredDailySchedules.map((s) => s.siteName));
 
     let complete = 0;
     let incomplete = 0;
@@ -610,7 +663,7 @@ const dailySiteCount = new Set(dailySchedules.map((s) => s.siteName)).size;
       incompleteCount: incomplete,
       inProcessCount: inProcess,
     };
-  }, [dailySchedules, dailyStatuses]);
+  }, [filteredDailySchedules, dailyStatuses]);
   const listSchedules = useMemo(() => {
   return schedules.filter((s) => {
     // hide one-off overrides from the main list
@@ -1163,7 +1216,7 @@ const dailySiteCount = new Set(dailySchedules.map((s) => s.siteName)).size;
                 <div className="flex items-center gap-2">
                   {(() => {
                     const siteNames = new Set(
-                      dailySchedules.map((s) => s.siteName)
+                      filteredDailySchedules.map((s) => s.siteName)
                     );
                     let total = 0;
                     siteNames.forEach((name) => {
@@ -1199,10 +1252,39 @@ const dailySiteCount = new Set(dailySchedules.map((s) => s.siteName)).size;
             </CardHeader>
 
             <CardContent>
+                        <div className="flex flex-wrap items-center gap-2 mb-3">
+  <div className="w-full sm:w-72">
+    <Input
+      placeholder="Search site, employee, team..."
+      value={dailySearch}
+      onChange={(e) => setDailySearch(e.target.value)}
+    />
+  </div>
+
+  <Select
+    value={statusFilter}
+    onValueChange={(v: "all" | "complete" | "in-process" | "incomplete") =>
+      setStatusFilter(v)
+    }
+  >
+    <SelectTrigger className="w-[180px]">
+      <SelectValue placeholder="Filter by status" />
+    </SelectTrigger>
+    <SelectContent>
+      <SelectItem value="all">All statuses</SelectItem>
+      <SelectItem value="complete">Complete</SelectItem>
+      <SelectItem value="in-process">In Progress</SelectItem>
+      <SelectItem value="incomplete">Incomplete</SelectItem>
+    </SelectContent>
+  </Select>
+</div>
               <ScrollArea className="h-[60vh]">
-                {dailySchedules.length > 0 ? (
+      
+                     {filteredDailySchedules.length > 0 ? (
+          
                   <div className="space-y-4">
-                    {dailySchedules.map((s) => {
+        
+                    {filteredDailySchedules.map((s) => {
                       const site = sites.find((x) => x.name === s.siteName);
                       const status = dailyStatuses.get(s.siteName);
 
@@ -1383,6 +1465,7 @@ const dailySiteCount = new Set(dailySchedules.map((s) => s.siteName)).size;
                   <div className="flex items-center justify-center h-48 text-muted-foreground">
                     No tasks scheduled for this day.
                   </div>
+             
                 )}
               </ScrollArea>
             </CardContent>

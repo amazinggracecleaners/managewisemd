@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useMemo, useState, useCallback } from "react";
+import React, { useMemo, useState, useCallback, useEffect } from "react";
 import type {
   Entry,
   Settings,
@@ -65,7 +65,14 @@ import {
 } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { EmployeeNotifications } from "./employee-notifications";
-
+import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectTrigger,
+  SelectValue,
+  SelectContent,
+  SelectItem,
+} from "@/components/ui/select";
 interface EmployeeViewProps {
   employee: Employee;
   onLogout: () => void;
@@ -178,7 +185,14 @@ export function EmployeeView({
   const { toast } = useToast();
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [currentDate, setCurrentDate] = useState(startOfDay(new Date()));
-
+const [dailySearch, setDailySearch] = useState("");
+const [statusFilter, setStatusFilter] = useState<
+  "all" | "complete" | "in-process" | "incomplete"
+>("all");
+useEffect(() => {
+  setDailySearch("");
+  setStatusFilter("all");
+}, [currentDate]);
   const [isNoteDialogOpen, setIsNoteDialogOpen] = useState(false);
   const [editingNoteForSchedule, setEditingNoteForSchedule] = useState<CleaningSchedule | null>(null);
   const [currentNote, setCurrentNote] = useState("");
@@ -283,7 +297,29 @@ if (!isAssigned) return false;
       }
     });
   };
+    const currentSiteStatuses = useMemo(() => getSiteStatuses(currentDate), [getSiteStatuses, currentDate]);
 
+const dailySchedules = useMemo(() => {
+  return scheduleForDay(currentDate);
+}, [currentDate, schedules, employee.id, settings.weekStartsOn]);
+
+const filteredDailySchedules = useMemo(() => {
+  const q = dailySearch.trim().toLowerCase();
+
+  return dailySchedules.filter((s) => {
+    const matchesSearch =
+      !q ||
+      s.siteName.toLowerCase().includes(q) ||
+      s.tasks.toLowerCase().includes(q) ||
+      (s.note ?? "").toLowerCase().includes(q);
+
+    const status = currentSiteStatuses.get(s.siteName);
+    const matchesStatus =
+      statusFilter === "all" ? true : status === statusFilter;
+
+    return matchesSearch && matchesStatus;
+  });
+}, [dailySchedules, dailySearch, statusFilter, currentSiteStatuses]);
   // Off-schedule active shifts (for today only)
   const offScheduleActiveShifts = useMemo(() => {
     if (!isSameDay(currentDate, new Date())) return [];
@@ -465,7 +501,7 @@ if (!isAssigned) return false;
     setCurrentDate((prev) => add(prev, { days: amount }));
   };
 
-  const currentSiteStatuses = useMemo(() => getSiteStatuses(currentDate), [getSiteStatuses, currentDate]);
+
 // ✅ Daily Site Summary for Employee
 const dailySiteSummary = useMemo(() => {
   const schedulesToday = scheduleForDay(currentDate);
@@ -680,106 +716,66 @@ const getHoursForSiteDay = useCallback(
     Incomplete: {dailySiteSummary.incomplete}
   </Badge>
 </div>
-                      <ScrollArea className="h-72">
-                        {scheduleForDay(currentDate).length > 0 ||
-                        (isCurrentDayToday && offScheduleActiveShifts.length > 0) ? (
-                          <ul className="space-y-4">
-                            {scheduleForDay(currentDate).map((schedule) => {
-                              const scheduleSite = settings.sites.find((s) => s.name === schedule.siteName);
+ <div className="mb-3 flex flex-col sm:flex-row gap-2 sm:items-center">
 
-                              const clockedInAtThisSite = hasOpenShiftForSiteOnDate(schedule.siteName, currentDate);
+  {/* 🔍 Search */}
+  <div className="relative flex-1 min-w-[220px]">
+    <Input
+      placeholder="Search site or task..."
+      value={dailySearch}
+      onChange={(e) => setDailySearch(e.target.value)}
+      className="pr-8"
+    />
 
-                              const siteBonus =
-                                scheduleSite?.bonusType && scheduleSite.bonusAmount
-                                  ? scheduleSite.bonusType === "hourly"
-                                    ? ` (+$${scheduleSite.bonusAmount.toFixed(2)}/hr)`
-                                    : ` (+$${scheduleSite.bonusAmount.toFixed(2)} flat)`
-                                  : "";
+    {dailySearch && (
+      <button
+        onClick={() => setDailySearch("")}
+        className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-muted-foreground"
+      >
+        ✕
+      </button>
+    )}
+  </div>
 
-                              const status = currentSiteStatuses.get(schedule.siteName);
-                              const clockInDisabled = status === "complete";
+  {/* 🎯 Status Filter */}
+  <Select
+    value={statusFilter}
+    onValueChange={(v: "all" | "complete" | "in-process" | "incomplete") =>
+      setStatusFilter(v)
+    }
+  >
+    <SelectTrigger className="w-[180px]">
+      <SelectValue placeholder="Filter by status" />
+    </SelectTrigger>
+    <SelectContent>
+      <SelectItem value="all">All statuses</SelectItem>
+      <SelectItem value="complete">Complete</SelectItem>
+      <SelectItem value="in-process">In Progress</SelectItem>
+      <SelectItem value="incomplete">Incomplete</SelectItem>
+    </SelectContent>
+  </Select>
 
-                              const hoursSpent =
-                                status === "complete" ? getHoursForSiteDay(schedule.siteName, currentDate) : undefined;
-
-                              return (
-                                <li
-                                  key={schedule.id}
-                                  className="p-3 rounded-md border bg-muted/20"
-                                  style={{
-                                    borderLeftColor: scheduleSite?.color,
-                                    borderLeftWidth: "4px",
-                                  }}
-                                >
-                                  <div className="flex justify-between items-start">
-                                    <p className="font-semibold" style={{ color: scheduleSite?.color }}>
-                                      {schedule.siteName}
-                                      {siteBonus && <span className="text-xs font-normal text-green-600">{siteBonus}</span>}
-                                    </p>
-                                    {getStatusIndicator(status, hoursSpent)}
-                                  </div>
-
-                                  <p className="text-sm text-muted-foreground my-1">{schedule.tasks}</p>
-
-                                  {asNoteText(schedule.note) && (
-                                    <p className="text-sm my-2 p-2 bg-amber-100 dark:bg-amber-900/50 border-l-4 border-amber-500 rounded-r-md">
-                                      {asNoteText(schedule.note)}
-                                    </p>
-                                  )}
-
-                                  <div className="flex gap-2 mt-2 flex-wrap">
-                                    {clockedInAtThisSite ? (
-                                      <Button
-                                        size="sm"
-                                        variant="destructive"
-                                        onClick={() => handleClockInOut("out", schedule.siteName)}
-                                        disabled={isManagerPreview}
-                                      >
-                                        <LogOut className="mr-2 h-4 w-4" />
-                                        Clock Out
-                                      </Button>
-                                    ) : (
-                                      <Button
-                                        size="sm"
-                                        onClick={() => handleClockInOut("in", schedule.siteName)}
-                                        disabled={isManagerPreview || clockInDisabled}
-                                      >
-                                        <LogIn className="mr-2 h-4 w-4" />
-                                        Clock In
-                                      </Button>
-                                    )}
-
-                                    {scheduleSite?.address && (
-                                      <Button asChild size="sm" variant="outline">
-                                        <a
-                                          href={`https://maps.google.com/?q=${encodeURIComponent(scheduleSite.address)}`}
-                                          target="_blank"
-                                          rel="noreferrer"
-                                        >
-                                          <ExternalLink className="mr-2 h-4 w-4" /> Map
-                                        </a>
-                                      </Button>
-                                    )}
-
-                                    <Button
-                                      size="sm"
-                                      variant="outline"
-                                      onClick={() => handleOpenNoteDialog(schedule)}
-                                      disabled={isManagerPreview}
-                                    >
-                                      <FilePenLine className="mr-2 h-4 w-4" />
-                                      Note
-                                    </Button>
-                                  </div>
-                                </li>
-                              );
-                            })}
-                          </ul>
-                        ) : (
-                          <div className="flex items-center justify-center h-24 text-muted-foreground">
-                            You have no scheduled tasks for this day.
-                          </div>
-                        )}
+</div>
+                      <ScrollArea className="h-[60vh]">
+                                                 
+                        {filteredDailySchedules.length > 0 ? (
+  <ul className="space-y-4">
+    {filteredDailySchedules.map((schedule) => {
+  return (
+    <li key={schedule.id} className="p-3 rounded-md border bg-muted/20">
+      <p className="font-semibold">{schedule.siteName}</p>
+      <p className="text-sm text-muted-foreground">{schedule.tasks}</p>
+    </li>
+  );
+})}
+  </ul>
+) : (
+  <div className="flex items-center justify-center h-24 text-muted-foreground">
+    {dailySchedules.length === 0
+      ? "You have no scheduled tasks for this day."
+      : "No schedules match your search or filter."}
+  </div>
+)}
                       </ScrollArea>
                     </TabsContent>
 
