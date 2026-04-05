@@ -193,6 +193,15 @@ useEffect(() => {
   setDailySearch("");
   setStatusFilter("all");
 }, [currentDate]);
+const [liveNow, setLiveNow] = useState(Date.now());
+
+useEffect(() => {
+  const id = window.setInterval(() => {
+    setLiveNow(Date.now());
+  }, 1000);
+
+  return () => window.clearInterval(id);
+}, []);
   const [isNoteDialogOpen, setIsNoteDialogOpen] = useState(false);
   const [editingNoteForSchedule, setEditingNoteForSchedule] = useState<CleaningSchedule | null>(null);
   const [currentNote, setCurrentNote] = useState("");
@@ -376,7 +385,43 @@ const filteredDailySchedules = useMemo(() => {
   },
   [sessionsForEmployee]
 );
+const getActiveShiftForSiteOnDate = useCallback(
+  (siteName: string, forDate: Date) => {
+    const dayStart = startOfDay(forDate).getTime();
+    const dayEnd = dayStart + 24 * 60 * 60 * 1000;
 
+    return sessionsForEmployee.find((s) => {
+      if (!s.active || !s.in) return false;
+      if ((s.in.site || "") !== siteName) return false;
+
+      const start = s.in.ts;
+      const rawEnd = s.out?.ts ?? Math.max(Date.now(), start);
+      const end = Math.min(rawEnd, dayEnd);
+
+      return end > dayStart && start < dayEnd;
+    });
+  },
+  [sessionsForEmployee]
+);
+
+const getLiveHoursForOpenShift = useCallback(
+  (siteName: string, forDate: Date) => {
+    const activeShift = getActiveShiftForSiteOnDate(siteName, forDate);
+    if (!activeShift?.in) return null;
+
+    const dayStart = startOfDay(forDate).getTime();
+    const dayEnd = dayStart + 24 * 60 * 60 * 1000;
+
+    const start = Math.max(activeShift.in.ts, dayStart);
+    const end = Math.min(liveNow, dayEnd);
+
+    if (end <= start) return "00:00";
+
+    const minutes = Math.floor((end - start) / 60000);
+    return minutesToHHMM(minutes);
+  },
+  [getActiveShiftForSiteOnDate, liveNow]
+);
  const handleClockInOut = useCallback(
   (action: "in" | "out", siteName: string) => {
     const site = settings.sites.find((s) => s.name === siteName);
@@ -757,26 +802,84 @@ const getHoursForSiteDay = useCallback(
 
 </div>
                       <ScrollArea className="h-[60vh]">
-                                                 
-                        {filteredDailySchedules.length > 0 ? (
-  <ul className="space-y-4">
-    {filteredDailySchedules.map((schedule) => {
+  {filteredDailySchedules.length > 0 ? (
+    <ul className="space-y-4">
+      {filteredDailySchedules.map((schedule) => {
+  const scheduleSite = settings.sites.find((s) => s.name === schedule.siteName);
+
+  const clockedInAtThisSite = hasOpenShiftForSiteOnDate(
+    schedule.siteName,
+    currentDate
+  );
+
+  const status = currentSiteStatuses.get(schedule.siteName);
+  const clockInDisabled = status === "complete";
+
+  const hoursSpent =
+    status === "complete"
+      ? getHoursForSiteDay(schedule.siteName, currentDate)
+      : undefined;
+
   return (
-    <li key={schedule.id} className="p-3 rounded-md border bg-muted/20">
-      <p className="font-semibold">{schedule.siteName}</p>
-      <p className="text-sm text-muted-foreground">{schedule.tasks}</p>
+    <li
+      key={schedule.id}
+      className={cn(
+        "p-3 rounded-md border bg-muted/20 transition-all",
+        clockedInAtThisSite && "ring-2 ring-green-500 bg-green-50/40 dark:bg-green-950/20"
+      )}
+      style={{
+        borderLeftColor: scheduleSite?.color,
+        borderLeftWidth: "4px",
+      }}
+    >
+      <div className="flex justify-between items-start gap-3">
+        <div>
+          <p className="font-semibold" style={{ color: scheduleSite?.color }}>
+            {schedule.siteName}
+          </p>
+        </div>
+
+        {getStatusIndicator(status, hoursSpent)}
+      </div>
+
+      <p className="text-sm text-muted-foreground my-1">
+        {schedule.tasks}
+      </p>
+
+      <div className="flex gap-2 mt-2 flex-wrap">
+        {clockedInAtThisSite ? (
+          <Button
+            size="sm"
+            variant="destructive"
+            onClick={() => handleClockInOut("out", schedule.siteName)}
+            disabled={isManagerPreview}
+          >
+            <LogOut className="mr-2 h-4 w-4" />
+            Clock Out
+          </Button>
+        ) : (
+          <Button
+            size="sm"
+            onClick={() => handleClockInOut("in", schedule.siteName)}
+            disabled={isManagerPreview || clockInDisabled}
+          >
+            <LogIn className="mr-2 h-4 w-4" />
+            Clock In
+          </Button>
+        )}
+      </div>
     </li>
   );
 })}
-  </ul>
-) : (
-  <div className="flex items-center justify-center h-24 text-muted-foreground">
-    {dailySchedules.length === 0
-      ? "You have no scheduled tasks for this day."
-      : "No schedules match your search or filter."}
-  </div>
-)}
-                      </ScrollArea>
+    </ul>
+  ) : (
+    <div className="flex items-center justify-center h-24 text-muted-foreground">
+      {dailySchedules.length === 0
+        ? "You have no scheduled tasks for this day."
+        : "No schedules match your search or filter."}
+    </div>
+  )}
+</ScrollArea>
                     </TabsContent>
 
                     {/* WEEKLY VIEW */}
