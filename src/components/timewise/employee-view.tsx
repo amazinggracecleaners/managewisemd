@@ -567,6 +567,17 @@ const dailySiteSummary = useMemo(() => {
 
   return { total, complete, inProcess, incomplete };
 }, [currentDate, schedules, employee.id, getSiteStatuses]);
+
+const dailyWorkedMinutes = useMemo(() => {
+  return sessionsForEmployee.reduce((sum, s) => {
+    return sum + sessionMinutesOnDay(s, currentDate);
+  }, 0);
+}, [sessionsForEmployee, currentDate]);
+
+const dailyWorkedHHMM = useMemo(() => {
+  return minutesToHHMM(dailyWorkedMinutes);
+}, [dailyWorkedMinutes]);
+
   const handleViewTimesheet = (periodId: string, employeeId: string) => {
     const period = payrollPeriods.find((p) => p.id === periodId);
     if (!period || employee.id !== employeeId) return;
@@ -724,8 +735,16 @@ const getHoursForSiteDay = useCallback(
 
                     {/* DAILY VIEW */}
                     <TabsContent value="daily">
-                      <div className="flex justify-between items-center my-2">
-                        <h3 className="font-semibold flex items-center gap-2">{formatDateHeader(currentDate)}</h3>
+                      <div className="flex justify-between items-center my-2 flex-wrap gap-2">
+  <div className="flex items-center gap-2 flex-wrap">
+    <h3 className="font-semibold">
+      {formatDateHeader(currentDate)}
+    </h3>
+
+    <Badge variant="outline">
+      Total Hours: {dailyWorkedHHMM}
+    </Badge>
+  </div>
                         <div className="flex gap-1">
                           <Button variant="outline" size="icon" className="h-7 w-7" onClick={() => changeDay(-1)}>
                             <ChevronLeft />
