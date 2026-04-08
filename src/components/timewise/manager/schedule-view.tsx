@@ -83,7 +83,8 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-
+import { addDoc, serverTimestamp } from "firebase/firestore";
+import { collection } from "firebase/firestore";
 import {
   Table,
   TableBody,
@@ -92,6 +93,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { db } from "@/firebase/client";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { useEngine } from "@/providers/EngineProvider";
 import { useSettings } from "@/features/settings/hooks/useSettings";
@@ -220,6 +222,11 @@ export function ScheduleView({
   teams,
 }: ScheduleViewProps) {
   const { engine } = useEngine();
+  const { settings } = useSettings();
+ const cId =
+  settings.companyId?.trim() ||
+  process.env.NEXT_PUBLIC_COMPANY_ID ||
+  "amazing-grace-cleaners";
 const { cloudReady } = useSettings();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingSchedule, setEditingSchedule] =
@@ -555,7 +562,7 @@ const resolveAssignedEmployeeIds = (names: string[]): string[] => {
     setCurrentDate((prev) => add(prev, { [unit + "s"]: amount } as any));
   };
 
-  const handleRemoveEmployeeFromSchedule = (
+ const handleRemoveEmployeeFromSchedule = async (
   scheduleId: string,
   employeeName: string
 ) => {
@@ -570,6 +577,9 @@ const resolveAssignedEmployeeIds = (names: string[]): string[] => {
   const schedule = schedules.find((s) => s.id === scheduleId);
   if (!schedule) return;
 
+  const employee = employees.find((e) => e.name === employeeName);
+  if (!employee) return;
+
   const updatedAssignedTo = (schedule.assignedTo || []).filter(
     (name) => name !== employeeName
   );
@@ -577,10 +587,33 @@ const resolveAssignedEmployeeIds = (names: string[]): string[] => {
   const updatedAssignedEmployeeIds =
     resolveAssignedEmployeeIds(updatedAssignedTo);
 
-  updateSchedule(scheduleId, {
+  // ✅ Update schedule first
+  await updateSchedule(scheduleId, {
     assignedTo: updatedAssignedTo,
     assignedEmployeeIds: updatedAssignedEmployeeIds,
   });
+
+  // 🔥 NEW: notify removed employee
+  if (engine === "cloud") {
+    const cId =
+    settings.companyId?.trim() ||
+    process.env.NEXT_PUBLIC_COMPANY_ID ||
+    "amazing-grace-cleaners";
+
+    await addDoc(
+      collection(db, "companies", cId, "employee_notifications"),
+      {
+        employeeId: employee.id,
+        type: "schedule-change",
+        title: "Schedule changed",
+        message: `You were removed from the schedule for ${schedule.siteName}.`,
+        siteName: schedule.siteName,
+        scheduleId: scheduleId,
+        createdAt: serverTimestamp(),
+        read: false,
+      }
+    );
+  }
 };
 const [dailySearch, setDailySearch] = useState("");
 const [statusFilter, setStatusFilter] = useState<
