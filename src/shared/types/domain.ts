@@ -250,6 +250,9 @@ export interface PayrollLineItem {
   net?: number;
 
   revision: number;
+ paid?: boolean;
+  paidAt?: number;
+  paidByUid?: string;
 }
 
 export type PayrollConfirmation = {

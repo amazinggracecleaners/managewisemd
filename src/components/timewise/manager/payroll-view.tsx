@@ -537,22 +537,27 @@ const sendPayrollNotifications = async (periodToNotify: PayrollPeriod) => {
   await sendPayrollNotifications(next);
 };
 
-  const handleMarkAsPaid = async () => {
-    if (!currentPeriod) return;
+  
+const handleMarkEmployeePaid = async (employeeId: string) => {
+  if (!currentPeriod) return;
 
-    const derived = derivePayrollStatus(currentPeriod, payrollConfirmations);
-    if (derived !== "ready_to_pay") {
-      alert("This payroll period is not ready to be paid yet.");
-      return;
-    }
+  const updatedLineItems = lineItems.map((item) => {
+    if (item.employeeId !== employeeId) return item;
 
-    await savePayrollPeriod({
-      ...currentPeriod,
-      status: "paid",
-      paidAt: new Date().toISOString(),
-    });
-  };
+    return {
+      ...item,
+      paid: true,
+      paidAt: Date.now(),
+    };
+  });
 
+  await savePayrollPeriod({
+    ...currentPeriod,
+    lineItems: updatedLineItems,
+  });
+
+  setLineItems(updatedLineItems);
+};
   const handleReopen = async () => {
     if (!currentPeriod || isPaid) return;
     if (
@@ -717,12 +722,7 @@ const sendPayrollNotifications = async (periodToNotify: PayrollPeriod) => {
                   </Button>
                 )}
 
-                {currentStatus === "ready_to_pay" && (
-                  <Button onClick={handleMarkAsPaid}>
-                    <DollarSign className="mr-2 h-4 w-4" />
-                    Mark as Paid
-                  </Button>
-                )}
+                
 
                 {(currentStatus === "waiting_for_confirmation" ||
                   currentStatus === "ready_to_pay") && !isPaid && (
@@ -839,71 +839,80 @@ const sendPayrollNotifications = async (periodToNotify: PayrollPeriod) => {
                     </TableRow>
                   </TableHeader>
 
-                  <TableBody>
-                    {lineItems.length > 0 ? (
-                      lineItems.map((item) => {
-                        const employee = employeeMap.get(item.employeeId);
-                        const hasConfirmed = confirmedIds.has(item.employeeId);
+                <TableBody>
+  {lineItems.length > 0 ? (
+    lineItems.map((item) => {
+      const employee = employeeMap.get(item.employeeId);
+      const hasConfirmed = confirmedIds.has(item.employeeId);
 
-                        return (
-                          <TableRow key={item.employeeId}>
-                            <TableCell className="font-medium">
-                              <div className="flex items-center gap-2">
-                                <Tooltip>
-                                  <TooltipTrigger asChild>
-                                    <span>{item.employeeName}</span>
-                                  </TooltipTrigger>
-                                  <TooltipContent>
-                                    Rev. {item.revision ?? currentPeriod?.revision ?? 1}
-                                  </TooltipContent>
-                                </Tooltip>
+      return (
+        <TableRow key={item.employeeId}>
+          <TableCell className="font-medium">
+            <div className="flex items-center gap-2">
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span>{item.employeeName}</span>
+                </TooltipTrigger>
+                <TooltipContent>
+                  Rev. {item.revision ?? currentPeriod?.revision ?? 1}
+                </TooltipContent>
+              </Tooltip>
 
-                                {employee?.bankInfo?.bankName && (
-                                  <Tooltip>
-                                    <TooltipTrigger asChild>
-                                      <Button
-                                        variant="ghost"
-                                        size="icon"
-                                        className="h-6 w-6 text-muted-foreground"
-                                      >
-                                        <Banknote className="h-4 w-4" />
-                                      </Button>
-                                    </TooltipTrigger>
-                                    <TooltipContent>
-                                      <div className="text-xs">
-                                        <p>
-                                          <strong>Bank:</strong>{" "}
-                                          {employee.bankInfo.bankName}
-                                        </p>
-                                        <p>
-                                          <strong>Routing:</strong>{" "}
-                                          {employee.bankInfo.routingNumber}
-                                        </p>
-                                        <p>
-                                          <strong>Account:</strong>{" "}
-                                          {employee.bankInfo.accountNumber}
-                                        </p>
-                                      </div>
-                                    </TooltipContent>
-                                  </Tooltip>
-                                )}
+              {hasConfirmed && !item.paid && (
+                <Badge variant="secondary">
+                  Confirmed
+                </Badge>
+              )}
 
-                                {hasConfirmed && (
-                                  <Tooltip>
-                                    <TooltipTrigger>
-                                      <UserCheck className="h-4 w-4 text-green-600" />
-                                    </TooltipTrigger>
-                                    <TooltipContent>
-                                      <p>Payroll confirmed by employee for this revision.</p>
-                                    </TooltipContent>
-                                  </Tooltip>
-                                )}
-                              </div>
-                            </TableCell>
+              {item.paid && (
+                <Badge className="bg-green-600 text-white">
+                  Paid
+                </Badge>
+              )}
 
-                            <TableCell>
-                              {((item.regularMinutes || 0) / 60).toFixed(2)}
-                            </TableCell>
+              {employee?.bankInfo?.bankName && (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-6 w-6 text-muted-foreground"
+                    >
+                      <Banknote className="h-4 w-4" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <div className="text-xs">
+                      <p>
+                        <strong>Bank:</strong> {employee.bankInfo.bankName}
+                      </p>
+                      <p>
+                        <strong>Routing:</strong> {employee.bankInfo.routingNumber}
+                      </p>
+                      <p>
+                        <strong>Account:</strong> {employee.bankInfo.accountNumber}
+                      </p>
+                    </div>
+                  </TooltipContent>
+                </Tooltip>
+              )}
+
+              {!item.paid && hasConfirmed && (
+                <Tooltip>
+                  <TooltipTrigger>
+                    <UserCheck className="h-4 w-4 text-green-600" />
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>Payroll confirmed by employee for this revision.</p>
+                  </TooltipContent>
+                </Tooltip>
+              )}
+            </div>
+          </TableCell>
+
+          <TableCell>
+            {((item.regularMinutes || 0) / 60).toFixed(2)}
+          </TableCell>
 
                             <TableCell>
                               {((item.bonusMinutes || 0) / 60).toFixed(2)}
@@ -925,7 +934,7 @@ const sendPayrollNotifications = async (periodToNotify: PayrollPeriod) => {
                                   )
                                 }
                                 className="w-24 h-8"
-                                disabled={isPaid}
+                                disabled={isPaid || item.paid}
                               />
                             </TableCell>
 
@@ -943,7 +952,7 @@ const sendPayrollNotifications = async (periodToNotify: PayrollPeriod) => {
                                   )
                                 }
                                 className="w-24 h-8"
-                                disabled={isPaid}
+                                disabled={isPaid || item.paid}
                               />
                             </TableCell>
 
@@ -951,17 +960,32 @@ const sendPayrollNotifications = async (periodToNotify: PayrollPeriod) => {
                               ${(item.net || 0).toFixed(2)}
                             </TableCell>
 
-                            <TableCell className="text-right">
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => handleDeleteLineItem(item.employeeId)}
-                                disabled={!isEditable}
-                                title="Remove employee from this payroll"
-                              >
-                                <Trash2 className="h-4 w-4 text-destructive" />
-                              </Button>
-                            </TableCell>
+                           <TableCell className="text-right">
+  <div className="flex justify-end gap-2">
+    {!item.paid ? (
+      <Button
+        size="sm"
+        onClick={() => handleMarkEmployeePaid(item.employeeId)}
+      >
+        <DollarSign className="mr-2 h-4 w-4" />
+        Mark Paid
+      </Button>
+    ) : (
+      <Badge className="bg-green-600 text-white">
+        Paid
+      </Badge>
+    )}
+
+    <Button
+      variant="ghost"
+      size="icon"
+      onClick={() => handleDeleteLineItem(item.employeeId)}
+      disabled={!isEditable}
+    >
+      <Trash2 className="h-4 w-4 text-destructive" />
+    </Button>
+  </div>
+</TableCell>
                           </TableRow>
                         );
                       })
