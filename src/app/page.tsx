@@ -1869,6 +1869,19 @@ await addDoc(
 
         const employeeName =
           employees.find((e) => e.id === employeeId)?.name || "Unknown";
+          await addDoc(
+  collection(db, "companies", cId, "notifications"),
+  {
+    type: "payroll",
+    employeeId,
+    employeeName:
+      employees.find((e) => e.id === employeeId)?.name || "Unknown",
+    periodId,
+    revision,
+    createdAt: serverTimestamp(),
+    read: false,
+  }
+);
 
         await createManagerNotification({
           companyId: cId,

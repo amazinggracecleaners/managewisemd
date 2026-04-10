@@ -1072,10 +1072,9 @@ const getHoursForSiteDay = useCallback(
       {filteredDailySchedules.map((schedule) => {
   const scheduleSite = settings.sites.find((s) => s.name === schedule.siteName);
 
-  const clockedInAtThisSite = hasOpenShiftForSiteOnDate(
-    schedule.siteName,
-    currentDate
-  );
+ const clockedInAtThisSite = isSameDay(currentDate, startOfDay(new Date()))
+  ? isClockedIn(schedule.siteName, employee.id)
+  : hasOpenShiftForSiteOnDate(schedule.siteName, currentDate);
 
   const status = currentSiteStatuses.get(schedule.siteName);
   const clockInDisabled = status === "complete";
