@@ -26,7 +26,7 @@ import { Button } from "@/components/ui/button";
 type EmployeeNotification = {
   id: string;
   employeeId: string;
-  type: "schedule-change";
+  type: "schedule-change" | "payroll-confirmation" | "payroll-confirmed" | "payment";
   title: string;
   message: string;
   siteName?: string;
@@ -206,9 +206,9 @@ export function EmployeeNotifications({
               </Badge>
             )}
           </CardTitle>
-          <CardDescription>
-            Schedule changes and employee updates
-          </CardDescription>
+         <CardDescription>
+  Schedule updates, payroll confirmations, and payments
+</CardDescription>
         </div>
 
         {unreadCount > 0 && (

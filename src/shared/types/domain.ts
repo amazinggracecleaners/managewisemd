@@ -250,8 +250,10 @@ export interface PayrollLineItem {
   net?: number;
 
   revision: number;
- paid?: boolean;
-  paidAt?: number;
+paymentMethod?: "cash" | "zelle" | "bank";
+paid?: boolean;
+paidAt?: number;
+paymentNote?: string;
   paidByUid?: string;
 }
 

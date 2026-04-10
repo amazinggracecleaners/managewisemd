@@ -44,10 +44,9 @@ import {
   ChevronRight,
   Download,
   Trash2,
-  Clock,
   Send,
-  CheckCircle,
   DollarSign,
+  FileText,
 } from "lucide-react";
 import { groupSessions } from "@/lib/time-utils";
 import {
@@ -71,7 +70,10 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 import { getFunctions, httpsCallable } from "firebase/functions";
 import { createPayrollConfirmationNotifications } from "@/lib/payroll-notifications";
-import { app } from "@/firebase/client";
+import { app, db } from "@/firebase/client";
+import { addDoc, collection, serverTimestamp } from "firebase/firestore";
+import jsPDF from "jspdf";
+
 type PayFrequency =
   | "weekly"
   | "bi-weekly"
@@ -79,7 +81,7 @@ type PayFrequency =
   | "monthly"
   | "custom";
 
-
+type PaymentMethod = "cash" | "zelle" | "bank";
 
 interface PayrollViewProps {
   employees: Employee[];
@@ -89,7 +91,7 @@ interface PayrollViewProps {
   savePayrollPeriod: (period: PayrollPeriod) => Promise<void>;
   deletePayrollPeriod: (periodId: string) => Promise<void>;
   payrollConfirmations: PayrollConfirmation[];
- companyId: string;
+  companyId: string;
 }
 
 function getPayrollLineEmployeeIds(period: PayrollPeriod): string[] {
@@ -152,7 +154,6 @@ function derivePayrollStatus(
 ): PayrollStatus {
   if (!period) return "draft";
 
-  // backward compatibility for old records
   const raw = (period.status as string | undefined) ?? "draft";
 
   if (raw === "paid") return "paid";
@@ -214,8 +215,15 @@ export function PayrollView({
     String(new Date().getFullYear())
   );
 
+  const [lineItems, setLineItems] = useState<PayrollLineItem[]>([]);
+  const [paymentMethodByEmployee, setPaymentMethodByEmployee] = useState<
+    Record<string, PaymentMethod>
+  >({});
+
   const availableYears = useMemo(() => {
-    const years = new Set(payrollPeriods.map((p) => p.startDate.substring(0, 4)));
+    const years = new Set(
+      payrollPeriods.map((p) => p.startDate.substring(0, 4))
+    );
     years.add(String(new Date().getFullYear()));
     return Array.from(years).sort((a, b) => b.localeCompare(a));
   }, [payrollPeriods]);
@@ -235,7 +243,8 @@ export function PayrollView({
           break;
         case "bi-weekly": {
           const weekStart = startOfWeek(currentDate);
-          const dayOffset = (currentDate.getDay() - weekStart.getDay() + 7) % 7;
+          const dayOffset =
+            (currentDate.getDay() - weekStart.getDay() + 7) % 7;
           if (dayOffset < 7) {
             start = weekStart;
             end = endOfWeek(add(weekStart, { weeks: 1 }));
@@ -283,14 +292,15 @@ export function PayrollView({
     };
   }, [currentDate, payFrequency, customStartDate, customEndDate]);
 
-  const [lineItems, setLineItems] = useState<PayrollLineItem[]>([]);
-
   const currentPeriod = useMemo(
     () => payrollPeriods.find((p) => p.id === periodId),
     [payrollPeriods, periodId]
   );
 
-  const siteMap = useMemo(() => new Map(sites.map((s) => [s.name, s])), [sites]);
+  const siteMap = useMemo(
+    () => new Map(sites.map((s) => [s.name, s])),
+    [sites]
+  );
   const employeeMap = useMemo(
     () => new Map(employees.map((e) => [e.id, e])),
     [employees]
@@ -319,6 +329,14 @@ export function PayrollView({
   useEffect(() => {
     if (currentPeriod && currentStatus !== "draft") {
       setLineItems(currentPeriod.lineItems ?? []);
+
+      const restoredMethods: Record<string, PaymentMethod> = {};
+      (currentPeriod.lineItems ?? []).forEach((item) => {
+        if (item.paymentMethod) {
+          restoredMethods[item.employeeId] = item.paymentMethod;
+        }
+      });
+      setPaymentMethodByEmployee(restoredMethods);
       return;
     }
 
@@ -381,12 +399,16 @@ export function PayrollView({
           gross: grossPay,
           deductions: 0,
           net: grossPay,
-        };
+          paid: false,
+          paidAt: undefined,
+          paymentMethod: undefined,
+        } as PayrollLineItem;
       })
       .filter((item) => (item.minutes ?? 0) > 0 || (item.gross ?? 0) > 0)
       .sort((a, b) => a.employeeName.localeCompare(b.employeeName));
 
     setLineItems(newLineItems);
+    setPaymentMethodByEmployee({});
   }, [
     startDate,
     endDate,
@@ -429,35 +451,35 @@ export function PayrollView({
 
   const isPaid = currentStatus === "paid";
   const isEditable = currentStatus === "draft";
-  const canEditFinalNumbers =
-    currentStatus === "waiting_for_confirmation" || currentStatus === "ready_to_pay";
-const sendPayrollNotifications = async (periodToNotify: PayrollPeriod) => {
-  try {
-    await createPayrollConfirmationNotifications({
-      companyId,
-      period: periodToNotify,
-      employees,
-    });
-  } catch (error) {
-    console.error("Failed to create in-app payroll notifications:", error);
-  }
 
-  try {
-    const fn = getFunctions(app, "us-central1");
+  const sendPayrollNotifications = async (periodToNotify: PayrollPeriod) => {
+    try {
+      await createPayrollConfirmationNotifications({
+        companyId,
+        period: periodToNotify,
+        employees,
+      });
+    } catch (error) {
+      console.error("Failed to create in-app payroll notifications:", error);
+    }
 
-    const sendPayrollConfirmationSms = httpsCallable<
-      { companyId: string; periodId: string },
-      { success: boolean; count: number; results: any[] }
-    >(fn, "sendPayrollConfirmationSms");
+    try {
+      const fn = getFunctions(app, "us-central1");
 
-    await sendPayrollConfirmationSms({
-      companyId,
-      periodId: periodToNotify.id,
-    });
-  } catch (error) {
-    console.error("Failed to send payroll SMS:", error);
-  }
-};
+      const sendPayrollConfirmationSms = httpsCallable<
+        { companyId: string; periodId: string },
+        { success: boolean; count: number; results: any[] }
+      >(fn, "sendPayrollConfirmationSms");
+
+      await sendPayrollConfirmationSms({
+        companyId,
+        periodId: periodToNotify.id,
+      });
+    } catch (error) {
+      console.error("Failed to send payroll SMS:", error);
+    }
+  };
+
   const handleLineItemChange = (
     employeeId: string,
     field: "deductions" | "flatBonus",
@@ -468,11 +490,12 @@ const sendPayrollNotifications = async (periodToNotify: PayrollPeriod) => {
     setLineItems((prev) =>
       prev.map((item) => {
         if (item.employeeId !== employeeId) return item;
+        if (item.paid) return item;
 
         const next = { ...item, [field]: value };
         const grossWithoutFlat = (item.gross || 0) - (item.flatBonus || 0);
         next.gross = grossWithoutFlat + (next.flatBonus || 0);
-        next.net = next.gross - (next.deductions || 0);
+        next.net = (next.gross || 0) - (next.deductions || 0);
         return next;
       })
     );
@@ -480,84 +503,118 @@ const sendPayrollNotifications = async (periodToNotify: PayrollPeriod) => {
 
   const handleDeleteLineItem = (employeeId: string) => {
     if (!isEditable) return;
-    if (!window.confirm("Are you sure you want to remove this employee from this payroll period?")) return;
+    if (
+      !window.confirm(
+        "Are you sure you want to remove this employee from this payroll period?"
+      )
+    ) {
+      return;
+    }
     setLineItems((prev) => prev.filter((item) => item.employeeId !== employeeId));
   };
 
- const handleSendForConfirmation = async () => {
-  if (!lineItems.length) {
-    alert("No payroll lines exist for this period.");
-    return;
-  }
+  const handleSendForConfirmation = async () => {
+    if (!lineItems.length) {
+      alert("No payroll lines exist for this period.");
+      return;
+    }
 
-  if (!window.confirm("Send this payroll period to employees for confirmation?")) {
-    return;
-  }
+    if (
+      !window.confirm(
+        "Send this payroll period to employees for confirmation?"
+      )
+    ) {
+      return;
+    }
 
-  const nextRevision = currentPeriod?.revision ?? 1;
+    const nextRevision = currentPeriod?.revision ?? 1;
 
-  const periodToSave: PayrollPeriod = {
-    id: periodId,
-    startDate,
-    endDate,
-    status: "waiting_for_confirmation",
-    revision: nextRevision,
-    sentForConfirmationAt: new Date().toISOString(),
-    lineItems: lineItems.map((li) => ({
-      ...li,
+    const periodToSave: PayrollPeriod = {
+      id: periodId,
+      startDate,
+      endDate,
+      status: "waiting_for_confirmation",
       revision: nextRevision,
-    })),
-  };
+      sentForConfirmationAt: new Date().toISOString(),
+      lineItems: lineItems.map((li) => ({
+        ...li,
+        revision: nextRevision,
+      })),
+    };
 
-  await savePayrollPeriod(periodToSave);
-
- 
+    await savePayrollPeriod(periodToSave);
     await sendPayrollNotifications(periodToSave);
-
-  
-};
+  };
 
   const handleSaveWaitingOrReady = async () => {
-  if (!currentPeriod || isPaid) return;
+    if (!currentPeriod || isPaid) return;
 
-  const nextRevision = (currentPeriod.revision ?? 0) + 1;
+    const nextRevision = (currentPeriod.revision ?? 0) + 1;
 
-  const next: PayrollPeriod = {
-    ...currentPeriod,
-    status: "waiting_for_confirmation",
-    revision: nextRevision,
-    sentForConfirmationAt: new Date().toISOString(),
-    lineItems: lineItems.map((li) => ({
-      ...li,
+    const next: PayrollPeriod = {
+      ...currentPeriod,
+      status: "waiting_for_confirmation",
       revision: nextRevision,
-    })),
+      sentForConfirmationAt: new Date().toISOString(),
+      lineItems: lineItems.map((li) => ({
+        ...li,
+        revision: nextRevision,
+      })),
+    };
+
+    await savePayrollPeriod(next);
+    await sendPayrollNotifications(next);
   };
 
-  await savePayrollPeriod(next);
-  await sendPayrollNotifications(next);
-};
+  const handleMarkEmployeePaid = async (employeeId: string) => {
+    if (!currentPeriod) return;
 
-  
-const handleMarkEmployeePaid = async (employeeId: string) => {
-  if (!currentPeriod) return;
+    const paymentMethod = paymentMethodByEmployee[employeeId];
+    if (!paymentMethod) {
+      alert("Please select a payment method first.");
+      return;
+    }
 
-  const updatedLineItems = lineItems.map((item) => {
-    if (item.employeeId !== employeeId) return item;
+    const updatedLineItems = lineItems.map((item) => {
+      if (item.employeeId !== employeeId) return item;
 
-    return {
-      ...item,
-      paid: true,
-      paidAt: Date.now(),
-    };
-  });
+      return {
+        ...item,
+        paid: true,
+        paidAt: Date.now(),
+        paymentMethod,
+      };
+    });
 
-  await savePayrollPeriod({
-    ...currentPeriod,
-    lineItems: updatedLineItems,
-  });
+    await savePayrollPeriod({
+      ...currentPeriod,
+      lineItems: updatedLineItems,
+    });
 
-  setLineItems(updatedLineItems);
-};
+    setLineItems(updatedLineItems);
+
+    const employee = employees.find((e) => e.id === employeeId);
+    const paidItem = updatedLineItems.find((li) => li.employeeId === employeeId);
+
+    if (employee && paidItem) {
+      await addDoc(
+        collection(db, "companies", companyId, "employee_notifications"),
+        {
+          type: "payment",
+          employeeId: employee.id,
+          employeeName: employee.name,
+          title: "You’ve been paid",
+          message: `You have been paid $${(paidItem.net || 0).toFixed(2)} for payroll period ${String(currentPeriod.startDate).slice(0, 10)} to ${String(currentPeriod.endDate).slice(0, 10)}.`,
+          periodId: currentPeriod.id,
+          revision: currentPeriod.revision ?? 1,
+          paymentMethod: paidItem.paymentMethod,
+          createdAt: serverTimestamp(),
+          read: false,
+        }
+      );
+    }
+  };
+
   const handleReopen = async () => {
     if (!currentPeriod || isPaid) return;
     if (
@@ -612,6 +669,8 @@ const handleMarkEmployeePaid = async (employeeId: string) => {
       "Flat Bonus",
       "Deductions",
       "Net Pay",
+      "Paid",
+      "Payment Method",
     ];
 
     const rows = lineItems.map((item) => [
@@ -622,6 +681,8 @@ const handleMarkEmployeePaid = async (employeeId: string) => {
       (item.flatBonus || 0).toFixed(2),
       (item.deductions || 0).toFixed(2),
       (item.net || 0).toFixed(2),
+      item.paid ? "Yes" : "No",
+      item.paymentMethod || "",
     ]);
 
     const csvContent = [header, ...rows]
@@ -676,6 +737,67 @@ const handleMarkEmployeePaid = async (employeeId: string) => {
     return lineItems.length > 0 && confirmedCount === lineItems.length;
   }, [lineItems.length, confirmedCount]);
 
+  const generateEmployeePaystub = async (item: PayrollLineItem) => {
+    const doc = new jsPDF();
+
+    try {
+      const img = new Image();
+      img.crossOrigin = "anonymous";
+      img.src = "/Mathieu_logo_AGC.jpg";
+
+      await new Promise<void>((resolve, reject) => {
+        img.onload = () => resolve();
+        img.onerror = () => reject(new Error("Logo load failed"));
+      });
+
+      doc.addImage(img, "JPEG", 14, 10, 36, 36);
+    } catch (error) {
+      console.warn("Logo load failed for paystub:", error);
+    }
+
+    doc.setFontSize(18);
+    doc.text("Amazing Grace Cleaners", 55, 20);
+    doc.setFontSize(12);
+    doc.text("Employee Paystub", 55, 28);
+
+    doc.setFontSize(11);
+    doc.text(`Employee: ${item.employeeName}`, 14, 55);
+    doc.text(
+      `Pay Period: ${String(currentPeriod?.startDate).slice(0, 10)} to ${String(currentPeriod?.endDate).slice(0, 10)}`,
+      14,
+      63
+    );
+    doc.text(
+      `Revision: ${item.revision ?? currentPeriod?.revision ?? 1}`,
+      14,
+      71
+    );
+
+    doc.text(
+      `Regular Hours: ${((item.regularMinutes || 0) / 60).toFixed(2)}`,
+      14,
+      85
+    );
+    doc.text(
+      `Bonus Hours: ${((item.bonusMinutes || 0) / 60).toFixed(2)}`,
+      14,
+      93
+    );
+    doc.text(`Gross Pay: $${(item.gross || 0).toFixed(2)}`, 14, 101);
+    doc.text(`Flat Bonus: $${(item.flatBonus || 0).toFixed(2)}`, 14, 109);
+    doc.text(`Deductions: $${(item.deductions || 0).toFixed(2)}`, 14, 117);
+    doc.text(`Net Pay: $${(item.net || 0).toFixed(2)}`, 14, 125);
+    doc.text(`Payment Method: ${item.paymentMethod || "—"}`, 14, 133);
+
+    if (item.paidAt) {
+      doc.text(`Paid At: ${new Date(item.paidAt).toLocaleString()}`, 14, 141);
+    }
+
+    doc.save(
+      `paystub-${item.employeeName.replace(/\s+/g, "-").toLowerCase()}-${currentPeriod?.id}.pdf`
+    );
+  };
+
   return (
     <TooltipProvider>
       <Card>
@@ -684,7 +806,7 @@ const handleMarkEmployeePaid = async (employeeId: string) => {
             <div>
               <CardTitle>Payroll</CardTitle>
               <CardDescription>
-                Calculate payroll for specific periods or view yearly summaries.
+                Calculate payroll for specific periods, track confirmations, pay employees individually, and generate paystubs.
               </CardDescription>
             </div>
           </div>
@@ -717,22 +839,29 @@ const handleMarkEmployeePaid = async (employeeId: string) => {
 
                 {(currentStatus === "waiting_for_confirmation" ||
                   currentStatus === "ready_to_pay") && (
-                  <Button variant="secondary" onClick={handleSaveWaitingOrReady} disabled={isPaid}>
+                  <Button
+                    variant="secondary"
+                    onClick={handleSaveWaitingOrReady}
+                    disabled={isPaid}
+                  >
                     Save & Re-send confirmation
                   </Button>
                 )}
 
-                
-
                 {(currentStatus === "waiting_for_confirmation" ||
-                  currentStatus === "ready_to_pay") && !isPaid && (
-                  <Button onClick={handleReopen} variant="destructive">
-                    Re-open Period
-                  </Button>
-                )}
+                  currentStatus === "ready_to_pay") &&
+                  !isPaid && (
+                    <Button onClick={handleReopen} variant="destructive">
+                      Re-open Period
+                    </Button>
+                  )}
 
                 {currentStatus === "draft" && currentPeriod && (
-                  <Button onClick={handleDelete} variant="destructive" size="sm">
+                  <Button
+                    onClick={handleDelete}
+                    variant="destructive"
+                    size="sm"
+                  >
                     <Trash2 className="mr-2 h-4 w-4" /> Delete Period
                   </Button>
                 )}
@@ -839,91 +968,121 @@ const handleMarkEmployeePaid = async (employeeId: string) => {
                     </TableRow>
                   </TableHeader>
 
-                <TableBody>
-  {lineItems.length > 0 ? (
-    lineItems.map((item) => {
-      const employee = employeeMap.get(item.employeeId);
-      const hasConfirmed = confirmedIds.has(item.employeeId);
+                  <TableBody>
+                    {lineItems.length > 0 ? (
+                      lineItems.map((item) => {
+                        const employee = employeeMap.get(item.employeeId);
+                        const hasConfirmed = confirmedIds.has(item.employeeId);
 
-      return (
-        <TableRow key={item.employeeId}>
-          <TableCell className="font-medium">
-            <div className="flex items-center gap-2">
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <span>{item.employeeName}</span>
-                </TooltipTrigger>
-                <TooltipContent>
-                  Rev. {item.revision ?? currentPeriod?.revision ?? 1}
-                </TooltipContent>
-              </Tooltip>
+                        return (
+                          <TableRow
+                            key={item.employeeId}
+                            className={
+                              !hasConfirmed && !item.paid
+                                ? "bg-amber-50/70 dark:bg-amber-950/20"
+                                : ""
+                            }
+                          >
+                            <TableCell className="font-medium">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <span>{item.employeeName}</span>
+                                  </TooltipTrigger>
+                                  <TooltipContent>
+                                    Rev. {item.revision ?? currentPeriod?.revision ?? 1}
+                                  </TooltipContent>
+                                </Tooltip>
 
-              {hasConfirmed && !item.paid && (
-                <Badge variant="secondary">
-                  Confirmed
-                </Badge>
-              )}
+                                {!hasConfirmed && !item.paid && (
+                                  <Badge variant="destructive">
+                                    Awaiting confirmation
+                                  </Badge>
+                                )}
 
-              {item.paid && (
-                <Badge className="bg-green-600 text-white">
-                  Paid
-                </Badge>
-              )}
+                                {hasConfirmed && !item.paid && (
+                                  <Badge variant="secondary">
+                                    Confirmed
+                                  </Badge>
+                                )}
 
-              {employee?.bankInfo?.bankName && (
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-6 w-6 text-muted-foreground"
-                    >
-                      <Banknote className="h-4 w-4" />
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    <div className="text-xs">
-                      <p>
-                        <strong>Bank:</strong> {employee.bankInfo.bankName}
-                      </p>
-                      <p>
-                        <strong>Routing:</strong> {employee.bankInfo.routingNumber}
-                      </p>
-                      <p>
-                        <strong>Account:</strong> {employee.bankInfo.accountNumber}
-                      </p>
-                    </div>
-                  </TooltipContent>
-                </Tooltip>
-              )}
+                                {item.paid && (
+                                  <Badge className="bg-green-600 text-white">
+                                    Paid
+                                  </Badge>
+                                )}
 
-              {!item.paid && hasConfirmed && (
-                <Tooltip>
-                  <TooltipTrigger>
-                    <UserCheck className="h-4 w-4 text-green-600" />
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    <p>Payroll confirmed by employee for this revision.</p>
-                  </TooltipContent>
-                </Tooltip>
-              )}
-            </div>
-          </TableCell>
+                                {item.paid && item.paymentMethod && (
+                                  <Badge variant="outline">
+                                    {item.paymentMethod.toUpperCase()}
+                                  </Badge>
+                                )}
 
-          <TableCell>
-            {((item.regularMinutes || 0) / 60).toFixed(2)}
-          </TableCell>
+                                {employee?.bankInfo?.bankName && (
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        className="h-6 w-6 text-muted-foreground"
+                                      >
+                                        <Banknote className="h-4 w-4" />
+                                      </Button>
+                                    </TooltipTrigger>
+                                    <TooltipContent>
+                                      <div className="text-xs">
+                                        <p>
+                                          <strong>Bank:</strong>{" "}
+                                          {employee.bankInfo.bankName}
+                                        </p>
+                                        <p>
+                                          <strong>Routing:</strong>{" "}
+                                          {employee.bankInfo.routingNumber}
+                                        </p>
+                                        <p>
+                                          <strong>Account:</strong>{" "}
+                                          {employee.bankInfo.accountNumber}
+                                        </p>
+                                      </div>
+                                    </TooltipContent>
+                                  </Tooltip>
+                                )}
+
+                                {!item.paid && hasConfirmed && (
+                                  <Tooltip>
+                                    <TooltipTrigger>
+                                      <UserCheck className="h-4 w-4 text-green-600" />
+                                    </TooltipTrigger>
+                                    <TooltipContent>
+                                      <p>
+                                        Payroll confirmed by employee for this revision.
+                                      </p>
+                                    </TooltipContent>
+                                  </Tooltip>
+                                )}
+                              </div>
+                            </TableCell>
+
+                            <TableCell>
+                              {((item.regularMinutes || 0) / 60).toFixed(2)}
+                            </TableCell>
 
                             <TableCell>
                               {((item.bonusMinutes || 0) / 60).toFixed(2)}
                             </TableCell>
 
-                            <TableCell>${(item.gross || 0).toFixed(2)}</TableCell>
+                            <TableCell>
+                              ${(item.gross || 0).toFixed(2)}
+                            </TableCell>
 
                             <TableCell>
                               <Input
                                 type="number"
-                                value={Number.isFinite(item.flatBonus) ? item.flatBonus : ""}
+                                value={
+                                  Number.isFinite(item.flatBonus)
+                                    ? item.flatBonus
+                                    : ""
+                                }
                                 onChange={(e) =>
                                   handleLineItemChange(
                                     item.employeeId,
@@ -934,14 +1093,18 @@ const handleMarkEmployeePaid = async (employeeId: string) => {
                                   )
                                 }
                                 className="w-24 h-8"
-                                disabled={isPaid || item.paid}
+                                disabled={isPaid || !!item.paid}
                               />
                             </TableCell>
 
                             <TableCell>
                               <Input
                                 type="number"
-                                value={Number.isFinite(item.deductions) ? item.deductions : ""}
+                                value={
+                                  Number.isFinite(item.deductions)
+                                    ? item.deductions
+                                    : ""
+                                }
                                 onChange={(e) =>
                                   handleLineItemChange(
                                     item.employeeId,
@@ -952,7 +1115,7 @@ const handleMarkEmployeePaid = async (employeeId: string) => {
                                   )
                                 }
                                 className="w-24 h-8"
-                                disabled={isPaid || item.paid}
+                                disabled={isPaid || !!item.paid}
                               />
                             </TableCell>
 
@@ -960,32 +1123,66 @@ const handleMarkEmployeePaid = async (employeeId: string) => {
                               ${(item.net || 0).toFixed(2)}
                             </TableCell>
 
-                           <TableCell className="text-right">
-  <div className="flex justify-end gap-2">
-    {!item.paid ? (
-      <Button
-        size="sm"
-        onClick={() => handleMarkEmployeePaid(item.employeeId)}
-      >
-        <DollarSign className="mr-2 h-4 w-4" />
-        Mark Paid
-      </Button>
-    ) : (
-      <Badge className="bg-green-600 text-white">
-        Paid
-      </Badge>
-    )}
+                            <TableCell className="text-right">
+                              <div className="flex justify-end gap-2 flex-wrap">
+                                {!item.paid && (
+                                  <Select
+                                    value={paymentMethodByEmployee[item.employeeId] ?? ""}
+                                    onValueChange={(v: PaymentMethod) =>
+                                      setPaymentMethodByEmployee((prev) => ({
+                                        ...prev,
+                                        [item.employeeId]: v,
+                                      }))
+                                    }
+                                  >
+                                    <SelectTrigger className="w-[120px] h-9">
+                                      <SelectValue placeholder="Method" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      <SelectItem value="cash">Cash</SelectItem>
+                                      <SelectItem value="zelle">Zelle</SelectItem>
+                                      <SelectItem value="bank">Bank</SelectItem>
+                                    </SelectContent>
+                                  </Select>
+                                )}
 
-    <Button
-      variant="ghost"
-      size="icon"
-      onClick={() => handleDeleteLineItem(item.employeeId)}
-      disabled={!isEditable}
-    >
-      <Trash2 className="h-4 w-4 text-destructive" />
-    </Button>
-  </div>
-</TableCell>
+                                {!item.paid ? (
+                                  <Button
+                                    size="sm"
+                                    onClick={() =>
+                                      handleMarkEmployeePaid(item.employeeId)
+                                    }
+                                  >
+                                    <DollarSign className="mr-2 h-4 w-4" />
+                                    Mark Paid
+                                  </Button>
+                                ) : (
+                                  <Badge className="bg-green-600 text-white">
+                                    Paid
+                                  </Badge>
+                                )}
+
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => generateEmployeePaystub(item)}
+                                >
+                                  <FileText className="mr-2 h-4 w-4" />
+                                  Paystub
+                                </Button>
+
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() =>
+                                    handleDeleteLineItem(item.employeeId)
+                                  }
+                                  disabled={!isEditable}
+                                >
+                                  <Trash2 className="h-4 w-4 text-destructive" />
+                                </Button>
+                              </div>
+                            </TableCell>
                           </TableRow>
                         );
                       })
@@ -1001,8 +1198,12 @@ const handleMarkEmployeePaid = async (employeeId: string) => {
               </ScrollArea>
 
               <div className="mt-4 pr-4 grid grid-cols-2 sm:grid-cols-3 gap-2 text-right">
-                <div className="font-medium">Total Gross: ${totalGross.toFixed(2)}</div>
-                <div className="font-medium">Total Net: ${grandTotalNet.toFixed(2)}</div>
+                <div className="font-medium">
+                  Total Gross: ${totalGross.toFixed(2)}
+                </div>
+                <div className="font-medium">
+                  Total Net: ${grandTotalNet.toFixed(2)}
+                </div>
                 <div className="text-sm text-muted-foreground">
                   Confirmed: {confirmedCount}/{lineItems.length}
                 </div>
@@ -1071,4 +1272,3 @@ const handleMarkEmployeePaid = async (employeeId: string) => {
     </TooltipProvider>
   );
 }
-
