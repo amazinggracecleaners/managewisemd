@@ -2170,13 +2170,13 @@ await addDoc(
 const showConnecting = engine === "cloud" && (!authReady || !cloudReady);
 
 return (
-  <main className="min-h-screen p-4 sm:p-6 lg:p-8">
+  <main className="min-h-screen w-full px-3 py-4 sm:px-4 sm:py-6 md:px-6 lg:px-8">
     {showConnecting ? (
-      <div className="min-h-[60vh] flex items-center justify-center">
+      <div className="flex min-h-[60vh] items-center justify-center">
         <p>Connecting to the cloud...</p>
       </div>
     ) : (
-      <div className="max-w-6xl mx-auto">
+      <div className="mx-auto w-full max-w-[1600px]">
         {process.env.NODE_ENV !== "production" && (
           <div className="mb-2 text-xs text-muted-foreground">
             Engine: <b>{engine}</b> · Company:{" "}
@@ -2274,7 +2274,6 @@ return (
             rejectEmployeeUpdate={rejectEmployeeUpdate}
             engine={engine}
             setEngine={setEngine}
-           
           />
         )}
 

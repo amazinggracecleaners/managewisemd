@@ -245,9 +245,10 @@ export function ManagerView(props: ManagerViewProps) {
   };
 
   return (
-    <section>
+    <section className="w-full space-y-4">
       <Tabs value={managerTab} onValueChange={(v) => setManagerTab(v as any)}>
-        <TabsList className="grid w-full grid-cols-1 md:grid-cols-6 lg:grid-cols-12 mb-4 h-auto flex-wrap">
+        <div className="mb-4 w-full overflow-x-auto">
+  <TabsList className="flex w-max min-w-full gap-1">
           <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
 
           <TabsTrigger value="requests" className="relative">
@@ -270,11 +271,12 @@ export function ManagerView(props: ManagerViewProps) {
           <TabsTrigger value="employeeView">Employee View</TabsTrigger>
           <TabsTrigger value="settings">Settings</TabsTrigger>
         </TabsList>
+</div>
 
-                <TabsContent value="dashboard">
-          <div className="space-y-4">
+               <TabsContent value="dashboard" className="mt-2">
+  <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
              <ManagerNotificationsCard companyId={props.settings.companyId} />
-
+<div className="xl:col-span-2">
             <ManagerDashboard
               activeShifts={props.activeShifts}
               totalsByEmployee={props.totalsByEmployee}
@@ -302,9 +304,10 @@ export function ManagerView(props: ManagerViewProps) {
               settings={props.settings}
             />
           </div>
+          </div>
         </TabsContent>
 
-        <TabsContent value="requests">
+        <TabsContent value="requests" className="mt-2">
           <Card>
             <CardHeader>
               <CardTitle>Profile Change Requests</CardTitle>
@@ -419,7 +422,7 @@ export function ManagerView(props: ManagerViewProps) {
                           )}
                         </div>
 
-                        <div className="flex gap-2 mt-2 md:mt-0">
+                        <div className="flex flex-wrap gap-2 mt-2 md:mt-0">
                           <Button
                             size="sm"
                             variant="outline"
@@ -450,7 +453,7 @@ export function ManagerView(props: ManagerViewProps) {
           </Card>
         </TabsContent>
 
-        <TabsContent value="schedule">
+        <TabsContent value="schedule" className="mt-2">
           <ScheduleView
             sites={props.sites}
             employees={props.employees}
@@ -467,7 +470,7 @@ export function ManagerView(props: ManagerViewProps) {
           />
         </TabsContent>
 
-        <TabsContent value="sites">
+        <TabsContent value="sites" className="mt-2">
           <SiteListView
             sites={props.sites}
             settings={props.settings}
@@ -478,11 +481,11 @@ export function ManagerView(props: ManagerViewProps) {
           />
         </TabsContent>
 
-        <TabsContent value="invoices">
+        <TabsContent value="invoices" className="mt-2">
           <InvoiceView sites={props.sites} />
         </TabsContent>
 
-        <TabsContent value="financials">
+        <TabsContent value="financials" className="mt-2">
           <FinancialsView
             invoices={props.invoices}
             otherExpenses={props.otherExpenses}
@@ -497,7 +500,7 @@ export function ManagerView(props: ManagerViewProps) {
           />
         </TabsContent>
 
-        <TabsContent value="mileage">
+        <TabsContent value="mileage" className="mt-2">
           <MileageView
             mileageLogs={props.mileageLogs}
             sites={props.sites}
@@ -509,7 +512,7 @@ export function ManagerView(props: ManagerViewProps) {
           />
         </TabsContent>
 
-        <TabsContent value="otherExpenses">
+        <TabsContent value="otherExpenses" className="mt-2">
           <OtherExpensesView
             otherExpenses={props.otherExpenses}
             sites={props.sites}
@@ -521,7 +524,7 @@ export function ManagerView(props: ManagerViewProps) {
           />
         </TabsContent>
 
-        <TabsContent value="employees">
+        <TabsContent value="employees" className="mt-2">
           <EmployeeManagerView
             employees={props.employees}
             teams={props.settings.teams ?? []}
@@ -535,7 +538,7 @@ export function ManagerView(props: ManagerViewProps) {
           />
         </TabsContent>
 
-        <TabsContent value="payroll">
+        <TabsContent value="payroll" className="mt-2">
           <PayrollView
             employees={props.employees}
             timeEntries={props.allEntries}
@@ -552,7 +555,7 @@ export function ManagerView(props: ManagerViewProps) {
           />
         </TabsContent>
 
-        <TabsContent value="employeeView">
+        <TabsContent value="employeeView" className="mt-2">
           <EmployeeViewer
             allEntries={props.allEntries}
             allSchedules={props.schedules}
@@ -568,7 +571,7 @@ export function ManagerView(props: ManagerViewProps) {
           />
         </TabsContent>
 
-        <TabsContent value="settings">
+        <TabsContent value="settings" className="mt-2">
           <ManagerSettingsView
             settings={props.settings}
             setSettings={props.setSettings}

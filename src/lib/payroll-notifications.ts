@@ -30,7 +30,7 @@ export async function createPayrollConfirmationNotifications(args: {
           employeeId: employee.id,
           employeeName: employee.name,
           title: "Payroll confirmation requested",
-          message: `Your payroll for ${String(period.startDate).slice(0, 10)} to ${String(period.endDate).slice(0, 10)} is ready for review.`,
+          message: `Your payroll for ${String(period.startDate).slice(0, 10)} to ${String(period.endDate).slice(0, 10)} is ready for review. Go to the payroll section to review it.`,
           periodId: period.id,
           revision: period.revision ?? 1,
           createdAt: serverTimestamp(),
