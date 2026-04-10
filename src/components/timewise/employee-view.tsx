@@ -637,7 +637,7 @@ const getHoursForSiteDay = useCallback(
     <>
       <Card className="mb-6">
         <CardHeader>
-          <div className="flex justify-between items-center">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             <CardTitle>Welcome, {employee.name}</CardTitle>
             {!isManagerPreview && (
               <div className="flex items-center gap-2">
@@ -675,28 +675,37 @@ const getHoursForSiteDay = useCallback(
       </Card>
 
       <Tabs defaultValue="schedule" className="w-full">
-        <TabsList className="grid w-full grid-cols-3">
-          <TabsTrigger value="schedule">Schedule & Actions</TabsTrigger>
-          <TabsTrigger value="activity">Recent Activity</TabsTrigger>
-          <TabsTrigger value="payroll">Payroll</TabsTrigger>
-        </TabsList>
+  
+
+  {/* 🔥 Sticky Tabs Bar */}
+  <div className="sticky top-0 z-40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b">
+    <div className="w-full overflow-x-auto">
+      <TabsList className="flex w-max min-w-full gap-1">
+        <TabsTrigger value="schedule">Schedule & Actions</TabsTrigger>
+        <TabsTrigger value="activity">Recent Activity</TabsTrigger>
+        <TabsTrigger value="payroll">Payroll</TabsTrigger>
+      </TabsList>
+    </div>
+  </div>
 
         {/* SCHEDULE TAB */}
         <TabsContent value="schedule" className="mt-6">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
             {/* Hours Summary */}
             <Card>
               <CardHeader>
                 <CardTitle className="text-base font-medium">Your Hours Worked</CardTitle>
                 <CardDescription>Based on your completed shifts.</CardDescription>
               </CardHeader>
-              <CardContent>
+             <CardContent className="p-3 sm:p-4">
                 <Tabs defaultValue="week">
-                  <TabsList className="grid w-full grid-cols-3">
+                  <div className="w-full overflow-x-auto">
+  <TabsList className="flex w-max min-w-full gap-1">
                     <TabsTrigger value="today">Today</TabsTrigger>
                     <TabsTrigger value="week">This Week</TabsTrigger>
                     <TabsTrigger value="month">This Month</TabsTrigger>
                   </TabsList>
+</div>
                   <TabsContent value="today" className="pt-4">
                     <div className="text-center">
                       <p className="text-3xl font-bold">{totalHoursToday.toFixed(2)}</p>
@@ -726,7 +735,7 @@ const getHoursForSiteDay = useCallback(
                   <CardTitle>Your Schedule</CardTitle>
                   <CardDescription>Tasks assigned to you.</CardDescription>
                 </CardHeader>
-                <CardContent>
+               <CardContent className="p-3 sm:p-4">
                   <Tabs defaultValue="daily">
                     <TabsList className="grid w-full grid-cols-2">
                       <TabsTrigger value="daily">Daily</TabsTrigger>
@@ -903,7 +912,7 @@ const getHoursForSiteDay = useCallback(
 
                     {/* WEEKLY VIEW */}
                     <TabsContent value="weekly">
-                      <ScrollArea className="h-60">
+                      <ScrollArea className="h-[50vh]">
                         <ul className="space-y-4">
                           {weeklySchedule.map((day) => (
                             <li key={day.date.toISOString()}>
@@ -957,9 +966,10 @@ const getHoursForSiteDay = useCallback(
               <CardTitle>Your Recent Activity</CardTitle>
               <CardDescription>Your last 20 clock-in/out events.</CardDescription>
             </CardHeader>
-            <CardContent>
+            <CardContent className="p-3 sm:p-4">
               <ScrollArea className="h-[500px]">
-                <Table>
+  <div className="w-full overflow-x-auto">
+    <Table className="min-w-[700px]">
                   <TableHeader>
                     <TableRow>
                       <TableHead>When</TableHead>
@@ -1016,8 +1026,9 @@ const getHoursForSiteDay = useCallback(
                       </TableRow>
                     )}
                   </TableBody>
-                </Table>
-              </ScrollArea>
+                    </Table>
+  </div>
+</ScrollArea>
             </CardContent>
           </Card>
         </TabsContent>

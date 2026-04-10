@@ -286,10 +286,10 @@ export function PayrollView({
     const endStr = format(end, "yyyy-MM-dd");
 
     return {
-      periodId: `${startStr}_${endStr}`,
-      startDate: start.toISOString(),
-      endDate: end.toISOString(),
-    };
+  periodId: `${startStr}_${endStr}`,
+  startDate: startStr,
+  endDate: endStr,
+};
   }, [currentDate, payFrequency, customStartDate, customEndDate]);
 
   const currentPeriod = useMemo(
@@ -604,7 +604,7 @@ export function PayrollView({
           employeeId: employee.id,
           employeeName: employee.name,
           title: "You’ve been paid",
-          message: `You have been paid $${(paidItem.net || 0).toFixed(2)} for payroll period ${String(currentPeriod.startDate).slice(0, 10)} to ${String(currentPeriod.endDate).slice(0, 10)}.`,
+          message: `You have been paid $${(paidItem.net || 0).toFixed(2)} for payroll period ${currentPeriod.startDate} to ${currentPeriod.endDate}.`,
           periodId: currentPeriod.id,
           revision: currentPeriod.revision ?? 1,
           paymentMethod: paidItem.paymentMethod,
