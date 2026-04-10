@@ -16,7 +16,7 @@ import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
 import { DEFAULT_PIN } from "@/lib/constants";
-import { cleanForFirestore } from "@/lib/utils";
+import { cleanForFirestore } from "@/lib/firestore-utils";
 
 // ✅ add these imports
 import {

@@ -72,14 +72,14 @@ import { FirestorePermissionError } from "@/firebase/errors";
 import { where } from "firebase/firestore";
 // ✅ Import singletons
 import { db, auth } from "@/firebase/client";
-
+import { createManagerNotification } from "@/lib/notifications";
 import { addOtherExpenseFS, updateOtherExpenseFS, deleteOtherExpenseFS } from "@/lib/expenses";
 
 import { useEngine } from "@/providers/EngineProvider";
 import { useSettings } from "@/features/settings/hooks/useSettings";
 import { withComputed } from "@/lib/invoice-math";
 import { computeJobProfitability } from "@/lib/job-profitability";
-import { cleanForFirestore } from "@/lib/utils";
+import { cleanForFirestore } from "@/lib/firestore-utils";
 import { addDays } from "date-fns";
 
 function sessionMinutesOnDay(s: Session, day: Date, nowTs: number = Date.now()): number {
@@ -1837,78 +1837,88 @@ await addDoc(
   );
 
   const confirmPayroll = useCallback(
-    async (periodId: string, employeeId: string, revision: number) => {
-      if (!user) return;
+  async (periodId: string, employeeId: string, revision: number) => {
+    if (!user) return;
 
-      const confirmation: PayrollConfirmation = {
-        periodId,
-        companyId: getCompanyId(settings),
-        uid: user.uid,
-        employeeId,
-        employeeName: employees.find((e) => e.id === employeeId)?.name || "Unknown",
-        confirmed: true,
-        at: serverTimestamp() as any,
-        revision,
-      };
-
-      const cId = getCompanyId(settings);
-      const docId = `${employeeId}__rev${revision}`;
-
-      if (engine === "cloud") {
-        const docRef = doc(db, `companies/${cId}/payroll_periods/${periodId}/confirmations`, docId);
-        try {
-  await setDoc(docRef, cleanForFirestore(confirmation), { merge: true });
-
-  const employeeName =
-    employees.find((e) => e.id === employeeId)?.name || "Unknown";
-
-  // employee-facing notification
-  await addDoc(
-    collection(db, "companies", cId, "employee_notifications"),
-    {
-      type: "payroll-confirmed",
-      employeeId,
-      employeeName,
-      title: "Payroll confirmed",
-      message: "You have successfully confirmed your payroll.",
+    const confirmation: PayrollConfirmation = {
       periodId,
-      revision,
-      createdAt: serverTimestamp(),
-      read: false,
-    }
-  );
-
-  // manager-facing notification
-  await addDoc(
-    collection(db, "companies", cId, "manager_notifications"),
-    {
-      type: "payroll-confirmed",
+      companyId: getCompanyId(settings),
+      uid: user.uid,
       employeeId,
-      employeeName,
-      title: "Payroll confirmed",
-      message: `${employeeName} confirmed payroll for revision ${revision}.`,
-      periodId,
+      employeeName:
+        employees.find((e) => e.id === employeeId)?.name || "Unknown",
+      confirmed: true,
+      at: serverTimestamp() as any,
       revision,
-      createdAt: serverTimestamp(),
-      read: false,
-    }
-  );
+    };
 
-  toast({ title: "Payroll confirmed!" });
-} catch (e: any) {
-          errorEmitter.emit(
-            "permission-error",
-            new FirestorePermissionError({ path: docRef.path, operation: "create", requestResourceData: confirmation })
-          );
-          toast({ variant: "destructive", title: "Cloud write failed", description: e.message, duration: 9000 });
-        }
-      } else {
-        toast({ title: "Payroll confirmed (local mode)." });
+    const cId = getCompanyId(settings);
+    const docId = `${employeeId}__rev${revision}`;
+
+    if (engine === "cloud") {
+      const docRef = doc(
+        db,
+        `companies/${cId}/payroll_periods/${periodId}/confirmations`,
+        docId
+      );
+
+      try {
+        await setDoc(docRef, cleanForFirestore(confirmation), {
+          merge: true,
+        });
+
+        const employeeName =
+          employees.find((e) => e.id === employeeId)?.name || "Unknown";
+
+        await createManagerNotification({
+          companyId: cId,
+          type: "payroll-confirmed",
+          employeeId,
+          employeeName,
+          periodId,
+          payrollRevision: revision,
+          deviceLabel: "Employee app",
+        });
+
+        await addDoc(
+          collection(db, "companies", cId, "employee_notifications"),
+          {
+            type: "payroll-confirmed",
+            employeeId,
+            employeeName,
+            title: "Payroll confirmed",
+            message: "You have successfully confirmed your payroll.",
+            periodId,
+            revision,
+            createdAt: serverTimestamp(),
+            read: false,
+          }
+        );
+
+        toast({ title: "Payroll confirmed!" });
+      } catch (e: any) {
+        errorEmitter.emit(
+          "permission-error",
+          new FirestorePermissionError({
+            path: docRef.path,
+            operation: "create",
+            requestResourceData: confirmation,
+          })
+        );
+
+        toast({
+          variant: "destructive",
+          title: "Cloud write failed",
+          description: e.message,
+          duration: 9000,
+        });
       }
-    },
-    [engine, employees, settings, toast, user]
-  );
-
+    } else {
+      toast({ title: "Payroll confirmed (local mode)." });
+    }
+  },
+  [engine, employees, settings, toast, user]
+);
   // --- Exports ---
   const exportCSV = useCallback(() => {
     const esc = (v: unknown) => `"${String(v ?? "").replace(/"/g, '""')}"`;

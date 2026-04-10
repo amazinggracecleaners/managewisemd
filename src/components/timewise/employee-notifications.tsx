@@ -65,7 +65,7 @@ export function EmployeeNotifications({
   const [notifications, setNotifications] = useState<EmployeeNotification[]>([]);
   const [loading, setLoading] = useState(true);
   const [prevCount, setPrevCount] = useState(0);
-
+const [unreadNotificationCount, setUnreadNotificationCount] = useState(0);
   const unreadCount = notifications.filter((n) => !n.read).length;
 
   const playNotificationSound = () => {
@@ -115,6 +115,7 @@ export function EmployeeNotifications({
       console.warn("Employee vibration failed:", error);
     }
   };
+
 
   useEffect(() => {
     if (!employee?.id || !companyId) {
@@ -192,7 +193,7 @@ export function EmployeeNotifications({
   };
 
   return (
-    <Card className="h-full flex flex-col">
+    <Card className="border-0 shadow-none h-full flex flex-col">
       <CardHeader className="sticky top-0 bg-background z-10 flex flex-row items-center justify-between">
         <div>
           <CardTitle className="flex items-center gap-2">

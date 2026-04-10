@@ -22,7 +22,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { format, parseISO, isValid } from "date-fns";
 import { uuid } from "@/lib/time-utils";
 import { Badge } from "@/components/ui/badge";
-import { cn, cleanForFirestore } from "@/lib/utils";
+import { cleanForFirestore } from "@/lib/firestore-utils";
+import { cn}from "@/lib/utils";
 import { useInvoices } from "@/features/invoices/hooks/useInvoices";
 import { withComputed } from "@/lib/invoice-math";
 import { exportInvoiceToPDF } from "@/lib/invoice-export";

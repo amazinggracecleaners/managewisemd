@@ -1,6 +1,24 @@
 "use client";
 
 import React, { useMemo, useState, useCallback, useEffect } from "react";
+import {
+  collection,
+  doc,
+  onSnapshot,
+  orderBy,
+  query,
+  where,
+  writeBatch,
+} from "firebase/firestore";
+import { db } from "@/firebase/client";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import type {
   Entry,
   Settings,
@@ -23,6 +41,7 @@ import {
   ChevronRight,
   MessageSquare,
   FilePenLine,
+  Bell,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -62,7 +81,9 @@ import {
   DialogDescription,
   DialogFooter,
   DialogClose,
+ DialogTrigger,
 } from "@/components/ui/dialog";
+
 import { Textarea } from "@/components/ui/textarea";
 import { EmployeeNotifications } from "./employee-notifications";
 import { Input } from "@/components/ui/input";
@@ -186,9 +207,26 @@ export function EmployeeView({
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [currentDate, setCurrentDate] = useState(startOfDay(new Date()));
 const [dailySearch, setDailySearch] = useState("");
+
 const [statusFilter, setStatusFilter] = useState<
   "all" | "complete" | "in-process" | "incomplete"
 >("all");
+const [openNotifications, setOpenNotifications] = useState(false);
+const [unreadNotificationCount, setUnreadNotificationCount] = useState(0);
+type HeaderEmployeeNotification = {
+  id: string;
+  employeeId: string;
+  type: "schedule-change" | "payroll-confirmation" | "payment";
+  title: string;
+  message: string;
+  createdAt?: unknown;
+  read: boolean;
+};
+
+const [headerNotifications, setHeaderNotifications] = useState<
+  HeaderEmployeeNotification[]
+>([]);
+const prevUnreadRef = React.useRef(0);
 useEffect(() => {
   setDailySearch("");
   setStatusFilter("all");
@@ -202,6 +240,102 @@ useEffect(() => {
 
   return () => window.clearInterval(id);
 }, []);
+
+const companyId =
+  settings.companyId?.trim() ||
+  process.env.NEXT_PUBLIC_COMPANY_ID ||
+  "amazing-grace-cleaners";
+
+const vibrateNotification = () => {
+  if (typeof navigator === "undefined") return;
+  if (!("vibrate" in navigator)) return;
+
+  try {
+    navigator.vibrate?.([120, 60, 120]);
+  } catch (error) {
+    console.warn("Employee vibration failed:", error);
+  }
+};
+
+useEffect(() => {
+  if (!employee?.id) {
+    setUnreadNotificationCount(0);
+    setHeaderNotifications([]);
+    prevUnreadRef.current = 0;
+    return;
+  }
+
+  const q = query(
+    collection(db, "companies", companyId, "employee_notifications"),
+    where("employeeId", "==", employee.id),
+    orderBy("createdAt", "desc")
+  );
+
+  const unsub = onSnapshot(
+    q,
+    (snap) => {
+      const items = snap.docs.map((d) => ({
+        id: d.id,
+        ...d.data(),
+      })) as HeaderEmployeeNotification[];
+
+      setHeaderNotifications(items);
+
+      const unread = items.filter((n) => !n.read).length;
+      setUnreadNotificationCount(unread);
+
+      // 🔥 vibration trigger
+      if (unread > prevUnreadRef.current) {
+        vibrateNotification();
+      }
+      prevUnreadRef.current = unread;
+    },
+    (err) => {
+      console.error("Notifications failed:", err);
+      setUnreadNotificationCount(0);
+      setHeaderNotifications([]);
+      prevUnreadRef.current = 0;
+    }
+  );
+
+  return () => unsub();
+}, [employee?.id, companyId]);
+
+const markHeaderNotificationRead = useCallback(
+  async (id: string) => {
+    const batch = writeBatch(db);
+
+    batch.update(
+      doc(db, "companies", companyId, "employee_notifications", id),
+      {
+        read: true,
+        readAt: new Date().toISOString(),
+      }
+    );
+
+    await batch.commit();
+  },
+  [companyId]
+);
+
+const markAllHeaderNotificationsRead = useCallback(async () => {
+  const unread = headerNotifications.filter((n) => !n.read);
+  if (!unread.length) return;
+
+  const batch = writeBatch(db);
+
+  unread.forEach((n) => {
+    batch.update(
+      doc(db, "companies", companyId, "employee_notifications", n.id),
+      {
+        read: true,
+        readAt: new Date().toISOString(),
+      }
+    );
+  });
+
+  await batch.commit();
+}, [companyId, headerNotifications]);
   const [isNoteDialogOpen, setIsNoteDialogOpen] = useState(false);
   const [editingNoteForSchedule, setEditingNoteForSchedule] = useState<CleaningSchedule | null>(null);
   const [currentNote, setCurrentNote] = useState("");
@@ -633,27 +767,130 @@ const getHoursForSiteDay = useCallback(
 );
 
 
-  return (
-    <>
-      <Card className="mb-6">
-        <CardHeader>
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-            <CardTitle>Welcome, {employee.name}</CardTitle>
-            {!isManagerPreview && (
-              <div className="flex items-center gap-2">
-                <Button variant="outline" size="sm" onClick={() => setIsProfileOpen(true)}>
-                  <User className="mr-2" /> My Profile
-                </Button>
-                <Button variant="ghost" size="sm" onClick={onLogout}>
-                  <Power className="mr-2" /> Logout
-                </Button>
-              </div>
-            )}
-            <EmployeeNotifications
-  employee={employee}
-  companyId={settings.companyId?.trim() || process.env.NEXT_PUBLIC_COMPANY_ID || "amazing-grace-cleaners"}
-/>
-          </div>
+ return (
+  <>
+    <Card className="mb-6">
+      <CardHeader>
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <CardTitle>Welcome, {employee.name}</CardTitle>
+
+          {!isManagerPreview && (
+            <div className="flex items-center gap-2 flex-wrap">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setIsProfileOpen(true)}
+              >
+                <User className="mr-2 h-4 w-4" />
+                My Profile
+              </Button>
+
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="sm" className="relative">
+                    <Bell className="mr-2 h-4 w-4" />
+                    Notifications
+
+                    {unreadNotificationCount > 0 && (
+                      <span className="ml-2 inline-flex min-w-[1.25rem] items-center justify-center rounded-full bg-red-600 px-1.5 py-0.5 text-[10px] font-semibold text-white">
+                        {unreadNotificationCount}
+                      </span>
+                    )}
+                  </Button>
+                </DropdownMenuTrigger>
+
+                <DropdownMenuContent align="end" className="w-96">
+                
+                    <div className="px-3 py-2 border-b flex justify-between items-center">
+  <span className="font-semibold text-sm">Notifications</span>
+
+  {unreadNotificationCount > 0 && (
+    <Button
+      variant="ghost"
+      size="sm"
+      onClick={markAllHeaderNotificationsRead}
+    >
+      Mark all as read
+    </Button>
+  )}
+</div>
+                  
+
+                  <DropdownMenuSeparator />
+
+                  {headerNotifications.length === 0 ? (
+                    <div className="p-4 text-sm text-muted-foreground">
+                      No notifications
+                    </div>
+                  ) : (
+                    <>
+                      {headerNotifications.slice(0, 3).map((n) => (
+                        <DropdownMenuItem
+                          key={n.id}
+                          onClick={() => {
+                            if (!n.read) void markHeaderNotificationRead(n.id);
+                          }}
+                          className="flex flex-col items-start gap-1 cursor-pointer hover:bg-muted"
+                        >
+                          <div className="flex justify-between w-full">
+                            <span className="font-medium">{n.title}</span>
+                            {!n.read && (
+                              <Badge
+                                variant="destructive"
+                                className="text-[10px]"
+                              >
+                                New
+                              </Badge>
+                            )}
+                          </div>
+
+                          <span className="text-xs text-muted-foreground line-clamp-2">
+                            {n.message}
+                          </span>
+                        </DropdownMenuItem>
+                      ))}
+
+                      <DropdownMenuSeparator />
+
+                      <Button
+                        variant="ghost"
+                        className="w-full"
+                        onClick={() => setOpenNotifications(true)}
+                      >
+                        View all notifications
+                      </Button>
+                    </>
+                  )}
+                </DropdownMenuContent>
+              </DropdownMenu>
+
+              <Dialog
+                open={openNotifications}
+                onOpenChange={setOpenNotifications}
+              >
+                <DialogContent className="max-w-2xl">
+                  <DialogHeader>
+                    <DialogTitle>Notifications</DialogTitle>
+                    <DialogDescription>
+                      Schedule updates, payroll confirmations, and payments
+                    </DialogDescription>
+                  </DialogHeader>
+
+                  <EmployeeNotifications
+                    employee={employee}
+                    companyId={companyId}
+                  />
+                </DialogContent>
+              </Dialog>
+
+              <Button variant="ghost" size="sm" onClick={onLogout}>
+                <Power className="mr-2 h-4 w-4" />
+                Logout
+              </Button>
+            </div>
+          )}
+        </div>
+         
           <CardDescription>
             Your base pay rate is ${employee.payRate.toFixed(2)}/hour.
             {activeShiftsCount > 0 ? (

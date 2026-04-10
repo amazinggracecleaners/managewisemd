@@ -3,6 +3,10 @@ import "./globals.css";
 import { Toaster } from "@/components/ui/toaster";
 import { FirebaseErrorListener } from "@/components/FirebaseErrorListener";
 import Providers from "./providers";
+import { Geist } from "next/font/google";
+import { cn } from "@/lib/utils";
+
+const geist = Geist({subsets:['latin'],variable:'--font-sans'});
 
 export const metadata: Metadata = {
   title: "ManageWise Business Operations",
@@ -16,7 +20,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang="en" suppressHydrationWarning className={cn("font-sans", geist.variable)}>
       <head>
         <meta
           name="viewport"

@@ -76,7 +76,8 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
-import { cn, cleanForFirestore } from "@/lib/utils";
+import { cleanForFirestore } from "@/lib/firestore-utils";
+import { cn}from "@/lib/utils";
 import {
   Tooltip,
   TooltipContent,
