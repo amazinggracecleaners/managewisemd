@@ -1869,6 +1869,12 @@ await addDoc(
 
         const employeeName =
           employees.find((e) => e.id === employeeId)?.name || "Unknown";
+          console.log("writing manager payroll notification", {
+  cId,
+  employeeId,
+  periodId,
+  revision,
+});
           await addDoc(
   collection(db, "companies", cId, "notifications"),
   {
