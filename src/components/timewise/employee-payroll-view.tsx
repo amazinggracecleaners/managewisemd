@@ -23,6 +23,7 @@ import {
   Download,
   ExternalLink,
 } from "lucide-react";
+import { PaystubCard } from "@/components/timewise/payroll/PaystubCard";
 import {
   Accordion,
   AccordionContent,
@@ -217,43 +218,90 @@ export function EmployeePayrollView({
     const { period, employeeData } = args;
     setPdfFor(period.id);
 
-    try {
-      const doc = new jsPDF();
-      const rev = period.revision ?? 1;
-      const status = derivePayrollStatus(period, payrollConfirmations);
+    try {const doc = new jsPDF();
 
-      doc.setFontSize(16);
-      doc.text(`${companyName || "OpsWiseMD"} — Paystub`, 14, 18);
-      doc.setFontSize(10);
-      doc.text(`Employee: ${employee.name} (ID: ${employee.id})`, 14, 26);
-      doc.text(`Period: ${fmt(period.startDate)} — ${fmt(period.endDate)}`, 14, 32);
-      doc.text(`Revision: ${rev}`, 14, 38);
-      doc.text(`Status: ${status}`, 14, 44);
+const logo = new Image();
+logo.src = "/logo.png"; // your logo in /public
 
-      doc.rect(12, 50, 186, 70);
-      let y = 58;
+// HEADER
+doc.setFontSize(18);
+doc.setFont("helvetica", "bold");
+doc.text(companyName || "Amazing Grace Cleaners LLC", 14, 18);
 
-      const line = (label: string, value: string) => {
-        doc.text(label, 16, y);
-        doc.text(value, 190, y, { align: "right" });
-        y += 8;
-      };
+doc.setFontSize(11);
+doc.setFont("helvetica", "normal");
+doc.text("Employee Pay Stub", 14, 26);
 
-      line("Regular Hours", toHours((employeeData as any).regularMinutes));
-      line("Bonus Hours", toHours((employeeData as any).bonusMinutes));
-      line("Flat Bonus", money.format(Number(employeeData.flatBonus ?? 0)));
-      line("Deductions", money.format(Number(employeeData.deductions ?? 0)));
+// RIGHT SIDE INFO
+doc.text(`Employee: ${employee.name}`, 140, 18);
+doc.text(`ID: ${employee.id}`, 140, 24);
+doc.text(`Period: ${fmt(period.startDate)} - ${fmt(period.endDate)}`, 140, 30);
 
-      doc.setFont("helvetica", "bold");
-      line("Net Pay", money.format(Number(employeeData.net ?? 0)));
-      doc.setFont("helvetica", "normal");
+// DIVIDER
+doc.line(14, 34, 196, 34);
 
-      doc.text("Employee confirmation (if applicable): ___________________________", 14, 130);
-      doc.text("Manager signature: _____________________________________________", 14, 138);
-      doc.text(`Generated: ${format(new Date(), "MMM d, yyyy h:mm a")}`, 14, 148);
+// EARNINGS SECTION
+let y = 44;
 
-      const filename = `paystub_${employee.id}_${period.id}_rev${rev}.pdf`;
-      doc.save(filename);
+doc.setFont("helvetica", "bold");
+doc.text("Earnings", 14, y);
+y += 6;
+
+doc.setFont("helvetica", "normal");
+
+const row = (label: string, value: string) => {
+  doc.text(label, 14, y);
+  doc.text(value, 196, y, { align: "right" });
+  y += 6;
+};
+
+row("Regular Hours", toHours((employeeData as any).regularMinutes));
+row("Overtime Hours", toHours((employeeData as any).overtimeMinutes));
+row("Bonus", money.format(Number(employeeData.flatBonus ?? 0)));
+
+y += 4;
+
+// DEDUCTIONS
+doc.setFont("helvetica", "bold");
+doc.text("Deductions", 14, y);
+y += 6;
+
+doc.setFont("helvetica", "normal");
+
+row("Deductions", money.format(Number(employeeData.deductions ?? 0)));
+
+y += 4;
+
+// TOTALS
+doc.setFont("helvetica", "bold");
+doc.text("Net Pay", 14, y);
+doc.text(
+  money.format(Number(employeeData.net ?? 0)),
+  196,
+  y,
+  { align: "right" }
+);
+
+y += 12;
+
+// SIGNATURES
+doc.setFont("helvetica", "normal");
+doc.text("Employee Signature: ___________________________", 14, y);
+y += 8;
+doc.text("Manager Signature: ___________________________", 14, y);
+
+y += 10;
+
+// FOOTER
+doc.setFontSize(9);
+doc.text(
+  "This is a computer-generated pay statement from Amazing Grace Cleaners LLC.",
+  14,
+  y
+);
+
+const filename = `paystub_${employee.id}_${period.id}.pdf`;
+doc.save(filename);
     } finally {
       setPdfFor(null);
     }
@@ -348,7 +396,28 @@ export function EmployeePayrollView({
                   </AccordionTrigger>
 
                   <AccordionContent>
-                    <div className="p-4 bg-muted/50 rounded-lg">
+                    <div className="p-4 bg-muted/50 rounded-lg space-y-4">
+
+  {/* 🔥 Branded Paystub Preview */}
+  <PaystubCard
+    companyName={companyName || "Amazing Grace Cleaners LLC"}
+    logoUrl="/Mathieu_logo_AGC.jpg"
+    employeeName={employee.name}
+    employeeId={employee.id}
+    payDate={fmt(period.endDate)}
+    payPeriodStart={fmt(period.startDate)}
+    payPeriodEnd={fmt(period.endDate)}
+    payRate={(employee as any).payRate}
+    regularHours={Number((employeeData as any).regularMinutes ?? 0) / 60}
+    overtimeHours={Number((employeeData as any).overtimeMinutes ?? 0) / 60}
+    bonus={Number(employeeData.flatBonus ?? 0)}
+    grossPay={Number(employeeData.gross ?? 0)}
+    deductions={[
+      { label: "Deductions", amount: Number(employeeData.deductions ?? 0) },
+    ]}
+    netPay={Number(employeeData.net ?? 0)}
+    companyContact="Amazing Grace Cleaners LLC"
+  />
                       <div className="grid grid-cols-2 gap-4">
                         <div>
                           <p className="text-sm font-medium">Regular Hours</p>
