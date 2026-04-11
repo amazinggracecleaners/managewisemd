@@ -44,7 +44,7 @@ env:
     value: "false"
     availability: [BUILD, RUNTIME]
   - variable: NEXT_PUBLIC_COMPANY_ID
-    value: "amazing-grace-cleaners"
+    value: "Amazing Grace Cleaners"
     availability: [BUILD, RUNTIME]
       - variable: NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID
     value: "G-DMZXZCL4Z4"

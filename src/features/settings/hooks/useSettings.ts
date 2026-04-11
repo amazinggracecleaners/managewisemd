@@ -10,7 +10,7 @@ import { useToast } from "@/hooks/use-toast";
 import { onAuthStateChanged, type User } from "firebase/auth";
 import { ensureAuthedUser } from "@/firebase/ensureAuth";
 
-const FALLBACK_COMPANY_ID = process.env.NEXT_PUBLIC_COMPANY_ID || "amazing-grace-cleaners";
+const FALLBACK_COMPANY_ID = process.env.NEXT_PUBLIC_COMPANY_ID || "Amazing Grace Cleaners";
 
 // Prefer env in cloud mode if present. Otherwise fall back to settings/companyId, then fallback.
 function resolveCompanyId(engine: "cloud" | "local", s: Settings) {

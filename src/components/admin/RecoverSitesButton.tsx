@@ -21,7 +21,7 @@ export function RecoverSitesButton() {
   const companyId =
     settings.companyId?.trim() ||
     process.env.NEXT_PUBLIC_COMPANY_ID ||
-    "amazing-grace-cleaners";
+    "Amazing Grace Cleaners";
 
   const normalizeName = (raw?: string) =>
     (raw || "")

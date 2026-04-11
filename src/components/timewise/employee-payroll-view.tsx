@@ -167,7 +167,30 @@ function PayrollStatusBadge({
 
   return <Badge className={className}>{label}</Badge>;
 }
+async function loadImageAsDataUrl(src: string): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.crossOrigin = "anonymous";
 
+    img.onload = () => {
+      const canvas = document.createElement("canvas");
+      canvas.width = img.naturalWidth;
+      canvas.height = img.naturalHeight;
+
+      const ctx = canvas.getContext("2d");
+      if (!ctx) {
+        reject(new Error("Could not create canvas context."));
+        return;
+      }
+
+      ctx.drawImage(img, 0, 0);
+      resolve(canvas.toDataURL("image/jpeg"));
+    };
+
+    img.onerror = () => reject(new Error(`Failed to load image: ${src}`));
+    img.src = src;
+  });
+}
 export function EmployeePayrollView({
   employee,
   payrollPeriods,
@@ -211,101 +234,179 @@ export function EmployeePayrollView({
       .sort((a, b) => safeDate(b.startDate) - safeDate(a.startDate));
   }, [employee.id, payrollPeriods]);
 
-  const downloadPaystub = (args: {
-    period: PayrollPeriod;
-    employeeData: PayrollLineItem;
-  }) => {
-    const { period, employeeData } = args;
-    setPdfFor(period.id);
+  const downloadPaystub = async (args: {
+  period: PayrollPeriod;
+  employeeData: PayrollLineItem;
+}) => {
+  const { period, employeeData } = args;
+  setPdfFor(period.id);
 
-    try {const doc = new jsPDF();
+  try {
+    const doc = new jsPDF();
+    const rev = period.revision ?? 1;
+    const status = derivePayrollStatus(period, payrollConfirmations);
 
-const logo = new Image();
-logo.src = "/logo.png"; // your logo in /public
+    let logoDataUrl: string | null = null;
 
-// HEADER
-doc.setFontSize(18);
-doc.setFont("helvetica", "bold");
-doc.text(companyName || "Amazing Grace Cleaners LLC", 14, 18);
-
-doc.setFontSize(11);
-doc.setFont("helvetica", "normal");
-doc.text("Employee Pay Stub", 14, 26);
-
-// RIGHT SIDE INFO
-doc.text(`Employee: ${employee.name}`, 140, 18);
-doc.text(`ID: ${employee.id}`, 140, 24);
-doc.text(`Period: ${fmt(period.startDate)} - ${fmt(period.endDate)}`, 140, 30);
-
-// DIVIDER
-doc.line(14, 34, 196, 34);
-
-// EARNINGS SECTION
-let y = 44;
-
-doc.setFont("helvetica", "bold");
-doc.text("Earnings", 14, y);
-y += 6;
-
-doc.setFont("helvetica", "normal");
-
-const row = (label: string, value: string) => {
-  doc.text(label, 14, y);
-  doc.text(value, 196, y, { align: "right" });
-  y += 6;
-};
-
-row("Regular Hours", toHours((employeeData as any).regularMinutes));
-row("Overtime Hours", toHours((employeeData as any).overtimeMinutes));
-row("Bonus", money.format(Number(employeeData.flatBonus ?? 0)));
-
-y += 4;
-
-// DEDUCTIONS
-doc.setFont("helvetica", "bold");
-doc.text("Deductions", 14, y);
-y += 6;
-
-doc.setFont("helvetica", "normal");
-
-row("Deductions", money.format(Number(employeeData.deductions ?? 0)));
-
-y += 4;
-
-// TOTALS
-doc.setFont("helvetica", "bold");
-doc.text("Net Pay", 14, y);
-doc.text(
-  money.format(Number(employeeData.net ?? 0)),
-  196,
-  y,
-  { align: "right" }
-);
-
-y += 12;
-
-// SIGNATURES
-doc.setFont("helvetica", "normal");
-doc.text("Employee Signature: ___________________________", 14, y);
-y += 8;
-doc.text("Manager Signature: ___________________________", 14, y);
-
-y += 10;
-
-// FOOTER
-doc.setFontSize(9);
-doc.text(
-  "This is a computer-generated pay statement from Amazing Grace Cleaners LLC.",
-  14,
-  y
-);
-
-const filename = `paystub_${employee.id}_${period.id}.pdf`;
-doc.save(filename);
-    } finally {
-      setPdfFor(null);
+    try {
+      logoDataUrl = await loadImageAsDataUrl("/Mathieu_logo_AGC.jpg");
+    } catch (e) {
+      console.warn("Logo could not be loaded for PDF.", e);
     }
-  };
+
+    // Header
+    if (logoDataUrl) {
+      doc.addImage(logoDataUrl, "JPEG", 14, 12, 28, 18);
+    }
+
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(18);
+    doc.text(companyName || "Amazing Grace Cleaners LLC", 48, 18);
+
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(11);
+    doc.text("Employee Pay Stub", 48, 25);
+
+    doc.setFontSize(10);
+    doc.text(`Employee: ${employee.name}`, 140, 18);
+    doc.text(`Employee ID: ${employee.id}`, 140, 24);
+    doc.text(`Pay Period: ${fmt(period.startDate)} - ${fmt(period.endDate)}`, 140, 30);
+    doc.text(`Revision: ${rev}`, 140, 36);
+    doc.text(`Status: ${status}`, 140, 42);
+
+    doc.line(14, 48, 196, 48);
+
+    // Summary cards
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(11);
+    doc.text("Employee Information", 14, 58);
+    doc.text("Pay Summary", 110, 58);
+
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(10);
+
+    doc.rect(14, 62, 84, 30);
+    doc.text(`Name: ${employee.name}`, 18, 70);
+    doc.text(`Pay Rate: ${money.format(Number((employee as any).payRate ?? 0))}/hr`, 18, 77);
+    doc.text(
+      `Hours Worked: ${(
+        Number((employeeData as any).regularMinutes ?? 0) / 60 +
+        Number((employeeData as any).overtimeMinutes ?? 0) / 60
+      ).toFixed(2)}`,
+      18,
+      84
+    );
+
+    const totalDeductions = Number(employeeData.deductions ?? 0);
+    const grossPay = Number((employeeData as any).gross ?? 0);
+    const netPay = Number(employeeData.net ?? 0);
+
+    doc.rect(110, 62, 86, 30);
+    doc.text(`Gross Pay: ${money.format(grossPay)}`, 114, 70);
+    doc.text(`Deductions: ${money.format(totalDeductions)}`, 114, 77);
+
+    doc.setFont("helvetica", "bold");
+    doc.text(`Net Pay: ${money.format(netPay)}`, 114, 84);
+    doc.setFont("helvetica", "normal");
+
+    // Earnings
+    let y = 104;
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(11);
+    doc.text("Earnings", 14, y);
+
+    y += 6;
+    doc.setFontSize(10);
+    doc.text("Description", 14, y);
+    doc.text("Hours", 110, y, { align: "right" });
+    doc.text("Rate", 145, y, { align: "right" });
+    doc.text("Amount", 196, y, { align: "right" });
+
+    y += 2;
+    doc.line(14, y, 196, y);
+    y += 8;
+
+    const regularHours = Number((employeeData as any).regularMinutes ?? 0) / 60;
+    const overtimeHours = Number((employeeData as any).overtimeMinutes ?? 0) / 60;
+    const payRate = Number((employee as any).payRate ?? 0);
+    const overtimeRate = payRate * 1.5;
+    const regularAmount = regularHours * payRate;
+    const overtimeAmount = overtimeHours * overtimeRate;
+    const bonus = Number(employeeData.flatBonus ?? 0);
+
+    const earningsRow = (
+      label: string,
+      hours: string,
+      rate: string,
+      amount: string
+    ) => {
+      doc.text(label, 14, y);
+      doc.text(hours, 110, y, { align: "right" });
+      doc.text(rate, 145, y, { align: "right" });
+      doc.text(amount, 196, y, { align: "right" });
+      y += 7;
+    };
+
+    earningsRow(
+      "Regular",
+      regularHours.toFixed(2),
+      money.format(payRate),
+      money.format(regularAmount)
+    );
+
+    if (overtimeHours > 0) {
+      earningsRow(
+        "Overtime",
+        overtimeHours.toFixed(2),
+        money.format(overtimeRate),
+        money.format(overtimeAmount)
+      );
+    }
+
+    if (bonus > 0) {
+      earningsRow("Bonus", "-", "-", money.format(bonus));
+    }
+
+    // Deductions
+    y += 6;
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(11);
+    doc.text("Deductions", 14, y);
+
+    y += 6;
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(10);
+    doc.text("Description", 14, y);
+    doc.text("Amount", 196, y, { align: "right" });
+
+    y += 2;
+    doc.line(14, y, 196, y);
+    y += 8;
+
+    doc.text("Payroll Deductions", 14, y);
+    doc.text(money.format(totalDeductions), 196, y, { align: "right" });
+
+    // Footer
+    y += 16;
+    doc.setFontSize(9);
+    doc.text(
+      `Generated: ${format(new Date(), "MMM d, yyyy h:mm a")}`,
+      14,
+      y
+    );
+    y += 6;
+    doc.text(
+      "This is a computer-generated pay statement from Amazing Grace Cleaners LLC.",
+      14,
+      y
+    );
+
+    const filename = `paystub_${employee.id}_${period.id}_rev${rev}.pdf`;
+    doc.save(filename);
+  } finally {
+    setPdfFor(null);
+  }
+};
 
   return (
     <Card>
@@ -400,24 +501,27 @@ doc.save(filename);
 
   {/* 🔥 Branded Paystub Preview */}
   <PaystubCard
-    companyName={companyName || "Amazing Grace Cleaners LLC"}
-    logoUrl="/Mathieu_logo_AGC.jpg"
-    employeeName={employee.name}
-    employeeId={employee.id}
-    payDate={fmt(period.endDate)}
-    payPeriodStart={fmt(period.startDate)}
-    payPeriodEnd={fmt(period.endDate)}
-    payRate={(employee as any).payRate}
-    regularHours={Number((employeeData as any).regularMinutes ?? 0) / 60}
-    overtimeHours={Number((employeeData as any).overtimeMinutes ?? 0) / 60}
-    bonus={Number(employeeData.flatBonus ?? 0)}
-    grossPay={Number(employeeData.gross ?? 0)}
-    deductions={[
-      { label: "Deductions", amount: Number(employeeData.deductions ?? 0) },
-    ]}
-    netPay={Number(employeeData.net ?? 0)}
-    companyContact="Amazing Grace Cleaners LLC"
-  />
+  companyName={companyName || "Amazing Grace Cleaners LLC"}
+  logoUrl="/Mathieu_logo_AGC.jpg"
+  employeeName={employee.name}
+  employeeId={employee.id}
+  payDate={fmt(period.endDate)}
+  payPeriodStart={fmt(period.startDate)}
+  payPeriodEnd={fmt(period.endDate)}
+  payRate={Number((employee as any).payRate ?? 0)}
+  regularHours={Number((employeeData as any).regularMinutes ?? 0) / 60}
+  bonusHours={Number((employeeData as any).bonusMinutes ?? 0) / 60}
+  flatBonus={Number(employeeData.flatBonus ?? 0)}
+  grossPay={Number(employeeData.gross ?? 0)}
+  deductions={[
+    {
+      label: "Deductions",
+      amount: Number(employeeData.deductions ?? 0),
+    },
+  ]}
+  netPay={Number(employeeData.net ?? 0)}
+  companyContact="Amazing Grace Cleaners LLC Email: amazinggracecleaners1@gmail.com • Phone: (859) 740-0101"
+/>
                       <div className="grid grid-cols-2 gap-4">
                         <div>
                           <p className="text-sm font-medium">Regular Hours</p>

@@ -16,8 +16,8 @@ type PaystubCardProps = {
   payPeriodEnd: string;
   payRate?: number;
   regularHours?: number;
-  overtimeHours?: number;
-  bonus?: number;
+  bonusHours?: number;
+  flatBonus?: number;
   grossPay: number;
   deductions: PaystubDeduction[];
   netPay: number;
@@ -34,29 +34,23 @@ export function PaystubCard({
   payPeriodEnd,
   payRate,
   regularHours = 0,
-  overtimeHours = 0,
-  bonus = 0,
+  bonusHours = 0,
+  flatBonus = 0,
   grossPay,
   deductions,
   netPay,
   companyContact,
 }: PaystubCardProps) {
-  const totalDeductions = deductions.reduce((sum, d) => sum + d.amount, 0);
+    const totalDeductions = deductions.reduce((sum, d) => sum + d.amount, 0);
 
   const regularAmount =
     payRate != null ? regularHours * payRate : 0;
-const bonusHours = Number(bonus ?? 0);
 
-const bonusRate =
-  payRate != null ? payRate + 0.5 : 0;
+  const bonusRate =
+    payRate != null ? payRate + 0.5 : 0;
 
-const bonusAmount =
-  payRate != null ? bonusHours * bonusRate : 0;
-  const overtimeRate =
-    payRate != null ? payRate * 1.5 : 0;
-
-  const overtimeAmount =
-    payRate != null ? overtimeHours * overtimeRate : 0;
+  const bonusAmount =
+    payRate != null ? bonusHours * bonusRate : 0;
 
   return (
     <div className="mx-auto w-full max-w-4xl bg-white text-black shadow-sm print:max-w-none print:shadow-none">
@@ -115,9 +109,9 @@ const bonusAmount =
               </div>
             ) : null}
             <div>
-              <span className="font-semibold">Hours Worked:</span>{" "}
-              {(regularHours + overtimeHours + bonusHours).toFixed(2)}
-            </div>
+  <span className="font-semibold">Hours Worked:</span>{" "}
+  {(regularHours + bonusHours).toFixed(2)}
+</div>
           </div>
         </div>
 
@@ -153,45 +147,45 @@ const bonusAmount =
             </tr>
           </thead>
           <tbody>
-            <tr>
-              <td className="border-b px-3 py-2">Regular</td>
-              <td className="border-b px-3 py-2 text-right">{regularHours.toFixed(2)}</td>
-              <td className="border-b px-3 py-2 text-right">
-                {payRate != null ? `$${payRate.toFixed(2)}` : "-"}
-              </td>
-              <td className="border-b px-3 py-2 text-right">
-                ${regularAmount.toFixed(2)}
-              </td>
-            </tr>
-
-            {overtimeHours > 0 ? (
-              <tr>
-                <td className="border-b px-3 py-2">Overtime</td>
-                <td className="border-b px-3 py-2 text-right">{overtimeHours.toFixed(2)}</td>
-                <td className="border-b px-3 py-2 text-right">
-                  {payRate != null ? `$${overtimeRate.toFixed(2)}` : "-"}
-                </td>
-                <td className="border-b px-3 py-2 text-right">
-                  ${overtimeAmount.toFixed(2)}
-                </td>
-              </tr>
-            ) : null}
-
-            {bonusHours > 0 ? (
   <tr>
-    <td className="border-b px-3 py-2">Bonus Hours</td>
+    <td className="border-b px-3 py-2">Regular</td>
     <td className="border-b px-3 py-2 text-right">
-      {bonusHours.toFixed(2)}
+      {regularHours.toFixed(2)}
     </td>
     <td className="border-b px-3 py-2 text-right">
-      ${bonusRate.toFixed(2)}
+      {payRate != null ? `$${payRate.toFixed(2)}` : "-"}
     </td>
     <td className="border-b px-3 py-2 text-right">
-      ${bonusAmount.toFixed(2)}
+      ${regularAmount.toFixed(2)}
     </td>
   </tr>
-) : null}
-          </tbody>
+
+  {bonusHours > 0 ? (
+    <tr>
+      <td className="border-b px-3 py-2">Bonus</td>
+      <td className="border-b px-3 py-2 text-right">
+        {bonusHours.toFixed(2)}
+      </td>
+      <td className="border-b px-3 py-2 text-right">
+        ${bonusRate.toFixed(2)}
+      </td>
+      <td className="border-b px-3 py-2 text-right">
+        ${bonusAmount.toFixed(2)}
+      </td>
+    </tr>
+  ) : null}
+
+  {flatBonus > 0 ? (
+    <tr>
+      <td className="border-b px-3 py-2">Flat Bonus</td>
+      <td className="border-b px-3 py-2 text-right">-</td>
+      <td className="border-b px-3 py-2 text-right">-</td>
+      <td className="border-b px-3 py-2 text-right">
+        ${flatBonus.toFixed(2)}
+      </td>
+    </tr>
+  ) : null}
+</tbody>
         </table>
       </div>
 

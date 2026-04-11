@@ -100,7 +100,7 @@ function sessionMinutesOnDay(s: Session, day: Date, nowTs: number = Date.now()):
 
 /** companyId is always derived the same way everywhere */
 const getCompanyId = (settings: Settings) =>
-  settings.companyId?.trim() || process.env.NEXT_PUBLIC_COMPANY_ID || "amazing-grace-cleaners";
+  settings.companyId?.trim() || process.env.NEXT_PUBLIC_COMPANY_ID || "Amazing Grace Cleaners";
 
 // Build a timestamp on a specific calendar day, using the time of `base`
 const buildTsOnDay = (day: Date, base: Date) => {
