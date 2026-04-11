@@ -45,7 +45,13 @@ export function PaystubCard({
 
   const regularAmount =
     payRate != null ? regularHours * payRate : 0;
+const bonusHours = Number(bonus ?? 0);
 
+const bonusRate =
+  payRate != null ? payRate + 0.5 : 0;
+
+const bonusAmount =
+  payRate != null ? bonusHours * bonusRate : 0;
   const overtimeRate =
     payRate != null ? payRate * 1.5 : 0;
 
@@ -68,7 +74,12 @@ export function PaystubCard({
             )}
 
             <div>
-              <h1 className="text-xl font-bold">{companyName}</h1>
+              <h1 className="text-xl font-bold tracking-tight">
+  {companyName}
+</h1>
+<p className="text-xs text-gray-500">
+  Commercial Cleaning Services
+</p>
               <p className="text-sm text-gray-600">Employee Pay Stub</p>
             </div>
           </div>
@@ -105,7 +116,7 @@ export function PaystubCard({
             ) : null}
             <div>
               <span className="font-semibold">Hours Worked:</span>{" "}
-              {(regularHours + overtimeHours).toFixed(2)}
+              {(regularHours + overtimeHours + bonusHours).toFixed(2)}
             </div>
           </div>
         </div>
@@ -121,7 +132,7 @@ export function PaystubCard({
             <div>
               <span className="font-semibold">Total Deductions:</span> ${totalDeductions.toFixed(2)}
             </div>
-            <div className="text-base font-bold text-green-700">
+            <div className="text-lg font-bold text-green-700">
               <span>Net Pay:</span> ${netPay.toFixed(2)}
             </div>
           </div>
@@ -166,14 +177,20 @@ export function PaystubCard({
               </tr>
             ) : null}
 
-            {bonus > 0 ? (
-              <tr>
-                <td className="border-b px-3 py-2">Bonus</td>
-                <td className="border-b px-3 py-2 text-right">-</td>
-                <td className="border-b px-3 py-2 text-right">-</td>
-                <td className="border-b px-3 py-2 text-right">${bonus.toFixed(2)}</td>
-              </tr>
-            ) : null}
+            {bonusHours > 0 ? (
+  <tr>
+    <td className="border-b px-3 py-2">Bonus Hours</td>
+    <td className="border-b px-3 py-2 text-right">
+      {bonusHours.toFixed(2)}
+    </td>
+    <td className="border-b px-3 py-2 text-right">
+      ${bonusRate.toFixed(2)}
+    </td>
+    <td className="border-b px-3 py-2 text-right">
+      ${bonusAmount.toFixed(2)}
+    </td>
+  </tr>
+) : null}
           </tbody>
         </table>
       </div>
@@ -214,7 +231,7 @@ export function PaystubCard({
     Amazing Grace Cleaners LLC
   </div>
 
-  <div>Email: amaginggracecleaners1@gmail.com</div>
+  <div>Email: amazinggracecleaners1@gmail.com</div>
   <div>Phone: (859) 740-0101</div>
 </div>
     </div>
