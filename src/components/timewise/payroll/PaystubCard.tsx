@@ -207,10 +207,16 @@ export function PaystubCard({
         </table>
       </div>
 
-      <div className="border-t px-6 py-4 text-xs text-gray-500">
-        <div>This is a computer-generated pay statement from {companyName}.</div>
-        {companyContact ? <div className="mt-1">{companyContact}</div> : null}
-      </div>
+      <div className="border-t px-6 py-4 text-xs text-gray-500 space-y-1">
+  <div>This is a generated pay statement from {companyName}.</div>
+
+  <div className="font-medium text-gray-700">
+    Amazing Grace Cleaners LLC
+  </div>
+
+  <div>Email: amaginggracecleaners1@gmail.com</div>
+  <div>Phone: (859) 740-0101</div>
+</div>
     </div>
   );
 }
