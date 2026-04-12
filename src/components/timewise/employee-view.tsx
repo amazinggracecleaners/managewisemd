@@ -181,7 +181,17 @@ function sessionMinutesOnDay(s: Session, day: Date, nowTs: number = Date.now()):
   if (overlapEnd <= overlapStart) return 0;
   return Math.floor((overlapEnd - overlapStart) / 60000);
 }
+function decimalHoursToHHMM(hours: number): string {
+  if (!hours || hours <= 0) return "00:00";
 
+  const totalMinutes = Math.round(hours * 60);
+  const h = Math.floor(totalMinutes / 60);
+  const m = totalMinutes % 60;
+
+  return `${h.toString().padStart(2, "0")}:${m
+    .toString()
+    .padStart(2, "0")}`;
+}
 export function EmployeeView({
   employee,
   onLogout,
@@ -679,7 +689,20 @@ const getLiveHoursForOpenShift = useCallback(
   const changeDay = (amount: number) => {
     setCurrentDate((prev) => add(prev, { days: amount }));
   };
+const totalHoursTodayHHMM = useMemo(
+  () => decimalHoursToHHMM(totalHoursToday),
+  [totalHoursToday]
+);
 
+const totalHoursThisWeekHHMM = useMemo(
+  () => decimalHoursToHHMM(totalHoursThisWeek),
+  [totalHoursThisWeek]
+);
+
+const totalHoursThisMonthHHMM = useMemo(
+  () => decimalHoursToHHMM(totalHoursThisMonth),
+  [totalHoursThisMonth]
+);
 
 // ✅ Daily Site Summary for Employee
 const dailySiteSummary = useMemo(() => {
@@ -945,20 +968,20 @@ const getHoursForSiteDay = useCallback(
 </div>
                   <TabsContent value="today" className="pt-4">
                     <div className="text-center">
-                      <p className="text-3xl font-bold">{totalHoursToday.toFixed(2)}</p>
-                      <p className="text-sm text-muted-foreground">hours today</p>
+                     <p className="text-3xl font-bold">{totalHoursTodayHHMM}</p>
+<p className="text-sm text-muted-foreground">hours today</p>
                     </div>
                   </TabsContent>
                   <TabsContent value="week" className="pt-4">
                     <div className="text-center">
-                      <p className="text-3xl font-bold">{totalHoursThisWeek.toFixed(2)}</p>
-                      <p className="text-sm text-muted-foreground">hours this week</p>
+                      <p className="text-3xl font-bold">{totalHoursThisWeekHHMM}</p>
+<p className="text-sm text-muted-foreground">hours this week</p>
                     </div>
                   </TabsContent>
                   <TabsContent value="month" className="pt-4">
                     <div className="text-center">
-                      <p className="text-3xl font-bold">{totalHoursThisMonth.toFixed(2)}</p>
-                      <p className="text-sm text-muted-foreground">hours this month</p>
+                      <p className="text-3xl font-bold">{totalHoursThisMonthHHMM}</p>
+<p className="text-sm text-muted-foreground">hours this month</p>
                     </div>
                   </TabsContent>
                 </Tabs>
