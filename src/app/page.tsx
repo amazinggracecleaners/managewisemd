@@ -287,7 +287,10 @@ const [notifications, setNotifications] = useState<ManagerNotification[]>([]);
  */
 const attachFirestoreListeners = useCallback(
   (cId: string) => {
-    const safeCId = (cId || "").trim();
+    const safeCId = (cId || "")
+      .trim()
+      .toLowerCase()
+      .replace(/\s+/g, "-");
 
     if (!safeCId) {
       console.warn("[Firestore] attachFirestoreListeners called with empty companyId");
