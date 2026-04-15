@@ -20,7 +20,7 @@ export const defaultSettings: Settings = {
     { id: "site-a", name: "Site A", color: "#ef4444" },
     { id: "site-b", name: "Site B", color: "#3b82f6" },
   ],
-  companyId: process.env.NEXT_PUBLIC_COMPANY_ID || "Amazing Grace Cleaners",
+  companyId: process.env.NEXT_PUBLIC_COMPANY_ID || "amazing-grace-cleaners",
   weekStartsOn: 0, // Sunday
   mileageRate: 0.58,
   taxRate: 0,

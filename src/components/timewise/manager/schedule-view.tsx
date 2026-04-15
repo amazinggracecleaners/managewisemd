@@ -227,7 +227,7 @@ export function ScheduleView({
  const cId =
   settings.companyId?.trim() ||
   process.env.NEXT_PUBLIC_COMPANY_ID ||
-  "Amazing Grace Cleaners";
+  "amazing-grace-cleaners";
 const { cloudReady } = useSettings();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingSchedule, setEditingSchedule] =
@@ -599,7 +599,7 @@ const resolveAssignedEmployeeIds = (names: string[]): string[] => {
     const cId =
     settings.companyId?.trim() ||
     process.env.NEXT_PUBLIC_COMPANY_ID ||
-    "Amazing Grace Cleaners";
+    "amazing-grace-cleaners";
 
     await addDoc(
       collection(db, "companies", cId, "employee_notifications"),

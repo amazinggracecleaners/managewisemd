@@ -254,7 +254,7 @@ useEffect(() => {
 const companyId =
   settings.companyId?.trim() ||
   process.env.NEXT_PUBLIC_COMPANY_ID ||
-  "Amazing Grace Cleaners";
+  "amazing-grace-cleaners";
 
 const vibrateNotification = () => {
   if (typeof navigator === "undefined") return;
