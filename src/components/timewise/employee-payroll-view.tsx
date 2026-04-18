@@ -102,22 +102,39 @@ function getPayrollConfirmationSummary(
   };
 }
 
-function derivePayrollStatus(
+function deriveEmployeePayrollStatus(
   period: PayrollPeriod,
+  employeeId: string,
   confirmations: PayrollConfirmation[]
 ): "draft" | "waiting_for_confirmation" | "ready_to_pay" | "paid" {
-  if (period.status === "paid") return "paid";
+  const employeeLine = (period.lineItems ?? []).find(
+    (item: PayrollLineItem) => item.employeeId === employeeId
+  );
+
+  // ✅ employee-level paid overrides everything
+  if ((employeeLine as any)?.paid === true) {
+    return "paid";
+  }
+
+ // 🔥 period-level paid overrides everything (safety)
+if (period.status === "paid") {
+  return "paid";
+}
+
+// draft
+if (period.status === "draft") return "draft";
 
   const summary = getPayrollConfirmationSummary(period, confirmations);
 
-  if (
-    period.status === "waiting_for_confirmation" &&
-    summary.allConfirmed
-  ) {
-    return "ready_to_pay";
+  if (summary.confirmedEmployeeIds.size === 0) {
+    return "waiting_for_confirmation";
   }
 
-  return (period.status as any) ?? "draft";
+  if (summary.confirmedEmployeeIds.size < summary.employeeIds.length) {
+    return "waiting_for_confirmation";
+  }
+
+  return "ready_to_pay";
 }
 
 function canEmployeeConfirm(
@@ -125,7 +142,11 @@ function canEmployeeConfirm(
   employeeId: string,
   confirmations: PayrollConfirmation[]
 ) {
-  const status = derivePayrollStatus(period, confirmations);
+  const status = deriveEmployeePayrollStatus(
+  period,
+  employeeId,
+  confirmations
+);
   if (status === "paid") return false;
   if (!(status === "waiting_for_confirmation" || status === "ready_to_pay")) {
     return false;
@@ -244,7 +265,11 @@ export function EmployeePayrollView({
   try {
     const doc = new jsPDF();
     const rev = period.revision ?? 1;
-    const status = derivePayrollStatus(period, payrollConfirmations);
+    const status = deriveEmployeePayrollStatus(
+  period,
+  employee.id,
+  payrollConfirmations
+);
 
     let logoDataUrl: string | null = null;
 
@@ -428,7 +453,11 @@ export function EmployeePayrollView({
 
               const summary = getPayrollConfirmationSummary(period, payrollConfirmations);
               const revision = summary.revision;
-              const status = derivePayrollStatus(period, payrollConfirmations);
+              const status = deriveEmployeePayrollStatus(
+  period,
+  employee.id,
+  payrollConfirmations
+);
 
               const hasConfirmedThisRev = summary.confirmedEmployeeIds.has(employee.id);
               const isPaid = status === "paid";

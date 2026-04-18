@@ -567,53 +567,67 @@ export function PayrollView({
   };
 
   const handleMarkEmployeePaid = async (employeeId: string) => {
-    if (!currentPeriod) return;
+  if (!currentPeriod) return;
 
-    const paymentMethod = paymentMethodByEmployee[employeeId];
-    if (!paymentMethod) {
-      alert("Please select a payment method first.");
-      return;
-    }
+  const paymentMethod = paymentMethodByEmployee[employeeId];
+  if (!paymentMethod) {
+    alert("Please select a payment method first.");
+    return;
+  }
 
-    const updatedLineItems = lineItems.map((item) => {
-      if (item.employeeId !== employeeId) return item;
+  const updatedLineItems = lineItems.map((item) => {
+    if (item.employeeId !== employeeId) return item;
 
-      return {
-        ...item,
-        paid: true,
-        paidAt: Date.now(),
-        paymentMethod,
-      };
-    });
+    return {
+      ...item,
+      paid: true,
+      paidAt: Date.now(),
+      paymentMethod,
+    };
+  });
 
-    await savePayrollPeriod({
-      ...currentPeriod,
-      lineItems: updatedLineItems,
-    });
+  // 🔥 CHECK IF ALL EMPLOYEES ARE PAID
+  const allPaid =
+    updatedLineItems.length > 0 &&
+    updatedLineItems.every((item) => item.paid === true);
 
-    setLineItems(updatedLineItems);
-
-    const employee = employees.find((e) => e.id === employeeId);
-    const paidItem = updatedLineItems.find((li) => li.employeeId === employeeId);
-
-    if (employee && paidItem) {
-      await addDoc(
-        collection(db, "companies", companyId, "employee_notifications"),
-        {
-          type: "payment",
-          employeeId: employee.id,
-          employeeName: employee.name,
-          title: "You’ve been paid",
-          message: `You have been paid $${(paidItem.net || 0).toFixed(2)} for payroll period ${currentPeriod.startDate} to ${currentPeriod.endDate}.`,
-          periodId: currentPeriod.id,
-          revision: currentPeriod.revision ?? 1,
-          paymentMethod: paidItem.paymentMethod,
-          createdAt: serverTimestamp(),
-          read: false,
-        }
-      );
-    }
+  // 🔥 BUILD UPDATED PERIOD
+  const updatedPeriod: PayrollPeriod = {
+    ...currentPeriod,
+    lineItems: updatedLineItems,
+    status: allPaid ? "paid" : currentPeriod.status,
+    paidAt: allPaid
+      ? new Date().toISOString()
+      : currentPeriod.paidAt,
   };
+
+  // 🔥 SAVE
+  await savePayrollPeriod(updatedPeriod);
+
+  setLineItems(updatedLineItems);
+
+  // 🔔 Notify employee
+  const employee = employees.find((e) => e.id === employeeId);
+  const paidItem = updatedLineItems.find((li) => li.employeeId === employeeId);
+
+  if (employee && paidItem) {
+    await addDoc(
+      collection(db, "companies", companyId, "employee_notifications"),
+      {
+        type: "payment",
+        employeeId: employee.id,
+        employeeName: employee.name,
+        title: "You’ve been paid",
+        message: `You have been paid $${(paidItem.net || 0).toFixed(2)} for payroll period ${currentPeriod.startDate} to ${currentPeriod.endDate}.`,
+        periodId: currentPeriod.id,
+        revision: currentPeriod.revision ?? 1,
+        paymentMethod: paidItem.paymentMethod,
+        createdAt: serverTimestamp(),
+        read: false,
+      }
+    );
+  }
+};
 
   const handleReopen = async () => {
     if (!currentPeriod || isPaid) return;
