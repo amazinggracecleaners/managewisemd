@@ -467,6 +467,8 @@ export function ManagerView(props: ManagerViewProps) {
             isClockedIn={props.isClockedIn}
             getDurationsBySite={props.getDurationsBySite}
             teams={props.settings.teams ?? []}
+            entries={props.allEntries}
+updateEntry={props.updateEntry}
           />
         </TabsContent>
 

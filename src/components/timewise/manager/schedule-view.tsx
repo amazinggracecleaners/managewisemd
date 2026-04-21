@@ -10,6 +10,7 @@ import type {
   BillingFrequency,
   RepeatFrequency,
   SiteStatus,
+  Entry,
 } from "@/shared/types/domain";
 import { Button } from "@/components/ui/button";
 import {
@@ -132,6 +133,8 @@ interface ScheduleViewProps {
     forDate: Date
   ) => Map<string, { minutes: number; byEmployee: Record<string, number> }>;
   teams: Team[];
+  entries: Entry[];
+updateEntry: (id: string, updates: Partial<Entry>) => Promise<void>;
 }
 
 
@@ -221,6 +224,8 @@ export function ScheduleView({
   isClockedIn,
   getDurationsBySite,
   teams,
+  entries,
+updateEntry,
 }: ScheduleViewProps) {
   const { engine } = useEngine();
   const { settings } = useSettings();
@@ -255,7 +260,18 @@ const { cloudReady } = useSettings();
     useState<BillingFrequency | undefined>();
 
   const [currentDate, setCurrentDate] = useState(startOfDay(new Date()));
+const [fixModal, setFixModal] = useState<{
+  open: boolean;
+  employeeId?: string;
+  employeeName?: string;
+  site?: Site;
+  date?: Date;
+  inEntryId?: string;
+  outEntryId?: string;
+}>({ open: false });
 
+const [fixIn, setFixIn] = useState("");
+const [fixOut, setFixOut] = useState("");
   // editing scope + occurrence (for “edit single day of series”)
   const [applyScope, setApplyScope] = useState<"single" | "series">("series");
   const [editingOccurrenceDate, setEditingOccurrenceDate] = useState<
@@ -325,7 +341,41 @@ const resolveAssignedEmployeeIds = (names: string[]): string[] => {
     if (assignMode === "team") return !!assignedTeamId;
     return assignedTo.length > 0;
   };
+const openFixShiftModal = (data: {
+  employeeId: string;
+  employeeName: string;
+  site: Site;
+  date: Date;
+}) => {
+  const dayEntries = entries
+    .filter(
+      (e) =>
+        e.employeeId === data.employeeId &&
+        e.site === data.site.name &&
+        isSameDay(new Date(e.ts), data.date)
+    )
+    .sort((a, b) => a.ts - b.ts);
 
+  const inEntry = dayEntries.find((e) => e.action === "in");
+  const outEntry = dayEntries.find((e) => e.action === "out");
+
+  const toInput = (ts?: number) => {
+    if (!ts) return "";
+    const d = new Date(ts);
+    const pad = (n: number) => String(n).padStart(2, "0");
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  };
+
+  setFixModal({
+    open: true,
+    ...data,
+    inEntryId: inEntry?.id,
+    outEntryId: outEntry?.id,
+  });
+
+  setFixIn(toInput(inEntry?.ts));
+  setFixOut(toInput(outEntry?.ts));
+};
   const handleOpenDialog = (
     schedule: CleaningSchedule | null = null,
     occurrenceDate?: Date
@@ -615,6 +665,39 @@ const resolveAssignedEmployeeIds = (names: string[]): string[] => {
       }
     );
   }
+};
+const handleFixShift = async () => {
+  if (!fixModal.employeeId || !fixModal.site) return;
+
+  const inTs = new Date(fixIn).getTime();
+  const outTs = new Date(fixOut).getTime();
+
+  if (!fixIn || !fixOut || isNaN(inTs) || isNaN(outTs)) {
+    alert("Enter valid clock-in and clock-out times");
+    return;
+  }
+
+  if (outTs <= inTs) {
+    alert("Clock-out must be after clock-in");
+    return;
+  }
+
+  if (!fixModal.inEntryId || !fixModal.outEntryId) {
+    alert("No existing shift found to edit.");
+    return;
+  }
+
+  await updateEntry(fixModal.inEntryId, {
+    ts: inTs,
+    note: "Manager edited clock-in",
+  });
+
+  await updateEntry(fixModal.outEntryId, {
+    ts: outTs,
+    note: "Manager edited clock-out",
+  });
+
+  setFixModal({ open: false });
 };
 const [dailySearch, setDailySearch] = useState("");
 const [statusFilter, setStatusFilter] = useState<
@@ -1485,7 +1568,22 @@ const dailySiteCount = new Set(
                                           <LogIn className="mr-1 h-4 w-4" />
                                           Clock In
                                         </Button>
+                                       
                                       )}
+                                       <Button
+  variant="outline"
+  size="sm"
+  onClick={() =>
+    openFixShiftModal({
+      employeeId: emp.id,
+      employeeName: emp.name,
+      site,
+      date: currentDate,
+    })
+  }
+>
+  Fix
+</Button>
                                     </div>
                                   </div>
                                 );
@@ -1727,6 +1825,50 @@ const dailySiteCount = new Set(
             </CardContent>
           </Card>
         </TabsContent>
+        <Dialog
+  open={fixModal.open}
+  onOpenChange={(open) =>
+    setFixModal((prev) => ({ ...prev, open }))
+  }
+>
+  <DialogContent>
+    <DialogHeader>
+      <DialogTitle>
+        Fix Shift — {fixModal.employeeName}
+      </DialogTitle>
+    </DialogHeader>
+
+    <div className="space-y-4">
+      <div>
+        <Label>Clock In</Label>
+        <Input
+          type="datetime-local"
+          value={fixIn}
+          onChange={(e) => setFixIn(e.target.value)}
+        />
+      </div>
+
+      <div>
+        <Label>Clock Out</Label>
+        <Input
+          type="datetime-local"
+          value={fixOut}
+          onChange={(e) => setFixOut(e.target.value)}
+        />
+      </div>
+    </div>
+
+    <DialogFooter>
+      <Button
+        variant="outline"
+        onClick={() => setFixModal({ open: false })}
+      >
+        Cancel
+      </Button>
+      <Button onClick={handleFixShift}>Save Fix</Button>
+    </DialogFooter>
+  </DialogContent>
+</Dialog>
       </Tabs>
     </TooltipProvider>
   );
