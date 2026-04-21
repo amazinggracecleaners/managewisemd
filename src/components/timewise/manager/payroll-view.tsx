@@ -326,6 +326,21 @@ export function PayrollView({
     return getPayrollConfirmationSummary(currentPeriod, payrollConfirmations);
   }, [currentPeriod, payrollConfirmations]);
 
+const payableLineItems = useMemo(() => {
+  return lineItems.filter(
+    (item) => (item.net ?? 0) > 0 || (item.gross ?? 0) > 0
+  );
+}, [lineItems]);
+
+const paidCount = useMemo(() => {
+  return payableLineItems.filter((item) => item.paid).length;
+}, [payableLineItems]);
+
+const paidProgressPct = useMemo(() => {
+  if (payableLineItems.length === 0) return 0;
+  return Math.round((paidCount / payableLineItems.length) * 100);
+}, [paidCount, payableLineItems.length]);
+
   useEffect(() => {
     if (currentPeriod && currentStatus !== "draft") {
       setLineItems(currentPeriod.lineItems ?? []);
@@ -450,7 +465,8 @@ export function PayrollView({
   }, [payrollPeriods, payrollConfirmations, employees, selectedYear]);
 
   const isPaid = currentStatus === "paid";
-  const isEditable = currentStatus === "draft";
+const isLocked = isPaid;
+const isEditable = !isLocked;
 
   const sendPayrollNotifications = async (periodToNotify: PayrollPeriod) => {
     try {
@@ -587,9 +603,21 @@ export function PayrollView({
   });
 
   // 🔥 CHECK IF ALL EMPLOYEES ARE PAID
-  const allPaid =
-    updatedLineItems.length > 0 &&
-    updatedLineItems.every((item) => item.paid === true);
+  const payableLineItems = updatedLineItems.filter(
+  (item) => (item.net ?? 0) > 0 || (item.gross ?? 0) > 0
+);
+
+const allPaid =
+  payableLineItems.length > 0 &&
+  payableLineItems.every((item) => item.paid === true);
+  if (
+  allPaid &&
+  !window.confirm(
+    "This is the last payable employee. Marking this employee as paid will lock the payroll period as PAID. Continue?"
+  )
+) {
+  return;
+}
 
   // 🔥 BUILD UPDATED PERIOD
   const updatedPeriod: PayrollPeriod = {
@@ -887,7 +915,7 @@ export function PayrollView({
                   <Select
                     value={payFrequency}
                     onValueChange={(v: PayFrequency) => setPayFrequency(v)}
-                    disabled={!isEditable}
+                    
                   >
                     <SelectTrigger>
                       <SelectValue />
@@ -910,14 +938,14 @@ export function PayrollView({
                         type="date"
                         value={customStartDate}
                         onChange={(e) => setCustomStartDate(e.target.value)}
-                        disabled={!isEditable}
+                       
                       />
                       <span>-</span>
                       <Input
                         type="date"
                         value={customEndDate}
                         onChange={(e) => setCustomEndDate(e.target.value)}
-                        disabled={!isEditable}
+                        
                       />
                     </div>
                   ) : (
@@ -926,7 +954,7 @@ export function PayrollView({
                         variant="outline"
                         size="icon"
                         onClick={() => changeDate(-1)}
-                        disabled={!isEditable}
+                        
                       >
                         <ChevronLeft />
                       </Button>
@@ -942,7 +970,7 @@ export function PayrollView({
                         variant="outline"
                         size="icon"
                         onClick={() => changeDate(1)}
-                        disabled={!isEditable}
+                       
                       >
                         <ChevronRight />
                       </Button>
@@ -957,7 +985,9 @@ export function PayrollView({
                 <Badge variant={allConfirmed ? "default" : "secondary"}>
                   Confirmed {confirmedCount}/{lineItems.length}
                 </Badge>
-
+<Badge variant="outline">
+  Paid {paidCount}/{payableLineItems.length || 0}
+</Badge>
                 <Badge variant="outline">
                   Pending {Math.max(0, lineItems.length - confirmedCount)}
                 </Badge>
@@ -966,7 +996,27 @@ export function PayrollView({
                   <Badge variant="outline">Rev. {currentPeriod.revision}</Badge>
                 )}
               </div>
+<div className="mb-4">
+  <div className="mb-1 flex items-center justify-between text-xs text-muted-foreground">
+    <span>Payroll payment progress</span>
+    <span>
+  {payableLineItems.length === 0 ? "—" : `${paidProgressPct}%`}
+</span>
+  </div>
 
+  <div className="h-2 w-full rounded-full bg-muted overflow-hidden">
+    <div
+      className={`h-full transition-all ${
+  paidProgressPct === 100
+    ? "bg-green-600"
+    : paidProgressPct > 50
+    ? "bg-yellow-500"
+    : "bg-red-500"
+}`}
+      style={{ width: `${paidProgressPct}%` }}
+    />
+  </div>
+</div>
               <ScrollArea className="h-96">
                 <Table>
                   <TableHeader>
