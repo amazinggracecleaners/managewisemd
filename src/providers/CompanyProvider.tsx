@@ -10,7 +10,12 @@ const CompanyContext = createContext<CompanyContextValue | null>(null);
 
 export function CompanyProvider({ children }: { children: React.ReactNode }) {
   const companyId = useMemo(() => {
-    return process.env.NEXT_PUBLIC_COMPANY_ID || "amazing-grace-cleaners";
+    const id =
+      process.env.NEXT_PUBLIC_COMPANY_ID || "amazing-grace-cleaners";
+
+    console.log("[COMPANY DEBUG] resolved companyId =", id);
+
+    return id;
   }, []);
 
   return (

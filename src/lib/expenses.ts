@@ -36,7 +36,7 @@ export async function addOtherExpenseFS(
   receiptFile?: File
 ) {
   const uid = requireUid();
-
+console.log("[EXPENSE DEBUG] companyId param =", companyId);
   console.log("[addOtherExpenseFS] uid =", auth.currentUser?.uid);
   console.log("[addOtherExpenseFS] companyId =", companyId);
   console.log(
@@ -53,14 +53,26 @@ export async function addOtherExpenseFS(
   let receiptUrl: string | undefined;
   let storedPath: string | undefined;
 
-  if (receiptFile) {
-    storedPath = receiptPath(companyId, uid, expenseId, receiptFile);
-    console.log("[addOtherExpenseFS] upload path =", storedPath);
+ if (receiptFile) {
+  storedPath = receiptPath(companyId, uid, expenseId, receiptFile);
+  console.log("[addOtherExpenseFS] upload path =", storedPath);
 
+  try {
     const fileRef = ref(storage, storedPath);
     await uploadBytes(fileRef, receiptFile);
     receiptUrl = await getDownloadURL(fileRef);
+    console.log("[addOtherExpenseFS] upload success", { receiptUrl, storedPath });
+  } catch (e: any) {
+    console.error("[addOtherExpenseFS] upload failed", {
+      code: e?.code,
+      message: e?.message,
+      storedPath,
+      companyId,
+      uid,
+    });
+    throw e;
   }
+}
 
   const payload: OtherExpense = {
     id: expenseId,
@@ -68,7 +80,10 @@ export async function addOtherExpenseFS(
     ...(receiptUrl ? { receiptUrl } : {}),
     ...(storedPath ? { receiptPath: storedPath } : {}),
   };
-
+console.log("[addOtherExpenseFS] writing Firestore doc", {
+  path: docRef.path,
+  payload,
+});
   await setDoc(docRef, payload);
   return payload;
 }
@@ -98,6 +113,9 @@ const uid = requireUid();
     }
 
     newReceiptPath = receiptPath(companyId, uid, expenseId, receiptFile);
+    console.log("[updateOtherExpenseFS] companyId =", companyId);
+console.log("[updateOtherExpenseFS] uid =", uid);
+console.log("[updateOtherExpenseFS] upload path =", newReceiptPath);
     const fileRef = ref(storage, newReceiptPath);
 
     await uploadBytes(fileRef, receiptFile);
