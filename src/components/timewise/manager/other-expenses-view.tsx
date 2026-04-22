@@ -162,9 +162,15 @@ export function OtherExpensesView({
                 await addOtherExpense(expenseData as Omit<OtherExpense, 'id'>, receiptFile);
             }
             setIsDialogOpen(false);
-        } catch (error) {
-            // Error toast is shown by the page-level function
-        } finally {
+        } catch (error: any) {
+  console.error("[Expense Upload Error]", error);
+
+  toast({
+    variant: "destructive",
+    title: "Failed to upload receipt",
+    description: error?.message || "Unknown error",
+  });
+} finally {
             setIsSaving(false);
         }
     };
