@@ -37,6 +37,15 @@ export async function addOtherExpenseFS(
 ) {
   const uid = requireUid();
 
+  console.log("[addOtherExpenseFS] uid =", auth.currentUser?.uid);
+  console.log("[addOtherExpenseFS] companyId =", companyId);
+  console.log(
+    "[addOtherExpenseFS] receiptFile =",
+    receiptFile?.name,
+    receiptFile?.type,
+    receiptFile?.size
+  );
+
   const colRef = collection(db, "companies", companyId, "other_expenses");
   const docRef = doc(colRef);
   const expenseId = docRef.id;
@@ -46,6 +55,8 @@ export async function addOtherExpenseFS(
 
   if (receiptFile) {
     storedPath = receiptPath(companyId, uid, expenseId, receiptFile);
+    console.log("[addOtherExpenseFS] upload path =", storedPath);
+
     const fileRef = ref(storage, storedPath);
     await uploadBytes(fileRef, receiptFile);
     receiptUrl = await getDownloadURL(fileRef);
