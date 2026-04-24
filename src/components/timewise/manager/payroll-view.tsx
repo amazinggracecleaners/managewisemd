@@ -306,10 +306,24 @@ export function PayrollView({
     [employees]
   );
 
-  const currentStatus = useMemo(
-    () => derivePayrollStatus(currentPeriod, payrollConfirmations),
-    [currentPeriod, payrollConfirmations]
-  );
+  const currentStatus = useMemo(() => {
+  if (!currentPeriod) return "draft";
+
+  const payableItems =
+    currentPeriod.lineItems?.filter(
+      (item) => (item.net ?? 0) > 0 || (item.gross ?? 0) > 0
+    ) ?? [];
+
+  const allPayablePaid =
+    payableItems.length > 0 &&
+    payableItems.every((item) => item.paid === true);
+
+  if (allPayablePaid || currentPeriod.status === "paid") {
+    return "paid";
+  }
+
+  return derivePayrollStatus(currentPeriod, payrollConfirmations);
+}, [currentPeriod, payrollConfirmations]);
 
   const confirmationSummary = useMemo(() => {
     if (!currentPeriod) {
@@ -435,35 +449,44 @@ const paidProgressPct = useMemo(() => {
   ]);
 
   const yearlySummary = useMemo(() => {
-    const yearPeriods = payrollPeriods.filter((p) => {
-      const status = derivePayrollStatus(p, payrollConfirmations);
-      return p.startDate.startsWith(selectedYear) && status === "paid";
+  const summary = new Map<
+    string,
+    { employeeName: string; gross: number; net: number }
+  >();
+
+  employees.forEach((emp) => {
+    summary.set(emp.id, { employeeName: emp.name, gross: 0, net: 0 });
+  });
+
+  payrollPeriods.forEach((period) => {
+    const periodDate = period.endDate || period.startDate || "";
+    const periodYear = periodDate.slice(0, 4);
+
+    if (periodYear !== selectedYear) return;
+
+    period.lineItems?.forEach((item) => {
+      const itemIsPaid = item.paid === true || period.status === "paid";
+
+      if (!itemIsPaid) return;
+
+      if (!summary.has(item.employeeId)) {
+        summary.set(item.employeeId, {
+          employeeName: item.employeeName,
+          gross: 0,
+          net: 0,
+        });
+      }
+
+      const current = summary.get(item.employeeId)!;
+      current.gross += Number(item.gross ?? 0);
+      current.net += Number(item.net ?? 0);
     });
+  });
 
-    const summary = new Map<
-      string,
-      { employeeName: string; gross: number; net: number }
-    >();
-
-    employees.forEach((emp) => {
-      summary.set(emp.id, { employeeName: emp.name, gross: 0, net: 0 });
-    });
-
-    yearPeriods.forEach((period) => {
-      period.lineItems.forEach((item) => {
-        if (summary.has(item.employeeId)) {
-          const current = summary.get(item.employeeId)!;
-          current.gross += item.gross || 0;
-          current.net += item.net || 0;
-        }
-      });
-    });
-
-    return Array.from(summary.values())
-      .filter((s) => s.gross > 0 || s.net > 0)
-      .sort((a, b) => a.employeeName.localeCompare(b.employeeName));
-  }, [payrollPeriods, payrollConfirmations, employees, selectedYear]);
-
+  return Array.from(summary.values())
+    .filter((s) => s.gross > 0 || s.net > 0)
+    .sort((a, b) => a.employeeName.localeCompare(b.employeeName));
+}, [payrollPeriods, employees, selectedYear]);
   const isPaid = currentStatus === "paid";
 const isLocked = isPaid;
 const isEditable = !isLocked;
