@@ -9,9 +9,9 @@ import { cn } from "@/lib/utils";
 const geist = Geist({subsets:['latin'],variable:'--font-sans'});
 
 export const metadata: Metadata = {
-  title: "ManageWise Business Operations",
+  title: "ManageWiseMD",
   description:
-    "A smart Business management application for employees and managers.",
+  "Smart workforce, payroll, and business operations platform.",
 };
 
 export default function RootLayout({

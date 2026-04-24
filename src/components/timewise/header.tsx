@@ -1,6 +1,6 @@
 "use client";
 
-import { Clock } from "lucide-react";
+import Image from "next/image";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 interface HeaderProps {
@@ -18,12 +18,16 @@ export function Header({
 }: HeaderProps) {
   return (
     <header className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-      <div className="min-w-0 flex items-center gap-3">
-        <Clock className="h-8 w-8 shrink-0 text-primary" />
-        <h1 className="truncate text-2xl font-bold text-foreground font-headline sm:text-3xl">
-          ManageWise
-        </h1>
-      </div>
+      <div className="flex items-center gap-3">
+  <Image
+    src="/managewisemd-logo.png"
+    alt="ManageWiseMD"
+    width={180}
+    height={50}
+    priority
+    className="h-auto w-auto max-h-12 object-contain"
+  />
+</div>
 
       {!isLoggedIn && (
         <div className="w-full sm:w-auto overflow-x-auto">
