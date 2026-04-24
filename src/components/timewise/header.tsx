@@ -18,14 +18,14 @@ export function Header({
 }: HeaderProps) {
   return (
     <header className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-3 min-w-0">
   <Image
     src="/managewisemd-logo.png"
     alt="ManageWiseMD"
-    width={180}
-    height={50}
+    width={280}
+    height={90}
     priority
-    className="h-auto w-auto max-h-12 object-contain"
+    className="h-auto w-auto max-h-24 object-contain"
   />
 </div>
 
