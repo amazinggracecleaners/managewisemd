@@ -1369,22 +1369,29 @@ await addDoc(
         try {
           await addOtherExpenseFS(cId, expenseData, receiptFile);
           toast({ title: "Expense added" });
-        } catch (e: any) {
-          console.error("[addOtherExpense] failed", e);
-          errorEmitter.emit(
-            "permission-error",
-            new FirestorePermissionError({
-              path: `companies/${cId}/other_expenses`,
-              operation: "create",
-              requestResourceData: expenseData,
-            })
-          );
-          toast({
-            variant: "destructive",
-            title: "Could not add expense",
-            description: e.message || "Check connection and permissions.",
-          });
-        }
+        }  catch (e: any) {
+  console.error("[addOtherExpense] failed", e);
+
+  const isStorageError =
+    typeof e?.code === "string" && e.code.startsWith("storage/");
+
+  if (!isStorageError) {
+    errorEmitter.emit(
+      "permission-error",
+      new FirestorePermissionError({
+        path: `companies/${cId}/other_expenses`,
+        operation: "create",
+        requestResourceData: expenseData,
+      })
+    );
+  }
+
+  toast({
+    variant: "destructive",
+    title: isStorageError ? "Receipt upload failed" : "Could not add expense",
+    description: e.message || "Check connection and permissions.",
+  });
+}
       } else {
         setOtherExpenses((prev) => [...prev, { id: uuid(), ...expenseData } as OtherExpense]);
         toast({ title: "Expense added (local)" });
