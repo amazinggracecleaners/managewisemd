@@ -20,6 +20,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { setAppIconBadge } from "@/lib/app-badge";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 
@@ -163,7 +164,13 @@ const [unreadNotificationCount, setUnreadNotificationCount] = useState(0);
       setPrevCount(notifications.length);
     }
   }, [notifications, loading, prevCount]);
+useEffect(() => {
+  const unreadCount = notifications.filter(
+    (n) => !n.read
+  ).length;
 
+  setAppIconBadge(unreadCount);
+}, [notifications]);
   const markRead = async (notificationId: string) => {
     await updateDoc(
       doc(db, "companies", companyId, "employee_notifications", notificationId),

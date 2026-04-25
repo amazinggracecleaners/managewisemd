@@ -9,6 +9,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { setAppIconBadge } from "@/lib/app-badge";
 import { Badge } from "@/components/ui/badge";
 import { CheckCircle2, LogIn, LogOut } from "lucide-react";
 import { useManagerNotifications } from "@/hooks/use-manager-notifications";
@@ -68,6 +69,9 @@ export function ManagerNotificationsCard({
   markAllAsRead,
   markOneAsRead,
 } = useManagerNotifications(companyId, 50);
+React.useEffect(() => {
+  setAppIconBadge(unreadCount);
+}, [unreadCount]);
 
   return (
   <Card className="h-full flex flex-col">
