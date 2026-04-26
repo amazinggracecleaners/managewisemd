@@ -32,7 +32,7 @@ export async function registerManagerPushToken({
   if (!token) return null;
 
   await setDoc(
-    doc(db, "companies", companyId, "push_tokens", `manager_${managerId}`),
+    doc(db, "companies", companyId, "push_tokens", `manager_${managerId}_${token.slice(-16)}`),
     {
       token,
       role: "manager",
