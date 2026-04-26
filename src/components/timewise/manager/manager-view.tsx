@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useMemo, useState } from "react";
+import React, {useEffect, useMemo, useState } from "react";
 import type {
   Session,
   Settings,
@@ -17,6 +17,7 @@ import type {
   EmployeeUpdateRequest,
   ManagerNotification,
 } from "@/shared/types/domain";
+import { registerManagerPushToken } from "@/lib/manager-push";
 import { ManagerNotificationsCard } from "./ManagerNotificationsCard";
 import { ManagerPinForm } from "./manager-pin-form";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -150,6 +151,19 @@ interface ManagerViewProps {
 }
 
 export function ManagerView(props: ManagerViewProps) {
+  useEffect(() => {
+  if (!props.unlocked) return;
+
+  const companyId =
+    props.settings.companyId?.trim() ||
+    process.env.NEXT_PUBLIC_COMPANY_ID ||
+    "amazing-grace-cleaners";
+
+  registerManagerPushToken({
+    companyId,
+    managerId: "owner",
+  });
+}, [props.unlocked, props.settings.companyId]);
   const [managerTab, setManagerTab] = useState<
     | "dashboard"
     | "requests"
