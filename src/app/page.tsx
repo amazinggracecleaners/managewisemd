@@ -976,12 +976,13 @@ const recordEntry = useCallback(
       const cId = getCompanyId(settings);
       const ref = collection(db, "companies", cId, "timeclock_entries");
       await addDoc(ref, { ...dataToSave, createdAt: serverTimestamp() });
-      const isManagerAction =
-  context?.source === "manager-schedule-view" ||
-  context?.source === "manager-manual-entry" ||
-  isManagerOverride === true;
+      const source = context?.source;
 
-const deviceLabel = isManagerAction
+const isActualManagerAction =
+  source === "manager-schedule-view" ||
+  source === "manager-manual-entry";
+
+const deviceLabel = isActualManagerAction
   ? "Manager override"
   : getDeviceLabel();
       // ✅ CREATE NOTIFICATION
