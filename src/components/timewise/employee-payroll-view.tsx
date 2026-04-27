@@ -269,7 +269,7 @@ export function EmployeePayrollView({
 
   try {
     const canvas = await html2canvas(paystubRef.current, {
-      scale: 3,
+      scale: 10,
       backgroundColor: "#ffffff",
       useCORS: true,
       windowWidth: paystubRef.current.scrollWidth,
