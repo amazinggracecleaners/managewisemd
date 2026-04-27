@@ -295,8 +295,8 @@ export function EmployeePayrollView({
       imgWidth = imgHeight * imgRatio;
     }
 
-    const x = (pageWidth - imgWidth) / 2;
-    const y = (pageHeight - imgHeight) / 2;
+    const x = 8
+    const y = 8
 
     pdf.addImage(imgData, "PNG", x, y, imgWidth, imgHeight);
 
