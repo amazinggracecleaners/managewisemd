@@ -272,18 +272,34 @@ export function EmployeePayrollView({
       scale: 2,
       backgroundColor: "#ffffff",
       useCORS: true,
+      windowWidth: paystubRef.current.scrollWidth,
     });
 
     const imgData = canvas.toDataURL("image/png");
-
     const pdf = new jsPDF("p", "mm", "a4");
 
     const pageWidth = pdf.internal.pageSize.getWidth();
-    const imgWidth = pageWidth - 20;
-    const imgHeight = (canvas.height * imgWidth) / canvas.width;
+    const pageHeight = pdf.internal.pageSize.getHeight();
 
-    pdf.addImage(imgData, "PNG", 10, 10, imgWidth, imgHeight);
+    const margin = 10;
+    const maxWidth = pageWidth - margin * 2;
+    const maxHeight = pageHeight - margin * 2;
 
+    const imgRatio = canvas.width / canvas.height;
+    const pageRatio = maxWidth / maxHeight;
+
+    let imgWidth = maxWidth;
+    let imgHeight = imgWidth / imgRatio;
+
+    if (imgHeight > maxHeight) {
+      imgHeight = maxHeight;
+      imgWidth = imgHeight * imgRatio;
+    }
+
+    const x = (pageWidth - imgWidth) / 2;
+    const y = margin;
+
+    pdf.addImage(imgData, "PNG", x, y, imgWidth, imgHeight);
     pdf.save(`paystub_${employee.id}_${period.id}.pdf`);
   } finally {
     setPdfFor(null);
