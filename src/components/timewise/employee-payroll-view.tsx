@@ -279,24 +279,21 @@ export function EmployeePayrollView({
     const pdf = new jsPDF("p", "mm", "a4");
 
     const pageWidth = pdf.internal.pageSize.getWidth();
-    const pageHeight = pdf.internal.pageSize.getHeight();
+const pageHeight = pdf.internal.pageSize.getHeight();
 
-    const margin = 5;
-    const maxWidth = pageWidth - margin * 2;
-    const maxHeight = pageHeight - margin * 2;
+/* Bigger printable size */
+let imgWidth = 200; // increase size here
+let imgHeight = (canvas.height * imgWidth) / canvas.width;
 
-    const imgRatio = canvas.width / canvas.height;
+/* If too tall, reduce slightly */
+if (imgHeight > 280) {
+  imgHeight = 280;
+  imgWidth = (canvas.width * imgHeight) / canvas.height;
+}
 
-    let imgWidth = maxWidth;
-    let imgHeight = imgWidth / imgRatio;
-
-    if (imgHeight > maxHeight) {
-      imgHeight = maxHeight;
-      imgWidth = imgHeight * imgRatio;
-    }
-
-    const x = 8
-    const y = 8
+/* Center horizontally, top aligned */
+const x = (pageWidth - imgWidth) / 2;
+const y = 5;
 
     pdf.addImage(imgData, "PNG", x, y, imgWidth, imgHeight);
 
