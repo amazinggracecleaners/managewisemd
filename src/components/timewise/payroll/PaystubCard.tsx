@@ -11,6 +11,7 @@ type PaystubCardProps = {
   logoUrl?: string;
   employeeName: string;
   employeeId?: string;
+  employeeAddress?: string;
   payDate: string;
   payPeriodStart: string;
   payPeriodEnd: string;
@@ -29,6 +30,7 @@ export function PaystubCard({
   logoUrl,
   employeeName,
   employeeId,
+  employeeAddress,
   payDate,
   payPeriodStart,
   payPeriodEnd,
@@ -103,6 +105,10 @@ export function PaystubCard({
             <div>
               <span className="font-semibold">Name:</span> {employeeName}
             </div>
+            <div>
+  <span className="font-semibold">Address:</span>{" "}
+  {employeeAddress || "—"}
+</div>
             {payRate != null ? (
               <div>
                 <span className="font-semibold">Pay Rate:</span> ${payRate.toFixed(2)}/hr
