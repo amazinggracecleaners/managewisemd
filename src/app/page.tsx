@@ -2316,7 +2316,9 @@ return (
           />
         )}
 
-        <Footer engine={engine} />
+        {unlocked && tab === "manager" && (
+  <Footer engine={engine} />
+)}
       </div>
     )}
 
