@@ -269,7 +269,7 @@ export function EmployeePayrollView({
 
   try {
     const canvas = await html2canvas(paystubRef.current, {
-      scale: 2,
+      scale: 3,
       backgroundColor: "#ffffff",
       useCORS: true,
       windowWidth: paystubRef.current.scrollWidth,
@@ -281,12 +281,11 @@ export function EmployeePayrollView({
     const pageWidth = pdf.internal.pageSize.getWidth();
     const pageHeight = pdf.internal.pageSize.getHeight();
 
-    const margin = 10;
+    const margin = 5;
     const maxWidth = pageWidth - margin * 2;
     const maxHeight = pageHeight - margin * 2;
 
     const imgRatio = canvas.width / canvas.height;
-    const pageRatio = maxWidth / maxHeight;
 
     let imgWidth = maxWidth;
     let imgHeight = imgWidth / imgRatio;
@@ -297,15 +296,15 @@ export function EmployeePayrollView({
     }
 
     const x = (pageWidth - imgWidth) / 2;
-    const y = margin;
+    const y = (pageHeight - imgHeight) / 2;
 
     pdf.addImage(imgData, "PNG", x, y, imgWidth, imgHeight);
+
     pdf.save(`paystub_${employee.id}_${period.id}.pdf`);
   } finally {
     setPdfFor(null);
   }
 };
-
   return (
     <Card>
       <CardHeader>
