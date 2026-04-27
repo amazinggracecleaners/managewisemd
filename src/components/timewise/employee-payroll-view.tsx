@@ -286,7 +286,7 @@ export function EmployeePayrollView({
 
     doc.setFont("helvetica", "bold");
     doc.setFontSize(18);
-    doc.text(companyName || "Amazing Grace Cleaners LLC", 48, 18);
+    doc.text( "Amazing Grace Cleaners LLC", 48, 18);
 
     doc.setFont("helvetica", "normal");
     doc.setFontSize(11);
