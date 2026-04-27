@@ -610,18 +610,24 @@ const getLiveHoursForOpenShift = useCallback(
       return;
     }
 
-    recordEntry(
-      "out",
-      site,
-      currentDate,
-      undefined,
-      employee.id,
-      isDateOverride,
-      {
-        source: "employee-clock",
-        initiatedBy: employee.id,
-      }
-    );
+    const confirmed = window.confirm(
+  `Are you sure you want to clock out from ${siteName}?`
+);
+
+if (!confirmed) return;
+
+recordEntry(
+  "out",
+  site,
+  currentDate,
+  undefined,
+  employee.id,
+  isDateOverride,
+  {
+    source: "employee-clock",
+    initiatedBy: employee.id,
+  }
+);
   },
   [
     settings.sites,

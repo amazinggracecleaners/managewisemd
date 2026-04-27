@@ -666,6 +666,45 @@ const openFixShiftModal = (data: {
     );
   }
 };
+const handleManagerClock = async (
+  action: "in" | "out",
+  site: Site,
+  emp: Employee
+) => {
+  if (action === "in") {
+    const alreadyClockedInSite = sites.find((s) =>
+      isClockedIn(s.name, emp.id)
+    );
+
+    if (alreadyClockedInSite) {
+      alert(
+        `${emp.name} is already clocked in at ${alreadyClockedInSite.name}. Please clock them out first before starting another shift.`
+      );
+      return;
+    }
+  }
+
+  if (action === "out") {
+    const confirmed = window.confirm(
+      `Confirm clock out for ${emp.name} from ${site.name}?`
+    );
+
+    if (!confirmed) return;
+  }
+
+  await recordEntry(
+    action,
+    site,
+    currentDate,
+    undefined,
+    emp.id,
+    true,
+    {
+      source: "manager-schedule-view",
+      initiatedBy: "manager",
+    }
+  );
+};
 const handleFixShift = async () => {
   if (!fixModal.employeeId || !fixModal.site) return;
 
@@ -1527,20 +1566,8 @@ const dailySiteCount = new Set(
                                         <Button
                                           variant="destructive"
                                           size="sm"
-                                          onClick={() =>
-  recordEntry(
-    "out",
-    site,
-    currentDate,
-    undefined,
-    emp.id,
-    true,
-    {
-      source: "manager-schedule-view",
-      initiatedBy: "manager",
-    }
-  )
-}
+                                          onClick={() => handleManagerClock("out", site, emp)}
+ 
                                         >
                                           <LogOut className="mr-1 h-4 w-4" />
                                           Clock Out
@@ -1549,20 +1576,8 @@ const dailySiteCount = new Set(
                                         <Button
                                           variant="default"
                                           size="sm"
-                                          onClick={() =>
-  recordEntry(
-    "in",
-    site,
-    currentDate,
-    undefined,
-    emp.id,
-    true,
-    {
-      source: "manager-schedule-view",
-      initiatedBy: "manager",
-    }
-  )
-}
+                                         onClick={() => handleManagerClock("in", site, emp)}
+   
                                           disabled={status === "complete"}
                                         >
                                           <LogIn className="mr-1 h-4 w-4" />
