@@ -153,6 +153,7 @@ export function ManagerDashboard({
         <CardContent className="p-4">
           <AllEventsTable
             sessions={filteredSessions}
+            search={search}
             updateEntry={updateEntry}
             deleteEntry={deleteEntry}
             employees={employees}

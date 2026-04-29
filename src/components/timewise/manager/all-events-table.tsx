@@ -55,12 +55,13 @@ interface AllEventsTableProps {
   employees: Employee[];
   mileageLogs: MileageLog[];
   otherExpenses: OtherExpense[];
+  search: string;
   settings?: { mileageRate?: number; defaultHourlyWage?: number; };
   updateEntry: (id: string, updates: Partial<Entry>) => Promise<void>;
   deleteEntry: (id: string) => Promise<void>;
 }
 
-export function AllEventsTable({ sessions, sites, employees, mileageLogs, otherExpenses, settings, updateEntry, deleteEntry }: AllEventsTableProps) {
+export function AllEventsTable({ sessions, sites, employees, mileageLogs, otherExpenses, search, settings, updateEntry, deleteEntry }: AllEventsTableProps) {
   const [editingEntry, setEditingEntry] = useState<Entry | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
 
@@ -193,6 +194,19 @@ export function AllEventsTable({ sessions, sites, employees, mileageLogs, otherE
       }));
     })
     .sort((a, b) => b.entry.ts - a.entry.ts);
+    const filteredRows = allRows.filter((row) => {
+  const q = search.toLowerCase().trim();
+
+  if (!q) return true;
+
+  return (
+    (row.employee || "").toLowerCase().includes(q) ||
+    (row.entry.site || "").toLowerCase().includes(q) ||
+    (row.action || "").toLowerCase().includes(q) ||
+    (typeof row.entry.note === "string" &&
+      row.entry.note.toLowerCase().includes(q))
+  );
+});
     
   const handleOpenDialog = (entry: Entry) => {
     const date = new Date(entry.ts);
@@ -261,8 +275,8 @@ export function AllEventsTable({ sessions, sites, employees, mileageLogs, otherE
               </TableRow>
             </TableHeader>
             <TableBody>
-              {allRows.length > 0 ? (
-                allRows.map((row) => {
+              {filteredRows.length > 0 ? (
+                filteredRows.map((row) => {
                   const { profit, revenue, laborCost, mileageCost, otherCost } = profitabilityForSession(row.session);
                   const positive = profit >= 0;
 

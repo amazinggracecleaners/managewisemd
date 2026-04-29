@@ -263,6 +263,7 @@ const { cloudReady } = useSettings();
     useState<BillingFrequency | undefined>();
 
   const [currentDate, setCurrentDate] = useState(startOfDay(new Date()));
+  const [activeTab, setActiveTab] = useState("list");
 const [fixModal, setFixModal] = useState<{
   open: boolean;
   employeeId?: string;
@@ -284,6 +285,10 @@ const [fixOut, setFixOut] = useState("");
   const goPrev = () => setCurrentDate((d) => addDays(d, -1));
   const goNext = () => setCurrentDate((d) => addDays(d, 1));
   const goToday = () => setCurrentDate(startOfDay(new Date()));
+  const jumpToShiftDay = (date: Date) => {
+  setCurrentDate(startOfDay(date));
+  setActiveTab("daily");
+};
 
   const teamsById = useMemo(() => new Map(teams.map((t) => [t.id, t])), [teams]);
 
@@ -878,7 +883,7 @@ const dailySiteCount = new Set(
 };
   return (
     <TooltipProvider>
-      <Tabs defaultValue="list" className="w-full">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         <div className="flex justify-between items-center mb-4 flex-wrap gap-2">
           <TabsList>
             <TabsTrigger value="list">List</TabsTrigger>
@@ -1680,8 +1685,9 @@ const dailySiteCount = new Set(
 
                               return (
                                 <li
-                                  key={s.id}
-                                  className="bg-muted/50 rounded-md p-2 text-xs relative group"
+  key={s.id}
+  onClick={() => jumpToShiftDay(day)}
+  className="bg-muted/50 rounded-md p-2 text-xs relative group cursor-pointer hover:bg-muted"
                                   style={{
                                     borderLeftColor: siteColor,
                                     borderLeftWidth: "2px",
@@ -1697,7 +1703,10 @@ const dailySiteCount = new Set(
                                         variant="ghost"
                                         size="icon"
                                         className="h-6 w-6"
-                                        onClick={() => handleOpenDialog(s)}
+                                        onClick={(e) => {
+  e.stopPropagation();
+  handleOpenDialog(s);
+}}
                                       >
                                         <Edit className="h-3 w-3" />
                                       </Button>
@@ -1808,9 +1817,11 @@ const dailySiteCount = new Set(
                               : (s.assignedTo || []).join(", ");
 
                             return (
-                              <div
-                                key={s.id}
-                                className="rounded p-1 truncate flex items-center gap-1.5 relative group"
+                           
+                                <div
+  key={s.id}
+  onClick={() => jumpToShiftDay(day)}
+  className="rounded p-1 truncate flex items-center gap-1.5 relative group cursor-pointer hover:ring-1 hover:ring-primary"
                                 style={{
                                   backgroundColor: site ? `${siteColor}33` : "var(--muted)",
                                 }}
@@ -1827,7 +1838,10 @@ const dailySiteCount = new Set(
                                   variant="ghost"
                                   size="icon"
                                   className="h-5 w-5 absolute right-0 top-0.5 opacity-0 group-hover:opacity-100"
-                                  onClick={() => handleOpenDialog(s)}
+                                  onClick={(e) => {
+  e.stopPropagation();
+  handleOpenDialog(s);
+}}
                                 >
                                   <Edit className="h-3 w-3" />
                                 </Button>

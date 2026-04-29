@@ -178,6 +178,7 @@ export function ManagerView(props: ManagerViewProps) {
     | "employeeView"
     | "settings"
   >("dashboard");
+  
 
   const employeeById = useMemo(
     () => new Map(props.employees.map((e) => [e.id, e])),
