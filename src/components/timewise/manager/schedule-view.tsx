@@ -191,10 +191,13 @@ const getStatusIndicator = (
 };
 
 const formatDateHeader = (date: Date): string => {
-  if (isToday(date)) return "Today";
-  if (isYesterday(date)) return "Yesterday";
-  if (isTomorrow(date)) return "Tomorrow";
-  return format(date, "eeee, MMMM d, yyyy");
+  const fullDate = format(date, "eeee, MMMM d, yyyy");
+
+  if (isToday(date)) return `Today, ${fullDate}`;
+  if (isYesterday(date)) return `Yesterday, ${fullDate}`;
+  if (isTomorrow(date)) return `Tomorrow, ${fullDate}`;
+
+  return fullDate;
 };
 
 // minutes -> "HH:MM" (rounded up)

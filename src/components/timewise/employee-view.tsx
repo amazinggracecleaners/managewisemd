@@ -154,12 +154,13 @@ const getStatusIndicator = (status: SiteStatus | undefined, hours?: string) => {
 const formatDateHeader = (date: Date): string => {
   const today = startOfToday();
   const diff = differenceInCalendarDays(date, today);
+  const fullDate = format(date, "EEEE, MMMM d, yyyy");
 
-  if (diff === 0) return "Today";
-  if (diff === -1) return "Yesterday";
-  if (diff === 1) return "Tomorrow";
+  if (diff === 0) return `Today, ${fullDate}`;
+  if (diff === -1) return `Yesterday, ${fullDate}`;
+  if (diff === 1) return `Tomorrow, ${fullDate}`;
 
-  return format(date, "EEEE, MMMM d, yyyy");
+  return fullDate;
 };
 
 /**
