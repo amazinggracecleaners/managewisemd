@@ -724,31 +724,47 @@ const getSiteStatuses = useCallback(
   (forDate: Date): Map<string, SiteStatus> => {
     const statuses = new Map<string, SiteStatus>();
     const dayStart = startOfDay(forDate).getTime();
-    const dayEnd = dayStart + 24 * 60 * 60 * 1000;
 
     for (const site of settings.sites ?? []) {
       const siteName = site.name;
 
-      const overlapping = sessions
-        .filter((s) => (s.in?.site || s.out?.site) === siteName)
-        .filter((s) => {
-          const start = s.in?.ts ?? s.out?.ts ?? 0;
-          const rawEnd = s.out?.ts ?? Math.max(Date.now(), start);
-          const end = Math.min(rawEnd, dayEnd);
-          return end > dayStart && start < dayEnd;
-        });
+      // Only count sessions whose CLOCK-IN started on this day
+      const siteSessions = sessions.filter(
+        (s) =>
+          (s.in?.site || s.out?.site) === siteName &&
+          !!s.in
+      );
 
-      if (overlapping.length === 0) {
+      const sessionsStartedThisDay = siteSessions.filter((s) => {
+        if (!s.in) return false;
+
+        const inDayStart = startOfDay(
+          new Date(s.in.ts)
+        ).getTime();
+
+        return inDayStart === dayStart;
+      });
+
+      if (sessionsStartedThisDay.length === 0) {
         statuses.set(siteName, "incomplete");
         continue;
       }
 
-      const hasClosed = overlapping.some((s) => !!s.out);
-      const hasActive = overlapping.some((s) => s.active);
+      const hasActive = sessionsStartedThisDay.some(
+        (s) => s.active || !s.out
+      );
 
-      if (hasClosed) statuses.set(siteName, "complete");
-      else if (hasActive) statuses.set(siteName, "in-process");
-      else statuses.set(siteName, "incomplete");
+      const hasClosed = sessionsStartedThisDay.some(
+        (s) => !!s.in && !!s.out
+      );
+
+      if (hasActive) {
+        statuses.set(siteName, "in-process");
+      } else if (hasClosed) {
+        statuses.set(siteName, "complete");
+      } else {
+        statuses.set(siteName, "incomplete");
+      }
     }
 
     return statuses;
