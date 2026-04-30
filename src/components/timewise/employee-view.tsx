@@ -1106,7 +1106,10 @@ const getHoursForSiteDay = useCallback(
   ? isClockedIn(schedule.siteName, employee.id)
   : hasOpenShiftForSiteOnDate(schedule.siteName, currentDate);
   const status = currentSiteStatuses.get(schedule.siteName);
-  const clockInDisabled = status === "complete";
+  const employeeCompletedThisSite =
+  getHoursForSiteDay(schedule.siteName, currentDate) !== "00:00";
+
+const clockInDisabled = status === "complete" || employeeCompletedThisSite;
 
   const hoursSpent =
     status === "complete"
