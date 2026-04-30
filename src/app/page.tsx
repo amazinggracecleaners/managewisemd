@@ -750,26 +750,62 @@ const getSiteStatuses = useCallback(
         continue;
       }
 
-      const hasActive = sessionsStartedThisDay.some(
-        (s) => s.active || !s.out
-      );
+      // Find schedule for this site (for this day)
+const scheduleForSite = schedules.find((sch) => {
+  if (sch.siteName !== siteName) return false;
 
-      const hasClosed = sessionsStartedThisDay.some(
-        (s) => !!s.in && !!s.out
-      );
+  const scheduleDate = startOfDay(new Date(sch.startDate)).getTime();
 
-      if (hasActive) {
-        statuses.set(siteName, "in-process");
-      } else if (hasClosed) {
-        statuses.set(siteName, "complete");
-      } else {
-        statuses.set(siteName, "incomplete");
-      }
+  return scheduleDate === dayStart;
+});
+
+// Get assigned employees (fallback to assignedTo names if needed)
+const assignedEmployeeIds =
+  scheduleForSite?.assignedEmployeeIds ??
+  employees
+    .filter((e) =>
+      (scheduleForSite?.assignedTo ?? []).includes(e.name)
+    )
+    .map((e) => e.id);
+
+// Employees who COMPLETED (have IN + OUT)
+const completedEmployeeIds = new Set(
+  sessionsStartedThisDay
+    .filter((s) => s.in && s.out)
+    .map((s) => s.employeeId)
+    .filter(Boolean)
+);
+
+// Employees still ACTIVE
+const activeEmployeeIds = new Set(
+  sessionsStartedThisDay
+    .filter((s) => s.active || !s.out)
+    .map((s) => s.employeeId)
+    .filter(Boolean)
+);
+
+// ✅ FINAL DECISION
+const everyoneCompleted =
+  assignedEmployeeIds.length > 0 &&
+  assignedEmployeeIds.every((id) =>
+    completedEmployeeIds.has(id)
+  );
+
+if (everyoneCompleted) {
+  statuses.set(siteName, "complete");
+} else if (
+  activeEmployeeIds.size > 0 ||
+  completedEmployeeIds.size > 0
+) {
+  statuses.set(siteName, "in-process");
+} else {
+  statuses.set(siteName, "incomplete");
+}
     }
 
     return statuses;
   },
-  [sessions, settings.sites]
+  [sessions, settings.sites, schedules, employees]
 );
  
  // --- Actions ---
