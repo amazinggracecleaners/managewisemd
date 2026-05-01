@@ -1534,6 +1534,8 @@ const dailySiteCount = new Set(
                                   empMinutes > 0 ? formatHHMM(empMinutes) : null;
 
                                 const clocked = isClockedIn(s.siteName, emp.id);
+                                const employeeCompletedThisSite =
+  empMinutes > 0 && !clocked;
 
                                 return (
                                   <div
@@ -1586,7 +1588,7 @@ const dailySiteCount = new Set(
                                           size="sm"
                                          onClick={() => handleManagerClock("in", site, emp)}
    
-                                          disabled={status === "complete"}
+                                          disabled={status === "complete" || employeeCompletedThisSite}
                                         >
                                           <LogIn className="mr-1 h-4 w-4" />
                                           Clock In
