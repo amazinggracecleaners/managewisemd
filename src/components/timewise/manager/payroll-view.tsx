@@ -491,33 +491,69 @@ const paidProgressPct = useMemo(() => {
 const isLocked = isPaid;
 const isEditable = !isLocked;
 
-  const sendPayrollNotifications = async (periodToNotify: PayrollPeriod) => {
-    try {
-      await createPayrollConfirmationNotifications({
-        companyId,
-        period: periodToNotify,
-        employees,
-      });
-    } catch (error) {
-      console.error("Failed to create in-app payroll notifications:", error);
-    }
+  const sendPayrollNotifications = async (
+  periodToNotify: PayrollPeriod,
+  onlyReconfirmation: boolean = false
+) => {
+  const targetLineItems = onlyReconfirmation
+    ? (periodToNotify.lineItems ?? []).filter(
+        (li) => (li as any).needsReconfirmation === true
+      )
+    : periodToNotify.lineItems ?? [];
 
+  if (!targetLineItems.length) return;
+
+  try {
+    await Promise.all(
+      targetLineItems.map((li) =>
+        addDoc(collection(db, "companies", companyId, "employee_notifications"), {
+          employeeId: li.employeeId,
+          employeeName: li.employeeName,
+          type: onlyReconfirmation
+            ? "payroll-reconfirmation"
+            : "payroll-confirmation",
+          title: onlyReconfirmation
+            ? "Payroll reconfirmation requested"
+            : "Payroll confirmation requested",
+          message: onlyReconfirmation
+            ? `Your payroll for ${periodToNotify.startDate} to ${periodToNotify.endDate} was corrected and is ready for review.`
+            : `Your payroll for ${periodToNotify.startDate} to ${periodToNotify.endDate} is ready for confirmation.`,
+          periodId: periodToNotify.id,
+          revision: periodToNotify.revision ?? 1,
+          createdAt: serverTimestamp(),
+          read: false,
+        })
+      )
+    );
+  } catch (error) {
+    console.error("Failed to create payroll notifications:", error);
+  }
+
+  
     try {
       const fn = getFunctions(app, "us-central1");
 
       const sendPayrollConfirmationSms = httpsCallable<
-        { companyId: string; periodId: string },
+        {
+  companyId: string;
+  periodId: string;
+  employeeIds: string[];
+  type: "confirmation" | "reconfirmation";
+},
         { success: boolean; count: number; results: any[] }
       >(fn, "sendPayrollConfirmationSms");
 
       await sendPayrollConfirmationSms({
-        companyId,
-        periodId: periodToNotify.id,
-      });
+  companyId,
+  periodId: periodToNotify.id,
+  employeeIds: targetLineItems.map((li) => li.employeeId),
+  type: onlyReconfirmation ? "reconfirmation" : "confirmation",
+});
     } catch (error) {
       console.error("Failed to send payroll SMS:", error);
     }
-  };
+  
+};
 
   const handleLineItemChange = (
     employeeId: string,
@@ -606,7 +642,7 @@ const isEditable = !isLocked;
     };
 
     await savePayrollPeriod(next);
-    await sendPayrollNotifications(next);
+    await sendPayrollNotifications(next, true);
   };
 
   const handleMarkEmployeePaid = async (employeeId: string) => {
