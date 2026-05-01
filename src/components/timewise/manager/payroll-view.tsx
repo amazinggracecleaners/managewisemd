@@ -531,7 +531,11 @@ const isEditable = !isLocked;
         if (item.employeeId !== employeeId) return item;
         if (item.paid) return item;
 
-        const next = { ...item, [field]: value };
+        const next = {
+  ...item,
+  [field]: value,
+  needsReconfirmation: true,
+};
         const grossWithoutFlat = (item.gross || 0) - (item.flatBonus || 0);
         next.gross = grossWithoutFlat + (next.flatBonus || 0);
         next.net = (next.gross || 0) - (next.deductions || 0);
@@ -588,7 +592,7 @@ const isEditable = !isLocked;
   const handleSaveWaitingOrReady = async () => {
     if (!currentPeriod || isPaid) return;
 
-    const nextRevision = (currentPeriod.revision ?? 0) + 1;
+    const nextRevision = currentPeriod.revision ?? 1;
 
     const next: PayrollPeriod = {
       ...currentPeriod,
@@ -779,20 +783,30 @@ const allPaid =
   );
 
   const confirmedIds = useMemo(() => {
-    if (!currentPeriod) return new Set<string>();
+  if (!currentPeriod) return new Set<string>();
 
-    const revision = currentPeriod.revision ?? 1;
-    return new Set(
-      (payrollConfirmations ?? [])
-        .filter(
-          (c) =>
-            c.periodId === currentPeriod.id &&
-            c.confirmed &&
-            c.revision === revision
-        )
-        .map((c) => c.employeeId)
-    );
-  }, [payrollConfirmations, currentPeriod]);
+  const revision = currentPeriod.revision ?? 1;
+
+  return new Set(
+    (payrollConfirmations ?? [])
+      .filter((c) => {
+        const line = currentPeriod.lineItems?.find(
+          (li) => li.employeeId === c.employeeId
+        );
+
+        if ((line as any)?.needsReconfirmation === true) {
+          return false;
+        }
+
+        return (
+          c.periodId === currentPeriod.id &&
+          c.confirmed &&
+          c.revision === revision
+        );
+      })
+      .map((c) => c.employeeId)
+  );
+}, [payrollConfirmations, currentPeriod]);
 
   const confirmedCount = useMemo(() => {
     return lineItems.filter((li) => confirmedIds.has(li.employeeId)).length;

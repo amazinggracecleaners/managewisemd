@@ -108,9 +108,13 @@ function deriveEmployeePayrollStatus(
   employeeId: string,
   confirmations: PayrollConfirmation[]
 ): "draft" | "waiting_for_confirmation" | "ready_to_pay" | "paid" {
-  const employeeLine = (period.lineItems ?? []).find(
-    (item: PayrollLineItem) => item.employeeId === employeeId
-  );
+ const employeeLine = (period.lineItems ?? []).find(
+  (item: PayrollLineItem) => item.employeeId === employeeId
+);
+
+if ((employeeLine as any)?.needsReconfirmation === true) {
+  return "waiting_for_confirmation";
+}
 
   // ✅ employee-level paid overrides everything
   if ((employeeLine as any)?.paid === true) {
