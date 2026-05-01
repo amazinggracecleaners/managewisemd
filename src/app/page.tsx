@@ -785,19 +785,13 @@ const activeEmployeeIds = new Set(
 );
 
 // ✅ FINAL DECISION
-const everyoneCompleted =
-  assignedEmployeeIds.length > 0 &&
-  assignedEmployeeIds.every((id) =>
-    completedEmployeeIds.has(id)
-  );
+const hasActiveEmployees = activeEmployeeIds.size > 0;
+const hasCompletedEmployees = completedEmployeeIds.size > 0;
 
-if (everyoneCompleted) {
-  statuses.set(siteName, "complete");
-} else if (
-  activeEmployeeIds.size > 0 ||
-  completedEmployeeIds.size > 0
-) {
+if (hasActiveEmployees) {
   statuses.set(siteName, "in-process");
+} else if (hasCompletedEmployees) {
+  statuses.set(siteName, "complete");
 } else {
   statuses.set(siteName, "incomplete");
 }
