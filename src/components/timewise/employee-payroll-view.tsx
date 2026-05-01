@@ -127,15 +127,14 @@ if (period.status === "draft") return "draft";
 
   const summary = getPayrollConfirmationSummary(period, confirmations);
 
-  if (summary.confirmedEmployeeIds.size === 0) {
-    return "waiting_for_confirmation";
-  }
+ const hasEmployeeConfirmed =
+  summary.confirmedEmployeeIds.has(employeeId);
 
-  if (summary.confirmedEmployeeIds.size < summary.employeeIds.length) {
-    return "waiting_for_confirmation";
-  }
+if (!hasEmployeeConfirmed) {
+  return "waiting_for_confirmation";
+}
 
-  return "ready_to_pay";
+return "ready_to_pay";
 }
 
 function canEmployeeConfirm(
