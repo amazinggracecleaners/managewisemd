@@ -162,7 +162,17 @@ function canEmployeeConfirm(
   if (!summary.employeeIds.includes(employeeId)) return false;
 
   // already confirmed for this revision
-  if (summary.confirmedEmployeeIds.has(employeeId)) return false;
+  const employeeLine = (period.lineItems ?? []).find(
+  (item: PayrollLineItem) => item.employeeId === employeeId
+);
+
+const needsReconfirmation =
+  (employeeLine as any)?.needsReconfirmation === true;
+
+// already confirmed for this revision, unless manager corrected payroll
+if (summary.confirmedEmployeeIds.has(employeeId) && !needsReconfirmation) {
+  return false;
+}
 
   return true;
 }
