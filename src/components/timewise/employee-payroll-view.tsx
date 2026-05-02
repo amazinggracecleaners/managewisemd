@@ -407,6 +407,7 @@ const y = 5;
   logoUrl="/Mathieu_logo_AGC.jpg"
   employeeName={employee.name}
   employeeId={employee.id}
+  employeeAddress={(employee as any).address || ""}
   payDate={fmt(period.endDate)}
   payPeriodStart={fmt(period.startDate)}
   payPeriodEnd={fmt(period.endDate)}
