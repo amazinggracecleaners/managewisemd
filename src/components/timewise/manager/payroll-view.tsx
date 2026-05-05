@@ -567,10 +567,21 @@ const isEditable = !isLocked;
         if (item.employeeId !== employeeId) return item;
         if (item.paid) return item;
 
-        const next = {
+       const prevCorrections = (item as any).corrections ?? {};
+
+const next = {
   ...item,
   [field]: value,
   needsReconfirmation: true,
+  wasCorrected: true,
+  corrections: {
+    ...prevCorrections,
+    [field]: {
+      before: item[field] ?? 0,
+      after: value,
+      changedAt: new Date().toISOString(),
+    },
+  },
 };
         const grossWithoutFlat = (item.gross || 0) - (item.flatBonus || 0);
         next.gross = grossWithoutFlat + (next.flatBonus || 0);
@@ -1137,11 +1148,15 @@ const allPaid =
                                   </Badge>
                                 )}
 
-                                {hasConfirmed && !item.paid && (
-                                  <Badge variant="secondary">
-                                    Confirmed
-                                  </Badge>
-                                )}
+                                {hasConfirmed && !item.paid && !(item as any)?.needsReconfirmation && (
+  <Badge variant="secondary">Confirmed</Badge>
+)}
+
+                                {(item as any)?.needsReconfirmation && !item.paid && (
+  <Badge className="bg-orange-500 text-white">
+    Corrected
+  </Badge>
+)}
 
                                 {item.paid && (
                                   <Badge className="bg-green-600 text-white">

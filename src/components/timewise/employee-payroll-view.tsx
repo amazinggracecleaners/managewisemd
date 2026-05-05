@@ -108,38 +108,43 @@ function deriveEmployeePayrollStatus(
   employeeId: string,
   confirmations: PayrollConfirmation[]
 ): "draft" | "waiting_for_confirmation" | "ready_to_pay" | "paid" {
- const employeeLine = (period.lineItems ?? []).find(
-  (item: PayrollLineItem) => item.employeeId === employeeId
-);
 
-if ((employeeLine as any)?.needsReconfirmation === true) {
-  return "waiting_for_confirmation";
-}
+  const employeeLine = (period.lineItems ?? []).find(
+    (item: PayrollLineItem) => item.employeeId === employeeId
+  );
+   
 
-  // ✅ employee-level paid overrides everything
-  if ((employeeLine as any)?.paid === true) {
-    return "paid";
+  // ✅ Paid overrides everything
+  if ((employeeLine as any)?.paid === true) return "paid";
+  if (period.status === "paid") return "paid";
+
+  // Draft
+  if (period.status === "draft") return "draft";
+
+  // ✅ Single source of truth
+  const summary = getPayrollConfirmationSummary(period, confirmations);
+  const hasEmployeeConfirmed =
+    summary.confirmedEmployeeIds.has(employeeId);
+
+  const needsReconfirmation =
+    (employeeLine as any)?.needsReconfirmation === true;
+ 
+
+  // 🔥 Correct reconfirmation logic
+  if (needsReconfirmation && !hasEmployeeConfirmed) {
+    return "waiting_for_confirmation";
   }
 
- // 🔥 period-level paid overrides everything (safety)
-if (period.status === "paid") {
-  return "paid";
+  // Not confirmed yet
+  if (!hasEmployeeConfirmed) {
+    return "waiting_for_confirmation";
+  }
+
+  // Confirmed
+  return "ready_to_pay";
 }
 
-// draft
-if (period.status === "draft") return "draft";
-
-  const summary = getPayrollConfirmationSummary(period, confirmations);
-
- const hasEmployeeConfirmed =
-  summary.confirmedEmployeeIds.has(employeeId);
-
-if (!hasEmployeeConfirmed) {
-  return "waiting_for_confirmation";
-}
-
-return "ready_to_pay";
-}
+  
 
 function canEmployeeConfirm(
   period: PayrollPeriod,
@@ -340,8 +345,21 @@ const y = 5;
   employee.id,
   payrollConfirmations
 );
+const employeeLine = period.lineItems.find(
+  (item: PayrollLineItem) => item.employeeId === employee.id
+);
 
-              const hasConfirmedThisRev = summary.confirmedEmployeeIds.has(employee.id);
+const needsReconfirmation =
+  (employeeLine as any)?.needsReconfirmation === true;
+
+const wasCorrected =
+  (employeeLine as any)?.wasCorrected === true;
+
+const isReconfirmed =
+  status === "ready_to_pay" && wasCorrected;
+
+const hasConfirmedThisRev =
+  summary.confirmedEmployeeIds.has(employee.id) && !needsReconfirmation;
               const isPaid = status === "paid";
               const employeeCanConfirm = canEmployeeConfirm(
                 period,
@@ -382,27 +400,24 @@ const y = 5;
                       <div className="flex items-center gap-3">
                         
                         <PayrollStatusBadge status={status} />
-                        {isPaid ? (
-                          <span className="flex items-center gap-2 text-green-700 font-semibold">
-                            <CheckCircle className="h-4 w-4" /> Paid
-                          </span>
-                        ) : hasConfirmedThisRev ? (
-                          <span className="flex items-center gap-2 text-green-600">
-                            <CheckCircle className="h-4 w-4" /> Confirmed
-                          </span>
-                        ) : status === "waiting_for_confirmation" ? (
-                          <span className="flex items-center gap-2 text-yellow-600">
-                            <Clock className="h-4 w-4" /> Awaiting Your Confirmation
-                          </span>
-                        ) : status === "ready_to_pay" ? (
-                          <span className="flex items-center gap-2 text-blue-600">
-                            <Clock className="h-4 w-4" /> Ready to Pay
-                          </span>
-                        ) : (
-                          <span className="flex items-center gap-2 text-muted-foreground">
-                            {status}
-                          </span>
-                        )}
+                       {status === "paid" ? (
+  <span className="flex items-center gap-2 text-green-700 font-semibold">
+    <CheckCircle className="h-4 w-4" /> Paid
+  </span>
+) : status === "ready_to_pay" ? (
+  <span className="flex items-center gap-2 text-green-600">
+    <CheckCircle className="h-4 w-4" />
+{isReconfirmed ? "Reconfirmed" : "Confirmed"}
+  </span>
+) : status === "waiting_for_confirmation" ? (
+  <span className="flex items-center gap-2 text-yellow-600">
+    <Clock className="h-4 w-4" /> Awaiting Your Confirmation
+  </span>
+) : (
+  <span className="flex items-center gap-2 text-muted-foreground">
+    Draft
+  </span>
+)}
                       </div>
                     </div>
                   </AccordionTrigger>
