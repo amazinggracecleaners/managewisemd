@@ -268,6 +268,26 @@ export function ManagerSettingsView(props: ManagerSettingsViewProps) {
               }
             />
           </div>
+          <div className="flex items-center justify-between gap-4 border-t pt-3">
+  <div>
+    <p className="text-sm font-semibold">
+      Require geofence for clock-out
+    </p>
+    <p className="text-xs text-muted-foreground">
+      Only allow clock-out when the employee is close to the site.
+    </p>
+  </div>
+
+  <Switch
+    checked={!!settings.requireClockOutGeofence}
+    onCheckedChange={(checked) =>
+      setSettings((s) => ({
+        ...s,
+        requireClockOutGeofence: checked,
+      }))
+    }
+  />
+</div>
 
           {settings.requireGeofence && (
             <div className="grid gap-2 max-w-xs">

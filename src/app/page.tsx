@@ -940,7 +940,7 @@ if (!isManagerOverride) {
     return;
   }
 
-  if (settings.requireGeofence && currentCoord) {
+  if (settings.requireClockOutGeofence && currentCoord) {
     if (!site.lat || !site.lng) {
       toast({
         variant: "destructive",

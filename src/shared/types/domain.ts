@@ -192,6 +192,7 @@ export type Settings = {
   mileageRate: number; // dollars per mile
   taxRate?: number;
   requireGeofence: boolean;
+  requireClockOutGeofence?: boolean;
   geofenceRadius: number; // in feet now
   defaultHourlyWage?: number;
   lastBackupAt?: string;
