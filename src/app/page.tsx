@@ -919,7 +919,66 @@ const recordEntry = useCallback(
     });
     return;
   }
+// --- CLOCK-OUT GEOFENCE CHECK ---
+if (!isManagerOverride) {
+  if (settings.requireGPS && !currentCoord) {
+    toast({
+      title: "Location required",
+      description: "Getting your location to verify clock-out...",
+    });
 
+    currentCoord = await requestLocation();
+  }
+
+  if (settings.requireGPS && !currentCoord) {
+    toast({
+      variant: "destructive",
+      title: "Clock-out denied",
+      description:
+        "Could not get your location. Please enable location services.",
+    });
+    return;
+  }
+
+  if (settings.requireGeofence && currentCoord) {
+    if (!site.lat || !site.lng) {
+      toast({
+        variant: "destructive",
+        title: "Clock-out denied: site location missing",
+        description: `Geofence is required, but the site "${site.name}" does not have GPS coordinates set.`,
+        duration: 7000,
+      });
+      return;
+    }
+
+    const METERS_TO_FEET = 3.28084;
+
+    const distanceInMeters = haversineDistance(
+      { lat: site.lat, lng: site.lng },
+      currentCoord
+    );
+
+    const distanceInFeet = distanceInMeters * METERS_TO_FEET;
+
+    const radiusMeters = settings.geofenceRadius ?? 0;
+
+    const radiusInFeet =
+      radiusMeters > 0 ? radiusMeters * METERS_TO_FEET : 150;
+
+    if (distanceInFeet > radiusInFeet) {
+      toast({
+        variant: "destructive",
+        title: "Clock-out denied: out of range",
+        description: `You are ${distanceInFeet.toFixed(
+          0
+        )}ft away. You must be within ${radiusInFeet.toFixed(0)}ft.`,
+        duration: 7000,
+      });
+
+      return;
+    }
+  }
+}
   const openInTs = openShift.in?.ts ?? 0;
 
   const candidateOutTs = buildTsOnDayWithRoll(forDate, now, openInTs);
