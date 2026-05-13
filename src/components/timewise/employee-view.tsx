@@ -580,7 +580,7 @@ const getLiveHoursForOpenShift = useCallback(
 
     const isPastDay = isBefore(selectedDay, today);
     const isFutureDay = isBefore(today, selectedDay);
-    const isDateOverride = isPastDay || isFutureDay || !!isManagerPreview;
+    const isDateOverride = !!isManagerPreview;
 
     if (action === "in") {
       const activeSomewhere = isClockedIn(undefined, employee.id);
