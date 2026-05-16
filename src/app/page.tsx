@@ -125,7 +125,8 @@ export default function TimeWisePage() {
   const { engine, setEngine } = useEngine();
   const { toast } = useToast();
 const [notifications, setNotifications] = useState<ManagerNotification[]>([]);
- const [showSplash, setShowSplash] = useState(true);
+const [splashStep, setSplashStep] = useState<"intro" | "choose-role" | "role-loading" | "done">("intro");
+const [selectedRole, setSelectedRole] = useState<"employee" | "manager" | null>(null);
 
   // --- Core data state ---
   const schedulesHydratedRef = useRef(false);
@@ -195,12 +196,14 @@ const [notifications, setNotifications] = useState<ManagerNotification[]>([]);
     }));
   }, [settings.sites, updateSettings]);
 useEffect(() => {
+  if (splashStep !== "intro") return;
+
   const timer = setTimeout(() => {
-    setShowSplash(false);
+    setSplashStep("choose-role");
   }, 2800);
 
   return () => clearTimeout(timer);
-}, []);
+}, [splashStep]);
   // Load initial data from local storage when in local engine
   useEffect(() => {
     if (engine !== "local") return;
@@ -2315,8 +2318,71 @@ await addDoc(
   },
   [sessions, getSiteStatuses]
 );
-if (showSplash) {
-  return <SplashScreen role={tab} />;
+if (splashStep === "intro") {
+  return <SplashScreen />;
+}
+
+if (splashStep === "choose-role") {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950 text-white">
+      <div className="w-full max-w-md rounded-3xl border border-white/10 bg-white/10 p-6 text-center shadow-2xl">
+        <h1 className="text-3xl font-bold">Welcome!</h1>
+        <p className="mt-2 text-sm text-slate-300">
+          Please select how you want to continue
+        </p>
+
+        <div className="mt-8 grid gap-4">
+          <button
+            onClick={() => {
+              setSelectedRole("employee");
+              setTab("employee");
+              setSplashStep("role-loading");
+
+              setTimeout(() => {
+                setSplashStep("done");
+              }, 1800);
+            }}
+            className="rounded-2xl border border-blue-400/40 bg-blue-500/20 p-5 text-left hover:bg-blue-500/30"
+          >
+            <div className="text-lg font-semibold text-blue-300">
+              I’m an Employee
+            </div>
+            <div className="mt-1 text-sm text-slate-300">
+              Access your tasks, schedule, clock-in, and payroll.
+            </div>
+          </button>
+
+          <button
+            onClick={() => {
+              setSelectedRole("manager");
+              setTab("manager");
+              setSplashStep("role-loading");
+
+              setTimeout(() => {
+                setSplashStep("done");
+              }, 1800);
+            }}
+            className="rounded-2xl border border-emerald-400/40 bg-emerald-500/20 p-5 text-left hover:bg-emerald-500/30"
+          >
+            <div className="text-lg font-semibold text-emerald-300">
+              I’m a Manager
+            </div>
+            <div className="mt-1 text-sm text-slate-300">
+              Manage team, schedules, payroll, reports, and operations.
+            </div>
+          </button>
+        </div>
+
+        <p className="mt-8 text-xs text-slate-500">
+          Powered by ManageWiseMD
+        </p>
+      </div>
+    </div>
+  );
+}
+
+if (splashStep === "role-loading" && selectedRole) {
+  return <SplashScreen role={selectedRole} />;
 }
 
   // --- Render guards ---
