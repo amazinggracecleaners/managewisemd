@@ -4,10 +4,11 @@ import Image from "next/image";
 import { motion } from "framer-motion";
 import { useEffect } from "react";
 
-type SplashRole = "employee" | "manager";
+type SplashRole = "intro" | "employee" | "manager";
 
-export default function SplashScreen({ role = "employee" }: { role?: SplashRole }) {
+export default function SplashScreen({ role = "intro" }: { role?: SplashRole }) {
   const isManager = role === "manager";
+  const isEmployee = role === "employee";
 
   useEffect(() => {
     const audio = new Audio("/splash-sound.mp3");
@@ -15,10 +16,22 @@ export default function SplashScreen({ role = "employee" }: { role?: SplashRole 
     audio.play().catch(() => {});
   }, []);
 
+  const title = role === "intro"
+  ? "Welcome to ManageWiseMD"
+  : isManager
+  ? "Manager Operations Center"
+ 
+  : "Employee Workspace";
+   
+
+  const subtitle = role === "intro"
+  ? "Smarter Practice. Better Care."
+  : isManager
+  ? "Loading business tools..."
+  : "Loading your schedule...";
+
   return (
     <motion.div
-      initial={{ opacity: 1 }}
-      animate={{ opacity: 1 }}
       className={`fixed inset-0 z-50 flex items-center justify-center overflow-hidden text-white ${
         isManager
           ? "bg-gradient-to-br from-slate-950 via-emerald-950 to-black"
@@ -60,9 +73,9 @@ export default function SplashScreen({ role = "employee" }: { role?: SplashRole 
           initial={{ opacity: 0, y: 18 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 1.2, duration: 0.6 }}
-          className="mt-6 text-3xl font-bold sm:text-4xl"
+          className="mt-6 text-3xl font-bold tracking-tight sm:text-4xl"
         >
-          {isManager ? "Manager Operations Center" : "Employee Workspace"}
+          {title}
         </motion.h1>
 
         <motion.p
@@ -71,19 +84,21 @@ export default function SplashScreen({ role = "employee" }: { role?: SplashRole 
           transition={{ delay: 1.6, duration: 0.6 }}
           className="mt-2 text-sm uppercase tracking-[0.25em] text-slate-300"
         >
-          {isManager ? "Loading business tools..." : "Loading your schedule..."}
+          {subtitle}
         </motion.p>
 
-        <div className="mt-8 h-1.5 w-64 overflow-hidden rounded-full bg-white/20">
-          <motion.div
-            initial={{ width: "0%" }}
-            animate={{ width: "100%" }}
-            transition={{ delay: 1.8, duration: 0.9, ease: "easeInOut" }}
-            className={`h-full rounded-full ${
-              isManager ? "bg-emerald-400" : "bg-blue-400"
-            }`}
-          />
-        </div>
+       {role !== "intro" && (
+  <div className="mt-8 h-1.5 w-64 overflow-hidden rounded-full bg-white/20">
+    <motion.div
+      initial={{ width: "0%" }}
+      animate={{ width: "100%" }}
+      transition={{ delay: 1.8, duration: 0.9, ease: "easeInOut" }}
+      className={`h-full rounded-full ${
+        isManager ? "bg-emerald-400" : "bg-blue-400"
+      }`}
+    />
+  </div>
+)}
 
         <p className="mt-6 text-xs text-slate-400">
           Powered by ManageWiseMD
