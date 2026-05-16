@@ -2340,7 +2340,7 @@ if (splashStep === "choose-role") {
 
               setTimeout(() => {
                 setSplashStep("done");
-              }, 1800);
+              }, 2500);
             }}
             className="rounded-2xl border border-blue-400/40 bg-blue-500/20 p-5 text-left hover:bg-blue-500/30"
           >
@@ -2360,7 +2360,7 @@ if (splashStep === "choose-role") {
 
               setTimeout(() => {
                 setSplashStep("done");
-              }, 1800);
+              }, 2500);
             }}
             className="rounded-2xl border border-emerald-400/40 bg-emerald-500/20 p-5 text-left hover:bg-emerald-500/30"
           >
@@ -2403,12 +2403,14 @@ return (
           </div>
         )}
 
-        <Header
-          tab={tab}
-          onTabChange={setTab as any}
-          isManager={unlocked && tab === "manager"}
-          isLoggedIn={!!loggedInEmployee}
-        />
+       {(loggedInEmployee || unlocked) && (
+  <Header
+    tab={tab}
+    onTabChange={setTab as any}
+    isManager={unlocked && tab === "manager"}
+    isLoggedIn={!!loggedInEmployee}
+  />
+)}
 
         {loggedInEmployee ? (
           <EmployeeView
