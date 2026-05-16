@@ -2316,7 +2316,7 @@ await addDoc(
   [sessions, getSiteStatuses]
 );
 if (showSplash) {
-  return <SplashScreen />;
+  return <SplashScreen role={tab} />;
 }
 
   // --- Render guards ---
