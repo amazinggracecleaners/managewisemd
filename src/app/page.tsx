@@ -58,7 +58,7 @@ import {
 
 import { groupSessions, uuid, haversineDistance } from "@/lib/time-utils";
 import { useToast } from "@/hooks/use-toast";
-
+import SplashScreen from "@/components/SplashScreen";
 import { Header } from "@/components/timewise/header";
 import { Footer } from "@/components/timewise/footer";
 import { EmployeeView } from "@/components/timewise/employee-view";
@@ -125,7 +125,7 @@ export default function TimeWisePage() {
   const { engine, setEngine } = useEngine();
   const { toast } = useToast();
 const [notifications, setNotifications] = useState<ManagerNotification[]>([]);
- 
+ const [showSplash, setShowSplash] = useState(true);
 
   // --- Core data state ---
   const schedulesHydratedRef = useRef(false);
@@ -194,7 +194,13 @@ const [notifications, setNotifications] = useState<ManagerNotification[]>([]);
       meta: { ...(s as any).meta, migratedSiteIds: true },
     }));
   }, [settings.sites, updateSettings]);
+useEffect(() => {
+  const timer = setTimeout(() => {
+    setShowSplash(false);
+  }, 2800);
 
+  return () => clearTimeout(timer);
+}, []);
   // Load initial data from local storage when in local engine
   useEffect(() => {
     if (engine !== "local") return;
@@ -2309,7 +2315,9 @@ await addDoc(
   },
   [sessions, getSiteStatuses]
 );
-
+if (showSplash) {
+  return <SplashScreen />;
+}
 
   // --- Render guards ---
 const showConnecting = engine === "cloud" && (!authReady || !cloudReady);
