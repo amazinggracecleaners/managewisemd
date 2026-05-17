@@ -732,32 +732,6 @@ const dailySiteSummary = useMemo(() => {
   return { total, complete, inProcess, incomplete };
 }, [currentDate, schedules, employee.id, getSiteStatuses]);
 
-const dailyWorkedMinutes = useMemo(() => {
-  return sessionsForEmployee.reduce((sum, s) => {
-    return sum + sessionMinutesOnDay(s, currentDate);
-  }, 0);
-}, [sessionsForEmployee, currentDate]);
-
-const dailyWorkedHHMM = useMemo(() => {
-  return minutesToHHMM(dailyWorkedMinutes);
-}, [dailyWorkedMinutes]);
-
-  const handleViewTimesheet = (periodId: string, employeeId: string) => {
-    const period = payrollPeriods.find((p) => p.id === periodId);
-    if (!period || employee.id !== employeeId) return;
-
-    const fromTime = parseISO(period.startDate).getTime();
-    const toTime = endOfDay(parseISO(period.endDate)).getTime();
-
-    const periodEntries = entries.filter((e) => e.employeeId === employee.id && e.ts >= fromTime && e.ts <= toTime);
-
-    // ✅ Also sort before grouping (same reasoning)
-    const sessions = groupSessions(periodEntries.slice().sort((a, b) => a.ts - b.ts));
-
-    setTimesheetData({ period, sessions });
-    setIsTimesheetDialogOpen(true);
-  };
-
   /**
  * ✅ Anchor cross-midnight sessions to the CLOCK-IN day.
  * If a session starts on `forDate`, count the FULL duration (even after midnight).
@@ -795,6 +769,44 @@ const getHoursForSiteDay = useCallback(
   },
   [entries, employee.id]
 );
+
+
+const dailyWorkedMinutes = useMemo(() => {
+  let total = 0;
+
+  for (const s of dailySchedules) {
+    const hhmm = getHoursForSiteDay(s.siteName, currentDate);
+
+    if (!hhmm || !hhmm.includes(":")) continue;
+
+    const [hours, minutes] = hhmm.split(":").map(Number);
+
+    total += hours * 60 + minutes;
+  }
+
+  return total;
+}, [dailySchedules, getHoursForSiteDay, currentDate]);
+
+const dailyWorkedHHMM = useMemo(() => {
+  return minutesToHHMM(dailyWorkedMinutes);
+}, [dailyWorkedMinutes]);
+
+  const handleViewTimesheet = (periodId: string, employeeId: string) => {
+    const period = payrollPeriods.find((p) => p.id === periodId);
+    if (!period || employee.id !== employeeId) return;
+
+    const fromTime = parseISO(period.startDate).getTime();
+    const toTime = endOfDay(parseISO(period.endDate)).getTime();
+
+    const periodEntries = entries.filter((e) => e.employeeId === employee.id && e.ts >= fromTime && e.ts <= toTime);
+
+    // ✅ Also sort before grouping (same reasoning)
+    const sessions = groupSessions(periodEntries.slice().sort((a, b) => a.ts - b.ts));
+
+    setTimesheetData({ period, sessions });
+    setIsTimesheetDialogOpen(true);
+  };
+
 
 
  return (

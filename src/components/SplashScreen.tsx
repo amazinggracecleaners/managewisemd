@@ -28,7 +28,7 @@ export default function SplashScreen({ role = "intro" }: { role?: SplashRole }) 
   ? "Smarter Practice. Better Care."
   : isManager
   ? "Loading business tools..."
-  : "Loading your schedule...";
+  : "Loading your Dashboard...";
 
   return (
     <motion.div

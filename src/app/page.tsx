@@ -2340,7 +2340,7 @@ if (splashStep === "choose-role") {
 
               setTimeout(() => {
                 setSplashStep("done");
-              }, 2500);
+              }, 3500);
             }}
             className="rounded-2xl border border-blue-400/40 bg-blue-500/20 p-5 text-left hover:bg-blue-500/30"
           >
@@ -2360,7 +2360,7 @@ if (splashStep === "choose-role") {
 
               setTimeout(() => {
                 setSplashStep("done");
-              }, 2500);
+              }, 3500);
             }}
             className="rounded-2xl border border-emerald-400/40 bg-emerald-500/20 p-5 text-left hover:bg-emerald-500/30"
           >
