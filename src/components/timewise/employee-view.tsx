@@ -407,6 +407,9 @@ const isAssigned = isAssignedDirect || isAssignedViaTeam;
 if (!isAssigned) return false;
 
       const schStart = parseISO(s.startDate);
+      const dateStr = format(date, "yyyy-MM-dd");
+
+if (s.exceptionDates?.includes(dateStr)) return false;
       if (date < startOfDay(schStart)) return false;
 
       if (s.repeatUntil && date > endOfDay(parseISO(s.repeatUntil))) return false;
