@@ -1156,7 +1156,12 @@ const clockInDisabled = status === "complete" || employeeCompletedThisSite;
       <p className="text-sm text-muted-foreground my-1">
         {schedule.tasks}
       </p>
-
+{asNoteText(schedule.note) && (
+  <div className="mt-2 rounded-md border-l-4 border-amber-500 bg-amber-50 p-2 text-sm text-amber-900">
+    <span className="font-semibold">Manager note: </span>
+    {asNoteText(schedule.note)}
+  </div>
+)}
       <div className="flex gap-2 mt-2 flex-wrap">
         {clockedInAtThisSite ? (
           <Button
