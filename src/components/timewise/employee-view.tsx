@@ -817,16 +817,36 @@ const dailyWorkedHHMM = useMemo(() => {
 const sendEmployeeNoteToManager = async () => {
   if (!employeeNoteText.trim() || !employeeNoteSite) return;
 
-  await addDoc(collection(db, "companies", companyId, "notifications"), {
+  const payload = {
     type: "employee-note",
     employeeId: employee.id,
     employeeName: employee.name,
     site: employeeNoteSite,
     message: employeeNoteText.trim(),
+
+    sender: "employee",
+
+    readByManager: false,
+    readByEmployee: true,
+
     date: format(currentDate, "yyyy-MM-dd"),
     createdAt: serverTimestamp(),
-    read: false,
-  });
+  };
+
+  // ✅ Main chat/messages system
+  await addDoc(
+    collection(db, "companies", companyId, "messages"),
+    payload
+  );
+
+  // ✅ Dashboard notification copy
+  await addDoc(
+    collection(db, "companies", companyId, "notifications"),
+    {
+      ...payload,
+      read: false,
+    }
+  );
 
   toast({
     title: "Note sent",
