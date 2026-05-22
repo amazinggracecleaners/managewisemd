@@ -10,6 +10,7 @@ import {
   where,
   writeBatch,
    addDoc,
+   updateDoc,
   serverTimestamp,
 } from "firebase/firestore";
 import { db } from "@/firebase/client";
@@ -381,6 +382,7 @@ const [employeeNoteOpen, setEmployeeNoteOpen] = useState(false);
 const [employeeNoteText, setEmployeeNoteText] = useState("");
 const [employeeNoteSite, setEmployeeNoteSite] = useState<string>("");
 const [employeeMessages, setEmployeeMessages] = useState<any[]>([]);
+const [employeeReplyText, setEmployeeReplyText] = useState("");
   const asNoteText = (n: unknown): string => (typeof n === "string" ? n : "");
 
   const userEntries = useMemo(() => {
@@ -841,6 +843,7 @@ const sendEmployeeNoteToManager = async () => {
     employeeId: employee.id,
     employeeName: employee.name,
     site: employeeNoteSite,
+    conversationKey: `${employee.id}_${employeeNoteSite || "general"}`,
     message: employeeNoteText.trim(),
 
     sender: "employee",
@@ -877,7 +880,46 @@ const sendEmployeeNoteToManager = async () => {
   setEmployeeNoteOpen(false);
 };
 
+const sendEmployeeReply = async () => {
+  if (!employeeReplyText.trim()) return;
 
+  await addDoc(collection(db, "companies", companyId, "messages"), {
+    type: "employee-note",
+    employeeId: employee.id,
+    employeeName: employee.name,
+    site: "",
+    conversationKey: `${employee.id}_general`,
+    message: employeeReplyText.trim(),
+    sender: "employee",
+    readByManager: false,
+    readByEmployee: true,
+    createdAt: serverTimestamp(),
+  });
+
+  await addDoc(collection(db, "companies", companyId, "notifications"), {
+    type: "employee-note",
+    employeeId: employee.id,
+    employeeName: employee.name,
+    site: "",
+    conversationKey: `${employee.id}_general`,
+    message: employeeReplyText.trim(),
+    sender: "employee",
+    readByManager: false,
+    readByEmployee: true,
+    read: false,
+    createdAt: serverTimestamp(),
+  });
+
+  setEmployeeReplyText("");
+
+  toast({
+    title: "Reply sent",
+    description: "Your reply was sent to the manager.",
+  });
+};
+const employeeUnreadMessages = employeeMessages.filter(
+  (m) => m.sender === "manager" && !m.readByEmployee
+).length;
  return (
   <>
     <Card className="mb-6">
@@ -1022,7 +1064,23 @@ const sendEmployeeNoteToManager = async () => {
         </CardHeader>
       </Card>
 
-      <Tabs defaultValue="schedule" className="w-full">
+      <Tabs
+  defaultValue="schedule"
+  className="w-full"
+  onValueChange={async (value) => {
+    if (value !== "messages") return;
+
+    const unread = employeeMessages.filter(
+      (m) => m.sender === "manager" && !m.readByEmployee
+    );
+
+    for (const m of unread) {
+      await updateDoc(doc(db, "companies", companyId, "messages", m.id), {
+        readByEmployee: true,
+      });
+    }
+  }}
+>
   
 
   {/* 🔥 Sticky Tabs Bar */}
@@ -1030,7 +1088,14 @@ const sendEmployeeNoteToManager = async () => {
     <div className="w-full overflow-x-auto">
       <TabsList className="flex w-max min-w-full gap-1">
         <TabsTrigger value="schedule">Schedule & Actions</TabsTrigger>
-        <TabsTrigger value="messages">Messages</TabsTrigger>
+        <TabsTrigger value="messages" className="relative">
+  Messages
+  {employeeUnreadMessages > 0 && (
+    <span className="ml-2 rounded-full bg-red-600 px-2 py-0.5 text-xs text-white">
+      {employeeUnreadMessages}
+    </span>
+  )}
+</TabsTrigger>
         <TabsTrigger value="activity">Recent Activity</TabsTrigger>
         <TabsTrigger value="payroll">Payroll</TabsTrigger>
       </TabsList>
@@ -1325,7 +1390,7 @@ const clockInDisabled = status === "complete" || employeeCompletedThisSite;
           </div>
         </TabsContent>
 
-        /* Message Tab */ 
+        {/* Message Tab */}
         <TabsContent value="messages" className="mt-4">
   <Card>
     <CardHeader>
@@ -1349,7 +1414,11 @@ const clockInDisabled = status === "complete" || employeeCompletedThisSite;
               }`}
             >
               <p className="text-sm">{m.message}</p>
-
+<p className="text-[10px] opacity-70 mt-1">
+  {m.createdAt?.toDate
+    ? format(m.createdAt.toDate(), "MMM d, h:mm a")
+    : ""}
+</p>
               {m.site && (
                 <p className="text-xs opacity-80 mt-1">
                   Site: {m.site}
@@ -1359,6 +1428,23 @@ const clockInDisabled = status === "complete" || employeeCompletedThisSite;
           ))
         )}
       </div>
+
+      <div className="mt-4 flex gap-2">
+  <Textarea
+    value={employeeReplyText}
+    onChange={(e) => setEmployeeReplyText(e.target.value)}
+    rows={3}
+    placeholder="Reply to manager..."
+  />
+
+  <Button
+    onClick={sendEmployeeReply}
+    disabled={!employeeReplyText.trim()}
+  >
+    <MessageSquare className="mr-2 h-4 w-4" />
+    Send
+  </Button>
+</div>
     </CardContent>
   </Card>
 </TabsContent>

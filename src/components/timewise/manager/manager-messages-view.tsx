@@ -44,7 +44,11 @@ export function ManagerMessagesView({
   const [messages, setMessages] = useState<Message[]>([]);
   const [selectedEmployeeId, setSelectedEmployeeId] = useState<string>("");
   const [replyText, setReplyText] = useState("");
-
+const totalUnreadMessages = useMemo(() => {
+  return messages.filter(
+    (m) => m.sender === "employee" && !m.readByManager
+  ).length;
+}, [messages]);
   useEffect(() => {
     if (!companyId) return;
 
@@ -126,9 +130,15 @@ export function ManagerMessagesView({
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <MessageSquare className="h-5 w-5" />
-            Employee Messages
-          </CardTitle>
+  <MessageSquare className="h-5 w-5" />
+  Employee Messages
+
+  {totalUnreadMessages > 0 && (
+    <Badge variant="destructive">
+      {totalUnreadMessages}
+    </Badge>
+  )}
+</CardTitle>
         </CardHeader>
 
         <CardContent className="space-y-2">
