@@ -33,7 +33,7 @@ import { OtherExpensesView } from "./other-expenses-view";
 import { ManagerDashboard } from "./manager-dashboard";
 import { SiteListView } from "./site-list-view";
 import { ManagerSettingsView } from "./manager-settings-view";
-
+import { ManagerMessagesView } from "@/components/timewise/manager/manager-messages-view";
 import type { JobProfitRow } from "@/lib/job-profitability";
 
 import {
@@ -274,7 +274,7 @@ export function ManagerView(props: ManagerViewProps) {
               </span>
             )}
           </TabsTrigger>
-
+<TabsTrigger value="messages">Messages</TabsTrigger>
           <TabsTrigger value="schedule">Schedule</TabsTrigger>
           <TabsTrigger value="sites">Sites</TabsTrigger>
           <TabsTrigger value="invoices">Invoices</TabsTrigger>
@@ -467,6 +467,17 @@ export function ManagerView(props: ManagerViewProps) {
             </CardContent>
           </Card>
         </TabsContent>
+
+        <TabsContent value="messages">
+  <ManagerMessagesView
+  companyId={
+    props.settings.companyId?.trim() ||
+    process.env.NEXT_PUBLIC_COMPANY_ID ||
+    "amazing-grace-cleaners"
+  }
+  employees={props.employees}
+/>
+</TabsContent>
 
         <TabsContent value="schedule" className="mt-2">
           <ScheduleView
