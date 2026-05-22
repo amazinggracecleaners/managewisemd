@@ -9,6 +9,8 @@ import {
   query,
   where,
   writeBatch,
+   addDoc,
+  serverTimestamp,
 } from "firebase/firestore";
 import { db } from "@/firebase/client";
 import {
@@ -356,6 +358,9 @@ const markAllHeaderNotificationsRead = useCallback(async () => {
     period?: PayrollPeriod;
     sessions: Session[];
   }>({ sessions: [] });
+const [employeeNoteOpen, setEmployeeNoteOpen] = useState(false);
+const [employeeNoteText, setEmployeeNoteText] = useState("");
+const [employeeNoteSite, setEmployeeNoteSite] = useState<string>("");
 
   const asNoteText = (n: unknown): string => (typeof n === "string" ? n : "");
 
@@ -809,7 +814,29 @@ const dailyWorkedHHMM = useMemo(() => {
     setTimesheetData({ period, sessions });
     setIsTimesheetDialogOpen(true);
   };
+const sendEmployeeNoteToManager = async () => {
+  if (!employeeNoteText.trim() || !employeeNoteSite) return;
 
+  await addDoc(collection(db, "companies", companyId, "notifications"), {
+    type: "employee-note",
+    employeeId: employee.id,
+    employeeName: employee.name,
+    site: employeeNoteSite,
+    message: employeeNoteText.trim(),
+    date: format(currentDate, "yyyy-MM-dd"),
+    createdAt: serverTimestamp(),
+    read: false,
+  });
+
+  toast({
+    title: "Note sent",
+    description: "Your note was sent to the manager.",
+  });
+
+  setEmployeeNoteText("");
+  setEmployeeNoteSite("");
+  setEmployeeNoteOpen(false);
+};
 
 
  return (
@@ -1183,6 +1210,17 @@ const clockInDisabled = status === "complete" || employeeCompletedThisSite;
             Clock In
           </Button>
         )}
+        <Button
+  size="sm"
+  variant="outline"
+  onClick={() => {
+    setEmployeeNoteSite(schedule.siteName);
+    setEmployeeNoteOpen(true);
+  }}
+>
+  <MessageSquare className="mr-2 h-4 w-4" />
+  Note to Manager
+</Button>
       </div>
     </li>
   );
@@ -1419,6 +1457,42 @@ const clockInDisabled = status === "complete" || employeeCompletedThisSite;
           </ScrollArea>
         </DialogContent>
       </Dialog>
-    </>
+
+<Dialog open={employeeNoteOpen} onOpenChange={setEmployeeNoteOpen}>
+  <DialogContent>
+    <DialogHeader>
+      <DialogTitle>Note to Manager</DialogTitle>
+
+      <DialogDescription>
+        Send a note about {employeeNoteSite || "this site"}.
+      </DialogDescription>
+    </DialogHeader>
+
+    <Textarea
+      value={employeeNoteText}
+      onChange={(e) => setEmployeeNoteText(e.target.value)}
+      rows={5}
+      placeholder="Write your note to the manager..."
+    />
+
+    <DialogFooter>
+      <Button
+        variant="outline"
+        onClick={() => setEmployeeNoteOpen(false)}
+      >
+        Cancel
+      </Button>
+
+      <Button
+        onClick={sendEmployeeNoteToManager}
+        disabled={!employeeNoteText.trim()}
+      >
+        Send Note
+      </Button>
+    </DialogFooter>
+  </DialogContent>
+</Dialog>
+
+</>
   );
 }
