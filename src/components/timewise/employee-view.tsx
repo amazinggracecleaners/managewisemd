@@ -320,17 +320,22 @@ useEffect(() => {
 
   const q = query(
     collection(db, "companies", companyId, "messages"),
-    where("employeeId", "==", employee.id),
-    orderBy("createdAt", "asc")
+    where("employeeId", "==", employee.id)
   );
 
   return onSnapshot(q, (snap) => {
-    setEmployeeMessages(
-      snap.docs.map((d) => ({
+    const items = snap.docs
+      .map((d) => ({
         id: d.id,
         ...d.data(),
       }))
-    );
+      .sort((a: any, b: any) => {
+        const aTime = a.createdAt?.toMillis?.() ?? 0;
+        const bTime = b.createdAt?.toMillis?.() ?? 0;
+        return aTime - bTime;
+      });
+
+    setEmployeeMessages(items);
   });
 }, [companyId, employee?.id]);
 
