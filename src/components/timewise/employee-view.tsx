@@ -314,6 +314,25 @@ useEffect(() => {
   return () => unsub();
 }, [employee?.id, companyId]);
 
+useEffect(() => {
+  if (!companyId || !employee?.id) return;
+
+  const q = query(
+    collection(db, "companies", companyId, "messages"),
+    where("employeeId", "==", employee.id),
+    orderBy("createdAt", "asc")
+  );
+
+  return onSnapshot(q, (snap) => {
+    setEmployeeMessages(
+      snap.docs.map((d) => ({
+        id: d.id,
+        ...d.data(),
+      }))
+    );
+  });
+}, [companyId, employee?.id]);
+
 const markHeaderNotificationRead = useCallback(
   async (id: string) => {
     const batch = writeBatch(db);
@@ -361,7 +380,7 @@ const markAllHeaderNotificationsRead = useCallback(async () => {
 const [employeeNoteOpen, setEmployeeNoteOpen] = useState(false);
 const [employeeNoteText, setEmployeeNoteText] = useState("");
 const [employeeNoteSite, setEmployeeNoteSite] = useState<string>("");
-
+const [employeeMessages, setEmployeeMessages] = useState<any[]>([]);
   const asNoteText = (n: unknown): string => (typeof n === "string" ? n : "");
 
   const userEntries = useMemo(() => {
@@ -1011,6 +1030,7 @@ const sendEmployeeNoteToManager = async () => {
     <div className="w-full overflow-x-auto">
       <TabsList className="flex w-max min-w-full gap-1">
         <TabsTrigger value="schedule">Schedule & Actions</TabsTrigger>
+        <TabsTrigger value="messages">Messages</TabsTrigger>
         <TabsTrigger value="activity">Recent Activity</TabsTrigger>
         <TabsTrigger value="payroll">Payroll</TabsTrigger>
       </TabsList>
@@ -1304,6 +1324,44 @@ const clockInDisabled = status === "complete" || employeeCompletedThisSite;
             )}
           </div>
         </TabsContent>
+
+        /* Message Tab */ 
+        <TabsContent value="messages" className="mt-4">
+  <Card>
+    <CardHeader>
+      <CardTitle>Messages</CardTitle>
+    </CardHeader>
+
+    <CardContent>
+      <div className="space-y-3 max-h-[500px] overflow-y-auto">
+        {employeeMessages.length === 0 ? (
+          <p className="text-sm text-muted-foreground">
+            No messages yet.
+          </p>
+        ) : (
+          employeeMessages.map((m) => (
+            <div
+              key={m.id}
+              className={`rounded-lg p-3 max-w-[85%] ${
+                m.sender === "manager"
+                  ? "bg-primary text-primary-foreground ml-auto"
+                  : "bg-muted"
+              }`}
+            >
+              <p className="text-sm">{m.message}</p>
+
+              {m.site && (
+                <p className="text-xs opacity-80 mt-1">
+                  Site: {m.site}
+                </p>
+              )}
+            </div>
+          ))
+        )}
+      </div>
+    </CardContent>
+  </Card>
+</TabsContent>
 
         {/* ACTIVITY TAB */}
         <TabsContent value="activity">
