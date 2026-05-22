@@ -11,14 +11,14 @@ import {
 } from "@/components/ui/card";
 import { setAppIconBadge } from "@/lib/app-badge";
 import { Badge } from "@/components/ui/badge";
-import { CheckCircle2, LogIn, LogOut } from "lucide-react";
+import { CheckCircle2, LogIn, LogOut, MessageSquare, } from "lucide-react";
 import { useManagerNotifications } from "@/hooks/use-manager-notifications";
 import { Button } from "@/components/ui/button";
 interface ManagerNotificationsCardProps {
   companyId?: string;
 }
 
-function getTypeIcon(n: { type: "clock" | "payroll"; action?: "in" | "out" }) {
+function getTypeIcon(n: { type: "clock" | "payroll" | "employee-note"; action?: "in" | "out" }) {
   if (n.type === "clock" && n.action === "in") {
     return <LogIn className="h-4 w-4" />;
   }
@@ -109,6 +109,61 @@ React.useEffect(() => {
         <p className="text-sm text-muted-foreground">No notifications yet.</p>
       ) : (
         notifications.map((n) => {
+          if (n.type === "employee-note") {
+  return (
+    <div
+      key={n.id}
+      onClick={() => !n.read && markOneAsRead(n.id)}
+      className={`rounded-xl border p-3 flex items-start justify-between gap-3 cursor-pointer transition hover:bg-muted ${
+        !n.read ? "bg-muted/40" : ""
+      }`}
+    >
+      <div className="min-w-0">
+        <div className="flex items-center gap-2 font-medium">
+          <MessageSquare className="h-4 w-4" />
+
+          <span className="truncate">
+            {n.employeeName} sent a note
+          </span>
+        </div>
+
+        <div className="mt-2 text-sm text-muted-foreground space-y-1">
+          <div>
+            <span className="font-medium text-foreground">
+              Employee:
+            </span>{" "}
+            {n.employeeName}
+          </div>
+
+          <div>
+            <span className="font-medium text-foreground">
+              Site:
+            </span>{" "}
+            {n.site || "—"}
+          </div>
+
+          <div>
+            <span className="font-medium text-foreground">
+              Message:
+            </span>{" "}
+            {n.message}
+          </div>
+
+          <div>
+            <span className="font-medium text-foreground">
+              Sent:
+            </span>{" "}
+            {formatStamp(n.createdAt)}
+          </div>
+        </div>
+      </div>
+
+      <Badge variant={n.read ? "secondary" : "default"}>
+        {n.read ? "Read" : "New"}
+      </Badge>
+    </div>
+  );
+}
           if (n.type === "clock") {
             return (
               <div

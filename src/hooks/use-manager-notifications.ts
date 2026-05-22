@@ -23,6 +23,7 @@ type RawNotification = {
    deviceLabel?: unknown;
   periodId?: unknown;
   revision?: unknown;
+  message?: unknown;
   createdAt?: unknown;
   read?: unknown;
 };
@@ -51,7 +52,18 @@ type PayrollNotificationShape = {
   read: boolean;
 };
 
-type ParsedNotification = ClockNotificationShape | PayrollNotificationShape;
+type EmployeeNoteNotificationShape = {
+  id: string;
+  type: "employee-note";
+  employeeId: string;
+  employeeName: string;
+  site: string;
+  message: string;
+  createdAt?: unknown;
+  read: boolean;
+};
+
+type ParsedNotification = ClockNotificationShape | PayrollNotificationShape  | EmployeeNoteNotificationShape;
 
 export function useManagerNotifications(companyId?: string, max = 50) {
   const [notifications, setNotifications] = useState<ParsedNotification[]>([]);
@@ -125,6 +137,35 @@ const { toast } = useToast();
               read: !!data.read,
             };
           }
+
+          if (data.type === "employee-note") {
+  return {
+    id: doc.id,
+    type: "employee-note" as const,
+    employeeId:
+      typeof data.employeeId === "string"
+        ? data.employeeId
+        : "",
+
+    employeeName:
+      typeof data.employeeName === "string"
+        ? data.employeeName
+        : "Unknown",
+
+    site:
+      typeof data.site === "string"
+        ? data.site
+        : "",
+
+    message:
+      typeof data.message === "string"
+        ? data.message
+        : "",
+
+    createdAt: data.createdAt,
+    read: !!data.read,
+  };
+}
 
           if (data.type === "payroll") {
             return {
@@ -217,12 +258,14 @@ useEffect(() => {
     if (newest && !newest.read) {
       toast({
         title: "New activity",
-        description:
-          newest.type === "clock"
-            ? newest.action === "in"
-              ? `${newest.employeeName} clocked in`
-              : `${newest.employeeName} clocked out`
-            : `${newest.employeeName} confirmed payroll`,
+       description:
+  newest.type === "clock"
+    ? newest.action === "in"
+      ? `${newest.employeeName} clocked in`
+      : `${newest.employeeName} clocked out`
+    : newest.type === "employee-note"
+    ? `${newest.employeeName} sent a note`
+    : `${newest.employeeName} confirmed payroll`,
       });
 
       playNotificationSound();
