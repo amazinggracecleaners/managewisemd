@@ -35,7 +35,12 @@ import { SiteListView } from "./site-list-view";
 import { ManagerSettingsView } from "./manager-settings-view";
 import { ManagerMessagesView } from "@/components/timewise/manager/manager-messages-view";
 import type { JobProfitRow } from "@/lib/job-profitability";
-
+import {
+  collection,
+  onSnapshot,
+  query,
+} from "firebase/firestore";
+import { db } from "@/firebase/client";
 import {
   Card,
   CardHeader,
@@ -164,6 +169,8 @@ export function ManagerView(props: ManagerViewProps) {
     managerId: "owner",
   });
 }, [props.unlocked, props.settings.companyId]);
+
+
   const [managerTab, setManagerTab] = useState<
     | "dashboard"
     | "requests"
@@ -179,6 +186,29 @@ export function ManagerView(props: ManagerViewProps) {
     | "settings"
   >("dashboard");
   
+const [managerUnreadMessages, setManagerUnreadMessages] = useState(0);
+
+useEffect(() => {
+  const companyId =
+    props.settings.companyId?.trim() ||
+    process.env.NEXT_PUBLIC_COMPANY_ID ||
+    "amazing-grace-cleaners";
+
+  const q = collection(db, "companies", companyId, "messages");
+
+  return onSnapshot(q, (snap) => {
+    const unread = snap.docs.filter((d) => {
+      const data = d.data();
+
+      return (
+        data.sender === "employee" &&
+        !data.readByManager
+      );
+    }).length;
+
+    setManagerUnreadMessages(unread);
+  });
+}, [props.settings.companyId]);
 
   const employeeById = useMemo(
     () => new Map(props.employees.map((e) => [e.id, e])),
@@ -259,6 +289,9 @@ export function ManagerView(props: ManagerViewProps) {
     bankInfo: "Bank Info",
   };
 
+
+
+
   return (
     <section className="w-full space-y-4">
       <Tabs value={managerTab} onValueChange={(v) => setManagerTab(v as any)}>
@@ -274,7 +307,14 @@ export function ManagerView(props: ManagerViewProps) {
               </span>
             )}
           </TabsTrigger>
-<TabsTrigger value="messages">Messages</TabsTrigger>
+<TabsTrigger value="messages">
+  Messages
+  {managerUnreadMessages > 0 && (
+    <span className="ml-2 rounded-full bg-red-600 px-2 py-0.5 text-xs text-white">
+      {managerUnreadMessages}
+    </span>
+  )}
+</TabsTrigger>
           <TabsTrigger value="schedule">Schedule</TabsTrigger>
           <TabsTrigger value="sites">Sites</TabsTrigger>
           <TabsTrigger value="invoices">Invoices</TabsTrigger>
