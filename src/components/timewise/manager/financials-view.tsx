@@ -130,6 +130,63 @@ function getPayrollTotal(p: PayrollPeriod): number {
   }, 0);
 }
 
+function getLivePayrollGrossFromEntries(args: {
+  startDate: Date;
+  endDate: Date;
+  entries: Entry[];
+  employees: Employee[];
+  settings?: Settings | null;
+}) {
+  const { startDate, endDate, entries, employees, settings } = args;
+
+  const fromTime = startDate.getTime();
+  const toTime = endDate.getTime();
+
+  const siteMap = new Map(
+    (settings?.sites ?? []).map((s) => [s.name, s])
+  );
+
+  const filteredEntries = entries.filter(
+    (entry) => entry.ts >= fromTime && entry.ts <= toTime
+  );
+
+  const sessions = groupSessions(
+    filteredEntries.slice().sort((a, b) => a.ts - b.ts)
+  );
+
+  let totalGross = 0;
+
+  for (const employee of employees) {
+    const employeeSessions = sessions.filter(
+      (s) => s.employee === employee.name && !!s.in && !!s.out
+    );
+
+    let basePay = 0;
+    let flatBonus = 0;
+
+    for (const session of employeeSessions) {
+      const sessionMinutes = Number(session.minutes ?? 0);
+      const site = siteMap.get(session.in?.site || "General");
+
+      basePay +=
+        (sessionMinutes / 60) *
+        Number((employee as any).payRate ?? (employee as any).wage ?? 0);
+
+      if (site?.bonusType === "hourly" && site.bonusAmount) {
+        basePay += (sessionMinutes / 60) * Number(site.bonusAmount || 0);
+      }
+
+      if (site?.bonusType === "flat" && site.bonusAmount) {
+        flatBonus += Number(site.bonusAmount || 0);
+      }
+    }
+
+    totalGross += basePay + flatBonus;
+  }
+
+  return totalGross;
+}
+
 function getMileageCost(m: any, fallbackRate: number): number {
   if (typeof m?.amount === "number") return m.amount;
   const miles = Number(m?.miles ?? m?.distance ?? 0) || 0;
@@ -287,7 +344,10 @@ export function FinancialsView({
       monthly.set(key, row);
     }
 
-    // Live payroll from saved payroll periods gross totals
+    // Payroll from saved payroll periods gross totals
+    
+const payrollMonths = new Set<MonthKey>();
+
 for (const p of pays) {
   const d = toDateMaybe(
     (p as any).endDate ??
@@ -304,8 +364,31 @@ for (const p of pays) {
     { revenue: 0, other: 0, payroll: 0, mileage: 0 };
 
   row.payroll += getPayrollTotal(p);
+  payrollMonths.add(key);
 
   monthly.set(key, row);
+}
+
+// If no saved payroll exists for the selected month/range,
+// calculate live payroll using the same Payroll formula.
+if (minDate && maxDate) {
+  const key = monthKey(minDate);
+
+  if (!payrollMonths.has(key)) {
+    const row =
+      monthly.get(key) ??
+      { revenue: 0, other: 0, payroll: 0, mileage: 0 };
+
+    row.payroll += getLivePayrollGrossFromEntries({
+      startDate: minDate,
+      endDate: maxDate,
+      entries: allEntries,
+      employees: emps,
+      settings,
+    });
+
+    monthly.set(key, row);
+  }
 }
 
     for (const m of miles) {

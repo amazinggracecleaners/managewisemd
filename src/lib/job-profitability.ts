@@ -139,24 +139,24 @@ export function computeJobProfitability(args: Args): Map<string, JobProfitRow> {
       if (!sSite || sSite !== site) continue;
       if (!s.out) continue; // open shifts don’t count yet
       const emp = employees.find(e => e.id === (s as any).employeeId) ?? employees.find(e => e.name === s.employee);
-      const rate = getEmployeeRate(emp, settings);
+     const rate = getEmployeeRate(emp, settings);
 const hours = (s.minutes ?? 0) / 60;
-
-let totalRate = rate;
 
 const siteCfg = (settings.sites ?? []).find(
   (x) => x.name === site
 );
 
-// Include hourly bonus only
+let laborRate = rate;
+
+// Only apply bonus rate to sessions on bonus sites
 if (
   (siteCfg as any)?.bonusType === "hourly" &&
   Number((siteCfg as any)?.bonusAmount ?? 0) > 0
 ) {
-  totalRate += Number((siteCfg as any).bonusAmount);
+  laborRate = rate + Number((siteCfg as any).bonusAmount);
 }
 
-labor += totalRate * hours;
+labor += laborRate * hours;
     }
 
     // Mileage ($)
