@@ -52,6 +52,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { uploadMessageAttachment } from "@/features/messages/message-attachments";
 import {
   format,
   add,
@@ -230,7 +231,7 @@ const [unreadNotificationCount, setUnreadNotificationCount] = useState(0);
 type HeaderEmployeeNotification = {
   id: string;
   employeeId: string;
-  type: "schedule-change" | "payroll-confirmation" | "payment";
+  type: "schedule-change" | "payroll-confirmation" | "payment"  | "manager-message";
   title: string;
   message: string;
   createdAt?: unknown;
@@ -388,6 +389,8 @@ const [employeeNoteText, setEmployeeNoteText] = useState("");
 const [employeeNoteSite, setEmployeeNoteSite] = useState<string>("");
 const [employeeMessages, setEmployeeMessages] = useState<any[]>([]);
 const [employeeReplyText, setEmployeeReplyText] = useState("");
+const [employeeReplyFile, setEmployeeReplyFile] = useState<File | null>(null);
+const [employeeNoteFile, setEmployeeNoteFile] = useState<File | null>(null);
   const asNoteText = (n: unknown): string => (typeof n === "string" ? n : "");
 
   const userEntries = useMemo(() => {
@@ -842,7 +845,13 @@ const dailyWorkedHHMM = useMemo(() => {
   };
 const sendEmployeeNoteToManager = async () => {
   if (!employeeNoteText.trim() || !employeeNoteSite) return;
-
+const attachment = employeeNoteFile
+  ? await uploadMessageAttachment({
+      companyId,
+      employeeId: employee.id,
+      file: employeeNoteFile,
+    })
+  : {};
   const payload = {
     type: "employee-note",
     employeeId: employee.id,
@@ -858,6 +867,7 @@ const sendEmployeeNoteToManager = async () => {
 
     date: format(currentDate, "yyyy-MM-dd"),
     createdAt: serverTimestamp(),
+    ...attachment,
   };
 
   // ✅ Main chat/messages system
@@ -881,13 +891,20 @@ const sendEmployeeNoteToManager = async () => {
   });
 
   setEmployeeNoteText("");
+  setEmployeeNoteFile(null);
   setEmployeeNoteSite("");
   setEmployeeNoteOpen(false);
 };
 
 const sendEmployeeReply = async () => {
   if (!employeeReplyText.trim()) return;
-
+const attachment = employeeReplyFile
+  ? await uploadMessageAttachment({
+      companyId,
+      employeeId: employee.id,
+      file: employeeReplyFile,
+    })
+  : {};
   await addDoc(collection(db, "companies", companyId, "messages"), {
     type: "employee-note",
     employeeId: employee.id,
@@ -899,6 +916,7 @@ const sendEmployeeReply = async () => {
     readByManager: false,
     readByEmployee: true,
     createdAt: serverTimestamp(),
+    ...attachment,
   });
 
   await addDoc(collection(db, "companies", companyId, "notifications"), {
@@ -913,10 +931,11 @@ const sendEmployeeReply = async () => {
     readByEmployee: true,
     read: false,
     createdAt: serverTimestamp(),
+    ...attachment,
   });
 
   setEmployeeReplyText("");
-
+setEmployeeReplyFile(null);
   toast({
     title: "Reply sent",
     description: "Your reply was sent to the manager.",
@@ -1419,6 +1438,26 @@ const clockInDisabled = status === "complete" || employeeCompletedThisSite;
               }`}
             >
               <p className="text-sm">{m.message}</p>
+              {m.attachmentUrl && (
+  <>
+    {m.attachmentType?.startsWith("image/") ? (
+      <img
+        src={m.attachmentUrl}
+        alt={m.attachmentName || "attachment"}
+        className="mt-2 max-h-60 rounded-md border"
+      />
+    ) : (
+      <a
+        href={m.attachmentUrl}
+        target="_blank"
+        rel="noreferrer"
+        className="mt-2 block text-xs underline"
+      >
+        📎 {m.attachmentName || "Open attachment"}
+      </a>
+    )}
+  </>
+)}
 <p className="text-[10px] opacity-70 mt-1">
   {m.createdAt?.toDate
     ? format(m.createdAt.toDate(), "MMM d, h:mm a")
@@ -1438,10 +1477,15 @@ const clockInDisabled = status === "complete" || employeeCompletedThisSite;
   <Textarea
     value={employeeReplyText}
     onChange={(e) => setEmployeeReplyText(e.target.value)}
+  
     rows={3}
     placeholder="Reply to manager..."
   />
-
+  <Input
+  type="file"
+  accept="image/*,.pdf,.doc,.docx"
+  onChange={(e) => setEmployeeReplyFile(e.target.files?.[0] ?? null)}
+/>
   <Button
     onClick={sendEmployeeReply}
     disabled={!employeeReplyText.trim()}
@@ -1643,7 +1687,11 @@ const clockInDisabled = status === "complete" || employeeCompletedThisSite;
       rows={5}
       placeholder="Write your note to the manager..."
     />
-
+<Input
+  type="file"
+  accept="image/*,.pdf,.doc,.docx"
+  onChange={(e) => setEmployeeNoteFile(e.target.files?.[0] ?? null)}
+/>
     <DialogFooter>
       <Button
         variant="outline"

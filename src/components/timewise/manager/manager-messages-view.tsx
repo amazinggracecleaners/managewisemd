@@ -15,13 +15,13 @@ import {
 import { db } from "@/firebase/client";
 import { format } from "date-fns";
 import { MessageSquare, Send } from "lucide-react";
-
+import { uploadMessageAttachment } from "@/features/messages/message-attachments";
 import type { Employee } from "@/shared/types/domain";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
-
+import { Input } from "@/components/ui/input";
 type Message = {
   id: string;
   employeeId: string;
@@ -29,9 +29,16 @@ type Message = {
   site?: string;
   message: string;
   sender: "employee" | "manager";
+
   readByManager?: boolean;
   readByEmployee?: boolean;
+
   createdAt?: any;
+
+  attachmentUrl?: string;
+  attachmentName?: string;
+  attachmentPath?: string;
+  attachmentType?: string;
 };
 
 export function ManagerMessagesView({
@@ -43,7 +50,10 @@ export function ManagerMessagesView({
 }) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [selectedEmployeeId, setSelectedEmployeeId] = useState<string>("");
+  const [selectedSite, setSelectedSite] = useState<string>("all");
   const [replyText, setReplyText] = useState("");
+  const [replyFile, setReplyFile] = useState<File | null>(null);
+
 const totalUnreadMessages = useMemo(() => {
   return messages.filter(
     (m) => m.sender === "employee" && !m.readByManager
@@ -52,18 +62,21 @@ const totalUnreadMessages = useMemo(() => {
   useEffect(() => {
     if (!companyId) return;
 
-    const q = query(
-      collection(db, "companies", companyId, "messages"),
-      orderBy("createdAt", "asc")
-    );
+    const q = collection(db, "companies", companyId, "messages");
 
     return onSnapshot(q, (snap) => {
-      setMessages(
-        snap.docs.map((d) => ({
-          id: d.id,
-          ...(d.data() as Omit<Message, "id">),
-        }))
-      );
+      const items = snap.docs
+  .map((d) => ({
+    id: d.id,
+    ...(d.data() as Omit<Message, "id">),
+  }))
+  .sort((a, b) => {
+    const aTime = a.createdAt?.toMillis?.() ?? 0;
+    const bTime = b.createdAt?.toMillis?.() ?? 0;
+    return aTime - bTime;
+  });
+
+setMessages(items);
     });
   }, [companyId]);
 
@@ -85,17 +98,31 @@ const totalUnreadMessages = useMemo(() => {
   const selectedEmployee =
     employees.find((e) => e.id === selectedEmployeeId) || null;
 
-  const thread = messages.filter((m) => m.employeeId === selectedEmployeeId);
+  const thread = messages.filter((m) => {
+  const matchesEmployee = m.employeeId === selectedEmployeeId;
+  const matchesSite = selectedSite === "all" || m.site === selectedSite;
+
+  return matchesEmployee && matchesSite;
+});
 
   useEffect(() => {
     if (!companyId || !selectedEmployeeId) return;
 
-    const unread = messages.filter(
-      (m) =>
-        m.employeeId === selectedEmployeeId &&
-        m.sender === "employee" &&
-        !m.readByManager
-    );
+    const unread = messages.filter((m) => {
+  const matchesEmployee =
+    m.employeeId === selectedEmployeeId;
+
+  const matchesSite =
+    selectedSite === "all" ||
+    m.site === selectedSite;
+
+  return (
+    matchesEmployee &&
+    matchesSite &&
+    m.sender === "employee" &&
+    !m.readByManager
+  );
+});
 
     unread.forEach((m) => {
       updateDoc(doc(db, "companies", companyId, "messages", m.id), {
@@ -106,24 +133,53 @@ const totalUnreadMessages = useMemo(() => {
 
   const sendReply = async () => {
     if (!selectedEmployee || !replyText.trim()) return;
-
+const attachment = replyFile
+  ? await uploadMessageAttachment({
+      companyId,
+      employeeId: selectedEmployee.id,
+      file: replyFile,
+    })
+  : {};
     await addDoc(collection(db, "companies", companyId, "messages"), {
       employeeId: selectedEmployee.id,
       employeeName: selectedEmployee.name,
+      site: selectedSite === "all" ? "" : selectedSite,
       message: replyText.trim(),
       sender: "manager",
       readByManager: true,
       readByEmployee: false,
       createdAt: serverTimestamp(),
+      ...attachment,
     });
 
+    await addDoc(collection(db, "companies", companyId, "employee_notifications"), {
+  employeeId: selectedEmployee.id,
+  type: "manager-message",
+  title: "New message from manager",
+  message: replyText.trim(),
+  site: selectedSite === "all" ? "" : selectedSite,
+  read: false,
+  createdAt: serverTimestamp(),
+});
+
     setReplyText("");
+    setReplyFile(null);
   };
 
   const formatTime = (value: any) => {
     const date = value?.toDate ? value.toDate() : null;
     return date ? format(date, "MMM d, h:mm a") : "";
   };
+
+  const siteList = useMemo(() => {
+  const sites = new Set<string>();
+
+  messages.forEach((m) => {
+    if (m.site && m.site.trim()) sites.add(m.site);
+  });
+
+  return Array.from(sites).sort();
+}, [messages]);
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
@@ -180,6 +236,23 @@ const totalUnreadMessages = useMemo(() => {
             </p>
           ) : (
             <div className="space-y-4">
+                <div className="flex gap-2 items-center">
+  <label className="text-sm font-medium">Site:</label>
+
+  <select
+    value={selectedSite}
+    onChange={(e) => setSelectedSite(e.target.value)}
+    className="rounded-md border bg-background px-3 py-2 text-sm"
+  >
+    <option value="all">All sites</option>
+
+    {siteList.map((site) => (
+      <option key={site} value={site}>
+        {site}
+      </option>
+    ))}
+  </select>
+</div>
               <div className="h-[420px] overflow-y-auto rounded-lg border p-3 space-y-3">
                 {thread.length === 0 ? (
                   <p className="text-sm text-muted-foreground">
@@ -196,7 +269,26 @@ const totalUnreadMessages = useMemo(() => {
                       }`}
                     >
                       <p className="text-sm">{m.message}</p>
-
+{m.attachmentUrl && (
+  <>
+    {m.attachmentType?.startsWith("image/") ? (
+      <img
+        src={m.attachmentUrl}
+        alt={m.attachmentName || "attachment"}
+        className="mt-2 max-h-60 rounded-md border"
+      />
+    ) : (
+      <a
+        href={m.attachmentUrl}
+        target="_blank"
+        rel="noreferrer"
+        className="mt-2 block text-xs underline"
+      >
+        📎 {m.attachmentName || "Open attachment"}
+      </a>
+    )}
+  </>
+)}
                       {m.site && (
                         <p className="text-xs mt-1 opacity-80">
                           Site: {m.site}
@@ -218,7 +310,11 @@ const totalUnreadMessages = useMemo(() => {
                   placeholder={`Reply to ${selectedEmployee.name}...`}
                   rows={3}
                 />
-
+<Input
+  type="file"
+  accept="image/*,.pdf,.doc,.docx"
+  onChange={(e) => setReplyFile(e.target.files?.[0] ?? null)}
+/>
                 <Button onClick={sendReply} disabled={!replyText.trim()}>
                   <Send className="h-4 w-4 mr-2" />
                   Send

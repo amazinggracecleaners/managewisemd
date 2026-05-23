@@ -123,13 +123,11 @@ function getInvoiceTotal(inv: any): number {
 }
 
 function getPayrollTotal(p: PayrollPeriod): number {
-  if (Array.isArray(p?.lineItems)) {
-    return p.lineItems.reduce(
-      (sum, item) => sum + (item.net || item.gross || 0),
-      0
-    );
-  }
-  return 0;
+  if (!Array.isArray(p.lineItems)) return 0;
+
+  return p.lineItems.reduce((sum, item) => {
+    return sum + Number(item.gross || 0);
+  }, 0);
 }
 
 function getMileageCost(m: any, fallbackRate: number): number {
@@ -289,43 +287,26 @@ export function FinancialsView({
       monthly.set(key, row);
     }
 
-    // Live accrued payroll from worked time
-    if (allEntries.length && emps.length) {
-      const sessions = groupSessions([...allEntries].sort((a, b) => a.ts - b.ts));
+    // Live payroll from saved payroll periods gross totals
+for (const p of pays) {
+  const d = toDateMaybe(
+    (p as any).endDate ??
+    (p as any).payDate ??
+    (p as any).createdAt
+  );
 
-      const employeeRateById = new Map(
-        emps.map((e) => [
-          e.id,
-          Number((e as any).payRate ?? (e as any).wage ?? 0) || 0,
-        ])
-      );
+  if (!d || !inRange(d, minDate, maxDate)) continue;
 
-      for (const s of sessions) {
-        if (!s.in) continue;
+  const key = monthKey(d);
 
-        const sessionStart = s.in.ts;
-        const sessionEnd = s.out?.ts ?? Date.now();
+  const row =
+    monthly.get(key) ??
+    { revenue: 0, other: 0, payroll: 0, mileage: 0 };
 
-        const overlapStart = Math.max(sessionStart, minMs);
-        const overlapEnd = Math.min(sessionEnd, maxMs);
+  row.payroll += getPayrollTotal(p);
 
-        if (overlapEnd <= overlapStart) continue;
-
-        const d = new Date(overlapStart);
-        const key = monthKey(d);
-
-        const row =
-          monthly.get(key) ??
-          { revenue: 0, other: 0, payroll: 0, mileage: 0 };
-
-        const employeeId = (s as any).employeeId ?? s.in.employeeId;
-        const rate = employeeRateById.get(employeeId) ?? 0;
-        const hours = (overlapEnd - overlapStart) / (1000 * 60 * 60);
-
-        row.payroll += rate * hours;
-        monthly.set(key, row);
-      }
-    }
+  monthly.set(key, row);
+}
 
     for (const m of miles) {
       const d = toDateMaybe((m as any).date ?? (m as any).createdAt);
