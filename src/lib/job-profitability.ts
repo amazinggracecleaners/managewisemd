@@ -143,7 +143,7 @@ export function computeJobProfitability(args: Args): Map<string, JobProfitRow> {
 const hours = (s.minutes ?? 0) / 60;
 
 const siteCfg = (settings.sites ?? []).find(
-  (x) => x.name === site
+  (x) => x.name === sSite
 );
 
 let laborRate = rate;
