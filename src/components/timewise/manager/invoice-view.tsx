@@ -127,6 +127,9 @@ export function InvoiceView({ sites }: InvoiceViewProps) {
         siteName: "",
         invoiceNumber: `INV-${Date.now()}`,
         date: format(new Date(), "yyyy-MM-dd"),
+        serviceStartDate: format(new Date(), "yyyy-MM-01"),
+serviceEndDate: format(new Date(), "yyyy-MM-dd"),
+paidDate: null,
         dueDate: format(new Date(), "yyyy-MM-dd"),
         lineItems: [{ id: uuid(), description: "", quantity: 1, unitPrice: 0, total: 0 }],
         status: "draft",
@@ -198,6 +201,9 @@ export function InvoiceView({ sites }: InvoiceViewProps) {
       siteName: draftInvoice.siteName,
       invoiceNumber: draftInvoice.invoiceNumber,
       date: draftInvoice.date,
+      serviceStartDate: (draftInvoice as any).serviceStartDate || null,
+serviceEndDate: (draftInvoice as any).serviceEndDate || null,
+paidDate: (draftInvoice as any).paidDate || null,
       dueDate: draftInvoice.dueDate,
       status: (draftInvoice.status ?? "draft") as Invoice["status"],
       lineItems: finalLineItems,
@@ -326,7 +332,7 @@ export function InvoiceView({ sites }: InvoiceViewProps) {
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
                       <div className="space-y-2">
                         <Label htmlFor="date">Date</Label>
                         <Input
@@ -336,7 +342,41 @@ export function InvoiceView({ sites }: InvoiceViewProps) {
                           onChange={(e) => setDraftInvoice((prev) => ({ ...prev, date: e.target.value }))}
                         />
                       </div>
+<div className="space-y-2">
+  <Label htmlFor="serviceStartDate">
+    Service Start
+  </Label>
 
+  <Input
+    id="serviceStartDate"
+    type="date"
+    value={(draftInvoice as any).serviceStartDate || ""}
+    onChange={(e) =>
+      setDraftInvoice((prev) => ({
+        ...prev,
+        serviceStartDate: e.target.value,
+      }))
+    }
+  />
+</div>
+
+<div className="space-y-2">
+  <Label htmlFor="serviceEndDate">
+    Service End
+  </Label>
+
+  <Input
+    id="serviceEndDate"
+    type="date"
+    value={(draftInvoice as any).serviceEndDate || ""}
+    onChange={(e) =>
+      setDraftInvoice((prev) => ({
+        ...prev,
+        serviceEndDate: e.target.value,
+      }))
+    }
+  />
+</div>
                       <div className="space-y-2">
                         <Label htmlFor="dueDate">Due Date</Label>
                         <Input
@@ -346,12 +386,37 @@ export function InvoiceView({ sites }: InvoiceViewProps) {
                           onChange={(e) => setDraftInvoice((prev) => ({ ...prev, dueDate: e.target.value }))}
                         />
                       </div>
+<div className="space-y-2">
+  <Label htmlFor="paidDate">
+    Paid Date
+  </Label>
 
+  <Input
+    id="paidDate"
+    type="date"
+    value={(draftInvoice as any).paidDate || ""}
+    onChange={(e) =>
+      setDraftInvoice((prev) => ({
+        ...prev,
+        paidDate: e.target.value,
+      }))
+    }
+  />
+</div>
                       <div className="space-y-2">
                         <Label htmlFor="status">Status</Label>
                         <Select
                           value={draftInvoice.status}
-                          onValueChange={(v: any) => setDraftInvoice((prev) => ({ ...prev, status: v }))}
+                          onValueChange={(v: any) =>
+  setDraftInvoice((prev) => ({
+    ...prev,
+    status: v,
+    paidDate:
+      v === "paid"
+        ? prev.paidDate || format(new Date(), "yyyy-MM-dd")
+        : prev.paidDate,
+  }))
+}
                         >
                           <SelectTrigger>
                             <SelectValue />

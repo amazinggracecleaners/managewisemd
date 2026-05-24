@@ -152,6 +152,9 @@ export type Invoice = {
   siteName: string; // legacy alias
   invoiceNumber: string;
   date: string; // yyyy-MM-dd
+  serviceStartDate?: string | null;
+serviceEndDate?: string | null;
+paidDate?: string | null;
   dueDate: string; // yyyy-MM-dd
   lineItems: InvoiceLineItem[];
   notes?: string;

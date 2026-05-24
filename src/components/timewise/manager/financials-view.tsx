@@ -649,9 +649,8 @@ if (minDate && maxDate) {
                 </Select>
               </div>
             )}
-          </CardContent>
-        </Card>
-<div className="space-y-2">
+
+            <div className="space-y-2">
   <Label>Accounting view</Label>
   <Select
     value={accountingView}
@@ -666,12 +665,21 @@ if (minDate && maxDate) {
     </SelectContent>
   </Select>
 </div>
+          </CardContent>
+        </Card>
+
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6 gap-4">
           <Card className="shadow-sm">
             <CardHeader>
               <CardTitle className="flex items-center">
                 Total revenue
-                <InfoTip text="Sum of all invoice amounts issued within the selected period." />
+                <InfoTip
+  text={
+    accountingView === "operational"
+      ? "Revenue recognized from services performed during the selected period."
+      : "Cash revenue received during the selected period from paid invoices."
+  }
+/>
               </CardTitle>
             </CardHeader>
             <CardContent className="text-2xl font-semibold">
@@ -679,35 +687,41 @@ if (minDate && maxDate) {
             </CardContent>
           </Card>
 
-          <Card className="shadow-sm">
-            <CardHeader>
-              <CardTitle className="flex items-center">
-                Standard service charge
-                <InfoTip text="Sum of each site's standard service rate multiplied by the number of days it was serviced." />
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="text-2xl font-semibold">
-              ${kpis.totalServiceCharge.toFixed(2)}
-            </CardContent>
-          </Card>
+          {accountingView === "operational" && (
+  <Card className="shadow-sm">
+    <CardHeader>
+      <CardTitle className="flex items-center">
+        Standard service charge
+        <InfoTip text="Sum of each site's standard service rate multiplied by the number of days it was serviced." />
+      </CardTitle>
+    </CardHeader>
 
-          <Card className="shadow-sm">
-            <CardHeader>
-              <CardTitle className="flex items-center">
-                Revenue vs service charge
-                <InfoTip text="Total revenue minus standard service charge. Positive values indicate performance above standard; negative values indicate below-standard billing." />
-              </CardTitle>
-            </CardHeader>
-            <CardContent
-              className={`text-2xl font-semibold ${
-                kpis.revenueVsServiceDiff >= 0
-                  ? "text-emerald-600"
-                  : "text-red-600"
-              }`}
-            >
-              ${kpis.revenueVsServiceDiff.toFixed(2)}
-            </CardContent>
-          </Card>
+    <CardContent className="text-2xl font-semibold">
+      ${kpis.totalServiceCharge.toFixed(2)}
+    </CardContent>
+  </Card>
+)}
+
+          {accountingView === "operational" && (
+  <Card className="shadow-sm">
+    <CardHeader>
+      <CardTitle className="flex items-center">
+        Revenue vs service charge
+        <InfoTip text="Total revenue minus standard service charge. Positive values indicate performance above standard; negative values indicate below-standard billing." />
+      </CardTitle>
+    </CardHeader>
+
+    <CardContent
+      className={`text-2xl font-semibold ${
+        kpis.revenueVsServiceDiff >= 0
+          ? "text-emerald-600"
+          : "text-red-600"
+      }`}
+    >
+      ${kpis.revenueVsServiceDiff.toFixed(2)}
+    </CardContent>
+  </Card>
+)}
 
           <Card className="shadow-sm">
             <CardHeader>
@@ -762,7 +776,9 @@ if (minDate && maxDate) {
           <Card className="shadow-sm">
             <CardHeader>
               <CardTitle className="flex items-center">
-                Net income
+               {accountingView === "operational"
+  ? "Net income"
+  : "Net cash flow"}
                 <InfoTip text="Revenue minus all operating expenses for the selected period." />
               </CardTitle>
             </CardHeader>
@@ -847,24 +863,33 @@ if (minDate && maxDate) {
               <TableHeader>
                 <TableRow>
                   <TableHead>Month</TableHead>
+                  {accountingView === "operational" && (
                   <TableHead className="text-right">
+            
                     <span className="inline-flex items-center justify-end w-full">
                       Service charge
                       <InfoTip text="Standard site rates × serviced days for this month." />
                     </span>
-                  </TableHead>
+                  </TableHead>)}
                   <TableHead className="text-right">
                     <span className="inline-flex items-center justify-end w-full">
                       Revenue
-                      <InfoTip text="Total of all invoices dated in this month." />
+                      <InfoTip
+  text={
+    accountingView === "operational"
+      ? "Revenue recognized from work/service performed during this month."
+      : "Cash revenue received during this month from paid invoices."
+  }
+/>
                     </span>
                   </TableHead>
+                  {accountingView === "operational" && (
                   <TableHead className="text-right">
                     <span className="inline-flex items-center justify-end w-full">
                       Revenue vs service
                       <InfoTip text="Revenue minus standard service charge for the month." />
                     </span>
-                  </TableHead>
+                  </TableHead>)}
                   <TableHead className="text-right">
                     <span className="inline-flex items-center justify-end w-full">
                       Payroll
@@ -908,21 +933,26 @@ if (minDate && maxDate) {
                   monthlyRows.map((r) => (
                     <TableRow key={r.month}>
                       <TableCell className="font-medium">{r.month}</TableCell>
-                      <TableCell className="text-right">
-                        ${r.serviceCharge.toFixed(2)}
-                      </TableCell>
+
+                      {accountingView === "operational" && (
+  <TableCell className="text-right">
+    ${r.serviceCharge.toFixed(2)}
+  </TableCell>
+)}
                       <TableCell className="text-right">
                         ${r.revenue.toFixed(2)}
                       </TableCell>
-                      <TableCell
-                        className={`text-right ${
-                          r.revMinusService >= 0
-                            ? "text-emerald-600"
-                            : "text-red-600"
-                        }`}
-                      >
-                        ${r.revMinusService.toFixed(2)}
-                      </TableCell>
+                      {accountingView === "operational" && (
+  <TableCell
+    className={`text-right ${
+      r.revMinusService >= 0
+        ? "text-emerald-600"
+        : "text-red-600"
+    }`}
+  >
+    ${r.revMinusService.toFixed(2)}
+  </TableCell>
+)}
                       <TableCell className="text-right">
                         ${r.payroll.toFixed(2)}
                       </TableCell>
