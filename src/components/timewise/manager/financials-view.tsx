@@ -290,6 +290,9 @@ export function FinancialsView({
   const [selectedMonth, setSelectedMonth] = useState(
     String(new Date().getMonth())
   );
+const [accountingView, setAccountingView] = useState<
+  "operational" | "cash"
+>("operational");
 
   const { minDate, maxDate } = useMemo(() => {
     if (viewType === "monthly") {
@@ -320,12 +323,24 @@ export function FinancialsView({
     const maxMs = maxDate ? maxDate.getTime() : Infinity;
 
     for (const inv of invs) {
-      const d = toDateMaybe(
-        (inv as any).date ?? (inv as any).issuedAt ?? (inv as any).createdAt
-      );
-      if (!d || !inRange(d, minDate, maxDate)) continue;
+  const d =
+    accountingView === "cash"
+      ? toDateMaybe(
+          (inv as any).paidDate ??
+            (inv as any).paymentDate ??
+            (inv as any).paidAt
+        )
+      : toDateMaybe(
+          (inv as any).serviceEndDate ??
+            (inv as any).serviceDate ??
+            (inv as any).date ??
+            (inv as any).issuedAt ??
+            (inv as any).createdAt
+        );
 
-      const key = monthKey(d);
+  if (!d || !inRange(d, minDate, maxDate)) continue;
+
+  const key = monthKey(d);
       const row =
         monthly.get(key) ??
         { revenue: 0, other: 0, payroll: 0, mileage: 0 };
@@ -345,7 +360,7 @@ export function FinancialsView({
     }
 
     // Payroll from saved payroll periods gross totals
-    
+
 const payrollMonths = new Set<MonthKey>();
 
 for (const p of pays) {
@@ -547,6 +562,7 @@ if (minDate && maxDate) {
     minDate,
     maxDate,
     mileageRate,
+    accountingView,
   ]);
 
   const payrollProgress = useMemo(() => {
@@ -563,7 +579,10 @@ if (minDate && maxDate) {
       <div className="space-y-6">
         <Card>
           <CardHeader>
-            <CardTitle>Financial summary</CardTitle>
+            <CardTitle>
+  Financial summary —{" "}
+  {accountingView === "operational" ? "Operational P&L" : "Cash Flow"}
+</CardTitle>
             <CardDescription>
               Professional view of revenue, standard service charges, and
               operating costs for the selected reporting period.
@@ -575,7 +594,7 @@ if (minDate && maxDate) {
           <CardHeader>
             <CardTitle>Reporting period</CardTitle>
           </CardHeader>
-          <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
+          <CardContent className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
             <div className="space-y-2">
               <Label>View type</Label>
               <Select
@@ -632,7 +651,21 @@ if (minDate && maxDate) {
             )}
           </CardContent>
         </Card>
-
+<div className="space-y-2">
+  <Label>Accounting view</Label>
+  <Select
+    value={accountingView}
+    onValueChange={(v: "operational" | "cash") => setAccountingView(v)}
+  >
+    <SelectTrigger>
+      <SelectValue />
+    </SelectTrigger>
+    <SelectContent>
+      <SelectItem value="operational">Operational P&L</SelectItem>
+      <SelectItem value="cash">Cash Flow</SelectItem>
+    </SelectContent>
+  </Select>
+</div>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6 gap-4">
           <Card className="shadow-sm">
             <CardHeader>
