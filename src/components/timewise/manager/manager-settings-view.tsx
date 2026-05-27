@@ -446,7 +446,105 @@ export function ManagerSettingsView(props: ManagerSettingsViewProps) {
           </div>
         </CardContent>
       </Card>
+<Card>
+  <CardHeader>
+    <CardTitle>Route Optimization</CardTitle>
 
+    <CardDescription>
+      Configure route tools for employees working multiple sites in one day.
+    </CardDescription>
+  </CardHeader>
+
+  <CardContent className="space-y-4">
+    <div className="flex items-center justify-between gap-4">
+      <div>
+        <p className="text-sm font-semibold">
+          Enable route optimization
+        </p>
+
+        <p className="text-xs text-muted-foreground">
+          Suggest the best order for employees visiting multiple sites.
+        </p>
+      </div>
+
+      <Switch
+        checked={!!settings.enableRouteOptimization}
+        onCheckedChange={(checked) =>
+          setSettings((s) => ({
+            ...s,
+            enableRouteOptimization: checked,
+          }))
+        }
+      />
+    </div>
+
+    <div className="flex items-center justify-between gap-4 border-t pt-3">
+      <div>
+        <p className="text-sm font-semibold">
+          Show travel duration estimates
+        </p>
+
+        <p className="text-xs text-muted-foreground">
+          Estimate drive time between assigned sites.
+        </p>
+      </div>
+
+      <Switch
+        checked={settings.enableTravelDurations !== false}
+        onCheckedChange={(checked) =>
+          setSettings((s) => ({
+            ...s,
+            enableTravelDurations: checked,
+          }))
+        }
+      />
+    </div>
+
+    <div className="flex items-center justify-between gap-4 border-t pt-3">
+      <div>
+        <p className="text-sm font-semibold">
+          Enable navigation links
+        </p>
+
+        <p className="text-xs text-muted-foreground">
+          Allow employees to open Google Maps navigation for sites.
+        </p>
+      </div>
+
+      <Switch
+        checked={settings.enableNavigationLinks !== false}
+        onCheckedChange={(checked) =>
+          setSettings((s) => ({
+            ...s,
+            enableNavigationLinks: checked,
+          }))
+        }
+      />
+    </div>
+
+    <div className="flex items-center justify-between gap-4 border-t pt-3">
+      <div>
+        <p className="text-sm font-semibold">
+          Show map display
+        </p>
+
+        <p className="text-xs text-muted-foreground">
+          Display route locations visually on a map.
+        </p>
+      </div>
+
+      <Switch
+        checked={!!settings.enableMapDisplay}
+        onCheckedChange={(checked) =>
+          setSettings((s) => ({
+            ...s,
+            enableMapDisplay: checked,
+          }))
+        }
+      />
+    </div>
+  </CardContent>
+</Card>
       <Card>
         <CardHeader>
           <CardTitle>Backup & maintenance</CardTitle>

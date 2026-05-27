@@ -38,6 +38,7 @@ import {
   LogIn,
   LogOut,
   ExternalLink,
+  Navigation,
   Power,
   User,
   ChevronLeft,
@@ -77,6 +78,8 @@ import { useToast } from "@/hooks/use-toast";
 import { EmployeeProfileDialog } from "./employee-profile";
 import { EmployeePayrollView } from "./employee-payroll-view";
 import { cn } from "@/lib/utils";
+import { getGoogleMapsUrl } from "@/lib/navigation";
+import { haversineMiles, estimateDriveMinutes } from "@/lib/routing";
 import {
   Dialog,
   DialogContent,
@@ -944,6 +947,29 @@ setEmployeeReplyFile(null);
 const employeeUnreadMessages = employeeMessages.filter(
   (m) => m.sender === "manager" && !m.readByEmployee
 ).length;
+
+const getTravelEstimateText = useCallback(
+  (site?: Site | null) => {
+    if (!settings.enableTravelDurations) return null;
+
+    if (!coord || !site?.lat || !site?.lng) {
+      return null;
+    }
+
+    const miles = haversineMiles(
+      coord.lat,
+      coord.lng,
+      site.lat,
+      site.lng
+    );
+
+    const minutes = estimateDriveMinutes(miles);
+
+    return `~${minutes} min drive • ${miles.toFixed(1)} mi`;
+  },
+  [coord, settings.enableTravelDurations]
+);
+
  return (
   <>
     <Card className="mb-6">
@@ -1304,6 +1330,13 @@ const clockInDisabled = status === "complete" || employeeCompletedThisSite;
           <p className="font-semibold" style={{ color: scheduleSite?.color }}>
             {schedule.siteName}
           </p>
+
+          {getTravelEstimateText(scheduleSite) && (
+  <p className="text-xs text-muted-foreground">
+    {getTravelEstimateText(scheduleSite)}
+  </p>
+)}
+
         </div>
 
         {getStatusIndicator(status, hoursSpent)}
@@ -1350,6 +1383,23 @@ const clockInDisabled = status === "complete" || employeeCompletedThisSite;
   <MessageSquare className="mr-2 h-4 w-4" />
   Note to Manager
 </Button>
+
+{settings.enableNavigationLinks !== false && scheduleSite && (
+  <Button
+    size="sm"
+    variant="outline"
+    asChild
+  >
+    <a
+      href={getGoogleMapsUrl(scheduleSite)}
+      target="_blank"
+      rel="noopener noreferrer"
+    >
+      <Navigation className="mr-2 h-4 w-4" />
+      Navigate
+    </a>
+  </Button>
+)}
       </div>
     </li>
   );

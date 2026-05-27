@@ -189,6 +189,10 @@ export type Settings = {
   engine: "local" | "cloud";
   managerPIN: string;
   requireGPS: boolean;
+  enableRouteOptimization?: boolean;
+enableTravelDurations?: boolean;
+enableNavigationLinks?: boolean;
+enableMapDisplay?: boolean;
   sites: Site[];
   firebaseConfig?: FirebaseOptions;
   companyId?: string;
@@ -198,7 +202,7 @@ export type Settings = {
   taxRate?: number;
   requireGeofence: boolean;
   requireClockOutGeofence?: boolean;
-  geofenceRadius: number; // in feet now
+  geofenceRadius: number; //  stored internally in meters
   defaultHourlyWage?: number;
   lastBackupAt?: string;
   readOnlyMode?: boolean;
