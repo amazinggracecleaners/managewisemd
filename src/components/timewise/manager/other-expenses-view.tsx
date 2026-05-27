@@ -61,6 +61,8 @@ export function OtherExpensesView({
     const [editingExpense, setEditingExpense] = useState<OtherExpense | null>(null);
 
     const [date, setDate] = useState('');
+const [expenseDate, setExpenseDate] = useState('');
+const [paidDate, setPaidDate] = useState('');
     const [description, setDescription] = useState('');
     const [vendor, setVendor] = useState('');
     const [amount, setAmount] = useState('');
@@ -75,7 +77,9 @@ export function OtherExpensesView({
     const [selectedYear, setSelectedYear] = useState(String(currentYear));
     const [selectedMonth, setSelectedMonth] = useState(String(new Date().getMonth()));
     const [groupBy, setGroupBy] = useState<'description' | 'vendor' | 'site'>('description');
-
+const [accountingView, setAccountingView] = useState<
+  "operational" | "cash"
+>("operational");
 
      const { fromDate, toDate: toDateObj } = useMemo(() => {
         if (viewType === 'monthly') {
@@ -103,7 +107,16 @@ export function OtherExpensesView({
 
         return otherExpenses.filter(exp => {
             if (!exp.date || !isValid(parseISO(exp.date))) return false;
-             const expDate = parseISO(exp.date);
+            const effectiveDate =
+  accountingView === "cash"
+    ? exp.paidDate || exp.date
+    : exp.expenseDate || exp.date;
+
+if (!effectiveDate || !isValid(parseISO(effectiveDate))) {
+  return false;
+}
+
+const expDate = parseISO(effectiveDate);
              if (!fromTime && !toTime) return true;
              if (fromTime && expDate.getTime() < fromTime) return false;
              if (toTime && expDate.getTime() > toTime) return false;
@@ -116,6 +129,8 @@ export function OtherExpensesView({
         setEditingExpense(expense);
         if (expense) {
             setDate(expense.date);
+            setExpenseDate(expense.expenseDate || expense.date || '');
+setPaidDate(expense.paidDate || '');
             setDescription(expense.description || '');
             setVendor(expense.vendor || '');
             setAmount(String(expense.amount));
@@ -123,6 +138,8 @@ export function OtherExpensesView({
             setSiteId(expense.siteId);
         } else {
             setDate(format(new Date(), 'yyyy-MM-dd'));
+            setExpenseDate(format(new Date(), 'yyyy-MM-dd'));
+setPaidDate('');
             setDescription('');
             setVendor('');
             setAmount('');
@@ -142,7 +159,13 @@ export function OtherExpensesView({
         }
 
         setIsSaving(true);
-        const expenseData: Partial<OtherExpense> = { date, description, amount: numAmount };
+        const expenseData: Partial<OtherExpense> = {
+  date,
+  expenseDate,
+  paidDate: paidDate || null,
+  description,
+  amount: numAmount,
+};
 
         if(vendor.trim()) {
             expenseData.vendor = vendor.trim();
@@ -294,6 +317,30 @@ export function OtherExpensesView({
                             </Select>
                         </div>
                     )}
+                    <div className="space-y-2">
+  <Label>Accounting View</Label>
+
+  <Select
+    value={accountingView}
+    onValueChange={(v: "operational" | "cash") =>
+      setAccountingView(v)
+    }
+  >
+    <SelectTrigger>
+      <SelectValue />
+    </SelectTrigger>
+
+    <SelectContent>
+      <SelectItem value="operational">
+        Operational P&L
+      </SelectItem>
+
+      <SelectItem value="cash">
+        Cash Flow
+      </SelectItem>
+    </SelectContent>
+  </Select>
+</div>
                 </CardContent>
             </Card>
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -375,9 +422,34 @@ export function OtherExpensesView({
                                         </DialogHeader>
                                         <div className="space-y-4 py-4">
                                             <div className="space-y-2">
-                                                <Label htmlFor="date">Date</Label>
+                                                <Label htmlFor="date">Legacy Date</Label>
                                                 <Input id="date" type="date" value={date} onChange={(e) => setDate(e.target.value)} required />
                                             </div>
+                                            <div className="space-y-2">
+  <Label htmlFor="expenseDate">
+    Expense Date
+  </Label>
+
+  <Input
+    id="expenseDate"
+    type="date"
+    value={expenseDate}
+    onChange={(e) => setExpenseDate(e.target.value)}
+  />
+</div>
+
+<div className="space-y-2">
+  <Label htmlFor="paidDate">
+    Paid Date
+  </Label>
+
+  <Input
+    id="paidDate"
+    type="date"
+    value={paidDate}
+    onChange={(e) => setPaidDate(e.target.value)}
+  />
+</div>
                                             <div className="space-y-2">
                                                 <Label>Site (optional)</Label>
                                                 <Select value={siteId ?? "__none__"} onValueChange={(v) => setSiteId(v === "__none__" ? undefined : v)}>
@@ -448,7 +520,11 @@ export function OtherExpensesView({
                                             const siteName = sites.find(s => s.id === expense.siteId)?.name ?? "No Site";
                                             return (
                                               <TableRow key={expense.id}>
-                                                <TableCell>{expense.date}</TableCell>
+                                                <TableCell>
+  {accountingView === "cash"
+    ? expense.paidDate || expense.date
+    : expense.expenseDate || expense.date}
+</TableCell>
                                                 <TableCell>{siteName}</TableCell>
                                                 <TableCell>{expense.vendor || '—'}</TableCell>
                                                 <TableCell>{expense.description || '—'}</TableCell>
