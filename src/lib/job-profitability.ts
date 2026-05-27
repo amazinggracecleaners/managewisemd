@@ -89,9 +89,22 @@ function resolveRevenueForSiteDay(siteName: string, isoDate: string, opts: {
   settings: Settings
 }) {
   // 1) If there is an invoice for this site/date, prefer it
-  const inv = opts.invoices.find(i =>
-    (i.siteName) === siteName && (i.date ?? "").slice(0,10) === isoDate
-  );
+  const inv = opts.invoices.find((i) => {
+  if ((i.siteName ?? "") !== siteName) return false;
+
+  const start =
+    (i as any).serviceStartDate ??
+    (i as any).date;
+
+  const end =
+    (i as any).serviceEndDate ??
+    (i as any).date;
+
+  if (!start || !end) return false;
+
+  return isoDate >= start.slice(0, 10) &&
+         isoDate <= end.slice(0, 10);
+});
   if (inv?.total != null) return Number(inv.total) || 0;
 
   // 2) If schedule has an explicit daily revenue/rate for that site/date

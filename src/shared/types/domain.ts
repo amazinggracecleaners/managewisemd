@@ -97,6 +97,8 @@ export type MileageLog = {
 export type OtherExpense = {
   id: string;
   date: string; // yyyy-MM-dd
+   expenseDate?: string | null;
+paidDate?: string | null;
   vendor?: string;
   description: string;
   amount: number;

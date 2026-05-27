@@ -349,7 +349,19 @@ const [accountingView, setAccountingView] = useState<
     }
 
     for (const exp of exps) {
-      const d = toDateMaybe((exp as any).date ?? (exp as any).createdAt);
+      const d =
+  accountingView === "cash"
+    ? toDateMaybe(
+        (exp as any).paidDate ??
+          (exp as any).paymentDate ??
+          (exp as any).date ??
+          (exp as any).createdAt
+      )
+    : toDateMaybe(
+        (exp as any).expenseDate ??
+          (exp as any).date ??
+          (exp as any).createdAt
+      );
       if (!d || !inRange(d, minDate, maxDate)) continue;
       const key = monthKey(d);
       const row =
