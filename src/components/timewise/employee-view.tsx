@@ -1321,10 +1321,18 @@ const getTravelEstimateText = useCallback(
   </Select>
 
 </div>
+
+{settings.enableRouteOptimization &&
+  routedDailySchedules.length > 1 && (
+    <div className="mb-3 rounded-md border border-blue-200 bg-blue-50 p-3 text-sm text-blue-900">
+      Suggested route order is enabled for today.
+      Employees may still follow manager instructions if needed.
+    </div>
+)}
                       <ScrollArea className="h-[60vh]">
   {filteredDailySchedules.length > 0 ? (
     <ul className="space-y-4">
-      {routedDailySchedules.map((schedule) => {
+      {routedDailySchedules.map((schedule, index) => {
   const scheduleSite = settings.sites.find((s) => s.name === schedule.siteName);
 
  const clockedInAtThisSite = isSameDay(currentDate, startOfDay(new Date()))
@@ -1355,9 +1363,23 @@ const clockInDisabled = status === "complete" || employeeCompletedThisSite;
     >
       <div className="flex justify-between items-start gap-3">
         <div>
-          <p className="font-semibold" style={{ color: scheduleSite?.color }}>
-            {schedule.siteName}
-          </p>
+                    
+          <div className="flex items-center gap-2 flex-wrap">
+  {settings.enableRouteOptimization &&
+    routedDailySchedules.length > 1 && (
+      <Badge variant="secondary">
+        Stop {index + 1}
+      </Badge>
+    )}
+
+  <p
+    className="font-semibold"
+    style={{ color: scheduleSite?.color }}
+  >
+    {schedule.siteName}
+  </p>
+</div>
+  
 
           {getTravelEstimateText(scheduleSite) && (
   <p className="text-xs text-muted-foreground">
@@ -1464,8 +1486,8 @@ const clockInDisabled = status === "complete" || employeeCompletedThisSite;
                                         }}
                                       >
                                         <p className="font-semibold" style={{ color: scheduleSite?.color }}>
-                                          {schedule.siteName}
-                                        </p>
+            {schedule.siteName}
+          </p>
                                         <p className="text-muted-foreground">{schedule.tasks}</p>
                                         {asNoteText(schedule.note) && (
                                           <p className="text-xs italic text-amber-700 truncate">
