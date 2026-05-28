@@ -82,7 +82,7 @@ import { getGoogleMapsUrl } from "@/lib/navigation";
 import {
   haversineMiles,
   estimateDriveMinutes,
-  optimizeRouteByNearest,
+  optimizeRouteFromStart,
 } from "@/lib/routing";
 import {
   Dialog,
@@ -535,11 +535,14 @@ const routedDailySchedules = useMemo(() => {
     };
   });
 
-  return optimizeRouteByNearest(scheduleWithSites).map((x) => x.schedule);
+  return optimizeRouteFromStart(scheduleWithSites, coord).map(
+  (x) => x.schedule
+);
 }, [
   filteredDailySchedules,
   settings.enableRouteOptimization,
   settings.sites,
+  coord,
 ]);
 
   // Off-schedule active shifts (for today only)
@@ -700,6 +703,7 @@ recordEntry(
   },
   [
     settings.sites,
+
     isClockedIn,
     employee.id,
     currentDate,

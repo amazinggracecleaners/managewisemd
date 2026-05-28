@@ -61,3 +61,53 @@ export function optimizeRouteByNearest<T extends {
 
   return [...ordered, ...noCoords];
 }
+
+export function optimizeRouteFromStart<T extends {
+  lat?: number;
+  lng?: number;
+}>(
+  stops: T[],
+  start?: { lat: number; lng: number } | null
+) {
+  if (!start) {
+    return optimizeRouteByNearest(stops);
+  }
+
+  const remaining = stops.filter((s) => s.lat != null && s.lng != null);
+  const noCoords = stops.filter((s) => s.lat == null || s.lng == null);
+
+  if (remaining.length <= 1) return stops;
+
+  const ordered: T[] = [];
+
+  let currentLat = start.lat;
+  let currentLng = start.lng;
+
+  while (remaining.length > 0) {
+    let nearestIndex = 0;
+    let nearestDistance = Infinity;
+
+    remaining.forEach((stop, index) => {
+      const distance = haversineMiles(
+        currentLat,
+        currentLng,
+        stop.lat!,
+        stop.lng!
+      );
+
+      if (distance < nearestDistance) {
+        nearestDistance = distance;
+        nearestIndex = index;
+      }
+    });
+
+    const next = remaining.splice(nearestIndex, 1)[0];
+
+    ordered.push(next);
+
+    currentLat = next.lat!;
+    currentLng = next.lng!;
+  }
+
+  return [...ordered, ...noCoords];
+}
