@@ -79,7 +79,11 @@ import { EmployeeProfileDialog } from "./employee-profile";
 import { EmployeePayrollView } from "./employee-payroll-view";
 import { cn } from "@/lib/utils";
 import { getGoogleMapsUrl } from "@/lib/navigation";
-import { haversineMiles, estimateDriveMinutes } from "@/lib/routing";
+import {
+  haversineMiles,
+  estimateDriveMinutes,
+  optimizeRouteByNearest,
+} from "@/lib/routing";
 import {
   Dialog,
   DialogContent,
@@ -514,6 +518,30 @@ const filteredDailySchedules = useMemo(() => {
     return matchesSearch && matchesStatus;
   });
 }, [dailySchedules, dailySearch, statusFilter, currentSiteStatuses]);
+
+const routedDailySchedules = useMemo(() => {
+  if (!settings.enableRouteOptimization) {
+    return filteredDailySchedules;
+  }
+
+  const scheduleWithSites = filteredDailySchedules.map((schedule) => {
+    const site = settings.sites.find((s) => s.name === schedule.siteName);
+
+    return {
+      schedule,
+      site,
+      lat: site?.lat,
+      lng: site?.lng,
+    };
+  });
+
+  return optimizeRouteByNearest(scheduleWithSites).map((x) => x.schedule);
+}, [
+  filteredDailySchedules,
+  settings.enableRouteOptimization,
+  settings.sites,
+]);
+
   // Off-schedule active shifts (for today only)
   const offScheduleActiveShifts = useMemo(() => {
     if (!isSameDay(currentDate, new Date())) return [];
@@ -1296,7 +1324,7 @@ const getTravelEstimateText = useCallback(
                       <ScrollArea className="h-[60vh]">
   {filteredDailySchedules.length > 0 ? (
     <ul className="space-y-4">
-      {filteredDailySchedules.map((schedule) => {
+      {routedDailySchedules.map((schedule) => {
   const scheduleSite = settings.sites.find((s) => s.name === schedule.siteName);
 
  const clockedInAtThisSite = isSameDay(currentDate, startOfDay(new Date()))

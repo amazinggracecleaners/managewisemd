@@ -22,3 +22,42 @@ export function estimateDriveMinutes(miles: number, avgMph = 35) {
   if (!Number.isFinite(miles) || miles <= 0) return 0;
   return Math.max(1, Math.round((miles / avgMph) * 60));
 }
+
+export function optimizeRouteByNearest<T extends {
+  lat?: number;
+  lng?: number;
+}>(stops: T[]) {
+  const remaining = stops.filter((s) => s.lat != null && s.lng != null);
+  const noCoords = stops.filter((s) => s.lat == null || s.lng == null);
+
+  if (remaining.length <= 1) return stops;
+
+  const ordered: T[] = [];
+  let current = remaining.shift()!;
+
+  ordered.push(current);
+
+  while (remaining.length > 0) {
+    let nearestIndex = 0;
+    let nearestDistance = Infinity;
+
+    remaining.forEach((stop, index) => {
+      const distance = haversineMiles(
+        current.lat!,
+        current.lng!,
+        stop.lat!,
+        stop.lng!
+      );
+
+      if (distance < nearestDistance) {
+        nearestDistance = distance;
+        nearestIndex = index;
+      }
+    });
+
+    current = remaining.splice(nearestIndex, 1)[0];
+    ordered.push(current);
+  }
+
+  return [...ordered, ...noCoords];
+}
