@@ -117,12 +117,15 @@ interface EmployeeViewProps {
     employeeId?: string,
     isManagerOverride?: boolean,
     context?: {
-      source:
-        | "employee-clock"
-        | "manager-schedule-view"
-        | "manager-manual-entry";
-      initiatedBy?: string;
-    }
+  source:
+    | "employee-clock"
+    | "manager-schedule-view"
+    | "manager-manual-entry";
+  initiatedBy?: string;
+
+  scheduleId?: string | null;
+  scheduleDate?: string | null;
+}
   ) => void;
   requestLocation: () => void;
   coord: { lat: number; lng: number } | null;
@@ -620,6 +623,20 @@ const getActiveShiftForSiteOnDate = useCallback(
   [sessionsForEmployee]
 );
 
+const getActiveShiftForSchedule = useCallback(
+  (scheduleId: string) => {
+    return sessionsForEmployee.find((s) => {
+      if (!s.active || !s.in) return false;
+
+      return (
+        (s.in as any).scheduleId &&
+        (s.in as any).scheduleId === scheduleId
+      );
+    });
+  },
+  [sessionsForEmployee]
+);
+
 const getLiveHoursForOpenShift = useCallback(
   (siteName: string, forDate: Date) => {
     const activeShift = getActiveShiftForSiteOnDate(siteName, forDate);
@@ -639,7 +656,11 @@ const getLiveHoursForOpenShift = useCallback(
   [getActiveShiftForSiteOnDate, liveNow]
 );
  const handleClockInOut = useCallback(
-  (action: "in" | "out", siteName: string) => {
+  (
+    action: "in" | "out",
+    siteName: string,
+    scheduleId?: string
+  ) => {
     const site = settings.sites.find((s) => s.name === siteName);
     if (!site) {
       toast({ variant: "destructive", title: "Site not found." });
@@ -675,9 +696,11 @@ const getLiveHoursForOpenShift = useCallback(
         employee.id,
         isDateOverride,
         {
-          source: "employee-clock",
-          initiatedBy: employee.id,
-        }
+  source: "employee-clock",
+  initiatedBy: employee.id,
+  scheduleId: scheduleId ?? null,
+  scheduleDate: format(currentDate, "yyyy-MM-dd"),
+}
       );
       return;
     }
@@ -696,9 +719,11 @@ recordEntry(
   employee.id,
   isDateOverride,
   {
-    source: "employee-clock",
-    initiatedBy: employee.id,
-  }
+  source: "employee-clock",
+  initiatedBy: employee.id,
+  scheduleId: scheduleId ?? null,
+  scheduleDate: format(currentDate, "yyyy-MM-dd"),
+}
 );
   },
   [
@@ -1339,9 +1364,19 @@ const getTravelEstimateText = useCallback(
       {routedDailySchedules.map((schedule, index) => {
   const scheduleSite = settings.sites.find((s) => s.name === schedule.siteName);
 
- const clockedInAtThisSite = isSameDay(currentDate, startOfDay(new Date()))
-  ? isClockedIn(schedule.siteName, employee.id)
-  : hasOpenShiftForSiteOnDate(schedule.siteName, currentDate);
+ const activeShiftForSchedule =
+  getActiveShiftForSchedule(schedule.id);
+
+const clockedInAtThisSite =
+  !!activeShiftForSchedule ||
+  (
+    isSameDay(currentDate, startOfDay(new Date()))
+      ? isClockedIn(schedule.siteName, employee.id)
+      : hasOpenShiftForSiteOnDate(
+          schedule.siteName,
+          currentDate
+        )
+  );
   const status = currentSiteStatuses.get(schedule.siteName);
   const employeeCompletedThisSite =
   getHoursForSiteDay(schedule.siteName, currentDate) !== "00:00";
@@ -1410,7 +1445,13 @@ const clockInDisabled = status === "complete" || employeeCompletedThisSite;
           <Button
             size="sm"
             variant="destructive"
-            onClick={() => handleClockInOut("out", schedule.siteName)}
+            onClick={() =>
+  handleClockInOut(
+    "out",
+    schedule.siteName,
+    schedule.id
+  )
+}
             disabled={isManagerPreview}
           >
             <LogOut className="mr-2 h-4 w-4" />
@@ -1419,7 +1460,13 @@ const clockInDisabled = status === "complete" || employeeCompletedThisSite;
         ) : (
           <Button
             size="sm"
-            onClick={() => handleClockInOut("in", schedule.siteName)}
+            onClick={() =>
+  handleClockInOut(
+    "in",
+    schedule.siteName,
+    schedule.id
+  )
+}
             disabled={isManagerPreview || clockInDisabled}
           >
             <LogIn className="mr-2 h-4 w-4" />
