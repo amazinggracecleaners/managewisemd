@@ -34,6 +34,7 @@ import { ManagerDashboard } from "./manager-dashboard";
 import { SiteListView } from "./site-list-view";
 import { ManagerSettingsView } from "./manager-settings-view";
 import { ManagerMessagesView } from "@/components/timewise/manager/manager-messages-view";
+import { ServiceReport } from "./service-report";
 import type { JobProfitRow } from "@/lib/job-profitability";
 import {
   collection,
@@ -176,7 +177,9 @@ export function ManagerView(props: ManagerViewProps) {
   const [managerTab, setManagerTab] = useState<
     | "dashboard"
     | "requests"
+    | "messages"
     | "schedule"
+    | "serviceReport"
     | "sites"
     | "invoices"
     | "financials"
@@ -322,6 +325,7 @@ useEffect(() => {
   )}
 </TabsTrigger>
           <TabsTrigger value="schedule">Schedule</TabsTrigger>
+          <TabsTrigger value="serviceReport">Service Report</TabsTrigger>
           <TabsTrigger value="sites">Sites</TabsTrigger>
           <TabsTrigger value="invoices">Invoices</TabsTrigger>
           <TabsTrigger value="financials">Financials</TabsTrigger>
@@ -543,6 +547,15 @@ useEffect(() => {
 updateEntry={props.updateEntry}
           />
         </TabsContent>
+
+        <TabsContent value="serviceReport" className="mt-2">
+  <ServiceReport
+    schedules={props.schedules}
+    entries={props.allEntries}
+    employees={props.employees}
+    sites={props.sites}
+  />
+</TabsContent>
 
         <TabsContent value="sites" className="mt-2">
           <SiteListView
