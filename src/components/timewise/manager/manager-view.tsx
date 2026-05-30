@@ -128,6 +128,8 @@ interface ManagerViewProps {
     action: "in" | "out",
     site: Site,
     forDate: Date,
+     scheduleId?: string,
+  scheduleDate?: string,
     note?: string,
     employeeId?: string,
     isManagerOverride?: boolean,
@@ -254,24 +256,28 @@ useEffect(() => {
   }
 
   const recordEntryAsManager = (
-    action: "in" | "out",
-    site: Site,
-    forDate: Date,
-    note?: string,
-    employeeId?: string
-  ) => {
+  action: "in" | "out",
+  site: Site,
+  forDate: Date,
+  scheduleId?: string,
+  scheduleDate?: string,
+  note?: string,
+  employeeId?: string
+) => {
     return props.recordEntry(
-      action,
-      site,
-      forDate,
-      note,
-      employeeId,
-      true,
-      {
-        source: "manager-schedule-view",
-        initiatedBy: "manager",
-      }
-    );
+  action,
+  site,
+  forDate,
+  scheduleId,
+  scheduleDate,
+  note,
+  employeeId,
+  true,
+  {
+    source: "manager-schedule-view",
+    initiatedBy: "manager",
+  }
+);
   };
 
   const FIELD_LABELS: Partial<Record<keyof Employee, string>> = {

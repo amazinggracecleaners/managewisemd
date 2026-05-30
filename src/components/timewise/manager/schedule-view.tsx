@@ -1,7 +1,7 @@
 // src/components/timewise/manager/schedule-view.tsx
 "use client";
 
-import React, { useMemo, useEffect, useState } from "react";
+import React, { useMemo, useEffect, useState, useCallback } from "react";
 import type {
   Site,
   CleaningSchedule,
@@ -117,6 +117,8 @@ interface ScheduleViewProps {
     action: "in" | "out",
     site: Site,
     forDate: Date,
+    scheduleId?: string,
+    scheduleDate?: string,
     note?: string,
     employeeId?: string,
     isManagerOverride?: boolean,
@@ -674,19 +676,22 @@ const openFixShiftModal = (data: {
     );
   }
 };
-const handleManagerClock = async (
-  action: "in" | "out",
-  site: Site,
-  emp: Employee
-) => {
+const handleManagerClock = useCallback(
+  async (
+    action: "in" | "out",
+    site: Site,
+    employee: Employee,
+    scheduleId?: string,
+    scheduleDate?: string
+  ) => {
   if (action === "in") {
     const alreadyClockedInSite = sites.find((s) =>
-      isClockedIn(s.name, emp.id)
+      isClockedIn(s.name, employee.id)
     );
 
     if (alreadyClockedInSite) {
       alert(
-        `${emp.name} is already clocked in at ${alreadyClockedInSite.name}. Please clock them out first before starting another shift.`
+        `${employee.name} is already clocked in at ${alreadyClockedInSite.name}. Please clock them out first before starting another shift.`
       );
       return;
     }
@@ -694,25 +699,35 @@ const handleManagerClock = async (
 
   if (action === "out") {
     const confirmed = window.confirm(
-      `Confirm clock out for ${emp.name} from ${site.name}?`
+      `Confirm clock out for ${employee.name} from ${site.name}?`
     );
 
     if (!confirmed) return;
   }
 
   await recordEntry(
-    action,
-    site,
-    currentDate,
-    undefined,
-    emp.id,
-    true,
-    {
-      source: "manager-schedule-view",
-      initiatedBy: "manager",
-    }
-  );
-};
+  action,
+  site,
+  currentDate,
+  scheduleId,
+  scheduleDate,
+  undefined,
+  employee.id,
+  true,
+  {
+    source: "manager-schedule-view",
+    initiatedBy: "manager",
+  }
+);
+},
+[
+  currentDate,
+  isClockedIn,
+  recordEntry,
+  sites,
+]
+);
+
 const handleFixShift = async () => {
   if (!fixModal.employeeId || !fixModal.site) return;
 
@@ -1576,7 +1591,15 @@ const dailySiteCount = new Set(
                                         <Button
                                           variant="destructive"
                                           size="sm"
-                                          onClick={() => handleManagerClock("out", site, emp)}
+                                          onClick={() =>
+  handleManagerClock(
+    "out",
+    site,
+    emp,
+    s.id,
+    format(currentDate, "yyyy-MM-dd")
+  )
+}
  
                                         >
                                           <LogOut className="mr-1 h-4 w-4" />
@@ -1586,7 +1609,13 @@ const dailySiteCount = new Set(
                                         <Button
                                           variant="default"
                                           size="sm"
-                                         onClick={() => handleManagerClock("in", site, emp)}
+                                         onClick={() => handleManagerClock(
+  "in",
+  site,
+  emp,
+  s.id,
+  format(currentDate, "yyyy-MM-dd")
+)}
    
                                           disabled={status === "complete" || employeeCompletedThisSite}
                                         >

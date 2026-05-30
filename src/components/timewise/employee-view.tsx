@@ -110,23 +110,24 @@ interface EmployeeViewProps {
   onLogout: () => void;
   settings: Settings;
     recordEntry: (
-    action: "in" | "out",
-    site: Site,
-    entryTime: Date,
-    note?: string,
-    employeeId?: string,
-    isManagerOverride?: boolean,
-    context?: {
-  source:
-    | "employee-clock"
-    | "manager-schedule-view"
-    | "manager-manual-entry";
-  initiatedBy?: string;
+  action: "in" | "out",
+  site: Site,
+  entryTime: Date,
 
-  scheduleId?: string | null;
-  scheduleDate?: string | null;
-}
-  ) => void;
+  scheduleId?: string,
+  scheduleDate?: string,
+
+  note?: string,
+  employeeId?: string,
+  isManagerOverride?: boolean,
+  context?: {
+    source:
+      | "employee-clock"
+      | "manager-schedule-view"
+      | "manager-manual-entry";
+    initiatedBy?: string;
+  }
+) => void;
   requestLocation: () => void;
   coord: { lat: number; lng: number } | null;
   entries: Entry[];
@@ -623,14 +624,14 @@ const getActiveShiftForSiteOnDate = useCallback(
   [sessionsForEmployee]
 );
 
-const getActiveShiftForSchedule = useCallback(
-  (scheduleId: string) => {
+const getActiveShiftForScheduleOccurrence = useCallback(
+  (scheduleId: string, scheduleDate: string) => {
     return sessionsForEmployee.find((s) => {
       if (!s.active || !s.in) return false;
 
       return (
-        (s.in as any).scheduleId &&
-        (s.in as any).scheduleId === scheduleId
+        (s.in as any).scheduleId === scheduleId &&
+        (s.in as any).scheduleDate === scheduleDate
       );
     });
   },
@@ -689,19 +690,19 @@ const getLiveHoursForOpenShift = useCallback(
       }
 
       recordEntry(
-        "in",
-        site,
-        currentDate,
-        undefined,
-        employee.id,
-        isDateOverride,
-        {
-  source: "employee-clock",
-  initiatedBy: employee.id,
-  scheduleId: scheduleId ?? null,
-  scheduleDate: format(currentDate, "yyyy-MM-dd"),
-}
-      );
+  "in",
+  site,
+  currentDate,
+  scheduleId,
+  format(currentDate, "yyyy-MM-dd"),
+  undefined,
+  employee.id,
+  isDateOverride,
+  {
+    source: "employee-clock",
+    initiatedBy: employee.id,
+  }
+);
       return;
     }
 
@@ -715,15 +716,15 @@ recordEntry(
   "out",
   site,
   currentDate,
+  scheduleId,
+  format(currentDate, "yyyy-MM-dd"),
   undefined,
   employee.id,
   isDateOverride,
   {
-  source: "employee-clock",
-  initiatedBy: employee.id,
-  scheduleId: scheduleId ?? null,
-  scheduleDate: format(currentDate, "yyyy-MM-dd"),
-}
+    source: "employee-clock",
+    initiatedBy: employee.id,
+  }
 );
   },
   [
@@ -1364,19 +1365,17 @@ const getTravelEstimateText = useCallback(
       {routedDailySchedules.map((schedule, index) => {
   const scheduleSite = settings.sites.find((s) => s.name === schedule.siteName);
 
- const activeShiftForSchedule =
-  getActiveShiftForSchedule(schedule.id);
+ 
 
-const clockedInAtThisSite =
-  !!activeShiftForSchedule ||
-  (
-    isSameDay(currentDate, startOfDay(new Date()))
-      ? isClockedIn(schedule.siteName, employee.id)
-      : hasOpenShiftForSiteOnDate(
-          schedule.siteName,
-          currentDate
-        )
+const scheduleDateKey = format(currentDate, "yyyy-MM-dd");
+
+const activeShiftForThisSchedule =
+  getActiveShiftForScheduleOccurrence(
+    schedule.id,
+    scheduleDateKey
   );
+
+const clockedInAtThisSite = !!activeShiftForThisSchedule;
   const status = currentSiteStatuses.get(schedule.siteName);
   const employeeCompletedThisSite =
   getHoursForSiteDay(schedule.siteName, currentDate) !== "00:00";

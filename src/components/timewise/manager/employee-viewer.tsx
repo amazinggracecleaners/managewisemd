@@ -115,22 +115,26 @@ export function EmployeeViewer({
   const noOp = () => {};
 
   const recordEntryNoOp = async (
-    action?: "in" | "out",
-    site?: any,
-    forDate?: Date,
-    note?: string,
-    employeeId?: string,
-    isManagerOverride?: boolean,
-    context?: {
-      source?:
-        | "employee-clock"
-        | "manager-schedule-view"
-        | "manager-manual-entry";
-      initiatedBy?: string;
-    }
-  ) => {
-    return;
-  };
+  action?: "in" | "out",
+  site?: any,
+  forDate?: Date,
+
+  scheduleId?: string,
+  scheduleDate?: string,
+
+  note?: string,
+  employeeId?: string,
+  isManagerOverride?: boolean,
+  context?: {
+    source?:
+      | "employee-clock"
+      | "manager-schedule-view"
+      | "manager-manual-entry";
+    initiatedBy?: string;
+  }
+) => {
+  return;
+};
 
   const confirmPayrollNoOp = async (
     periodId?: string,

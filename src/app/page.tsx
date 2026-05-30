@@ -833,6 +833,8 @@ const recordEntry = useCallback(
     action: "in" | "out",
     site: Site,
     forDate: Date,
+    scheduleId?: string,
+    scheduleDate?: string,
     note?: string,
     employeeId?: string,
     isManagerOverride: boolean = false,
@@ -994,12 +996,15 @@ if (!isManagerOverride) {
   const finalOutTs = Math.max(candidateOutTs, openInTs + MIN_SHIFT_MS);
 
   entryData = {
-    employee: targetEmployee.name,
-    employeeId: targetEmployee.id,
-    action: "out",
-    ts: finalOutTs,
-    site: site.name,
-  };
+  employee: targetEmployee.name,
+  employeeId: targetEmployee.id,
+  action: "out",
+  ts: finalOutTs,
+  site: site.name,
+
+  scheduleId,
+  scheduleDate,
+};
 } else {
   // --- CLOCK-IN ---
   const anyShiftActive = isClockedIn(undefined, targetEmployee.id);
@@ -1071,12 +1076,15 @@ if (!isManagerOverride) {
   const ts = buildTsOnDay(forDate, now);
 
   entryData = {
-    employee: targetEmployee.name,
-    employeeId: targetEmployee.id,
-    action: "in",
-    ts,
-    site: site.name,
-  };
+  employee: targetEmployee.name,
+  employeeId: targetEmployee.id,
+  action: "in",
+  ts,
+  site: site.name,
+
+  scheduleId,
+  scheduleDate,
+};
 }
 
     const dataToSave: any = { ...entryData };

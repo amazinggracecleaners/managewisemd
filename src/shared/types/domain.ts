@@ -11,6 +11,8 @@ export type Entry = {
   lat?: number;
   lng?: number;
   note?: string;
+  scheduleId?: string | null;
+scheduleDate?: string | null;
   site?: string;
   // Firestore-specific fields
   createdAt?: Timestamp;
