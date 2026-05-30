@@ -549,12 +549,13 @@ updateEntry={props.updateEntry}
         </TabsContent>
 
         <TabsContent value="serviceReport" className="mt-2">
-  <ServiceReport
-    schedules={props.schedules}
-    entries={props.allEntries}
-    employees={props.employees}
-    sites={props.sites}
-  />
+ <ServiceReport
+  schedules={props.schedules}
+  entries={props.allEntries}
+  employees={props.employees}
+  sites={props.sites}
+  weekStartsOn={props.settings.weekStartsOn as any}
+/>
 </TabsContent>
 
         <TabsContent value="sites" className="mt-2">
