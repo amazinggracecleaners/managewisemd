@@ -140,6 +140,31 @@ function scheduleOccursOnDate(
   }
 }
 
+function isOccurrenceCompleted(
+  occurrence: ScheduleOccurrence,
+  entries: Entry[]
+) {
+  return entries.some((e) => {
+    if (e.action !== "out") return false;
+
+    // New accurate logic
+    if (e.scheduleId && e.scheduleDate) {
+      return (
+        e.scheduleId === occurrence.scheduleId &&
+        e.scheduleDate === occurrence.scheduleDate
+      );
+    }
+
+    // Backward compatibility for old entries
+    const entryDate = format(new Date(e.ts), "yyyy-MM-dd");
+
+    return (
+      e.site === occurrence.siteName &&
+      entryDate === occurrence.scheduleDate
+    );
+  });
+}
+
 export function ServiceReport({
   schedules,
   entries,
@@ -186,12 +211,7 @@ const [selectedSiteName, setSelectedSiteName] = useState<string | null>(null);
       }
     }
 
-    const completedOccurrenceKeys = new Set(
-      entries
-        .filter((e) => e.action === "out" && e.scheduleId && e.scheduleDate)
-        .map((e) => `${e.scheduleId}__${e.scheduleDate}`)
-    );
-
+    
     const siteRows = sites.map((site) => {
       const siteOccurrences = occurrences.filter(
         (o) => o.siteName === site.name
@@ -200,8 +220,8 @@ const [selectedSiteName, setSelectedSiteName] = useState<string | null>(null);
       const scheduled = siteOccurrences.length;
 
       const completed = siteOccurrences.filter((o) =>
-        completedOccurrenceKeys.has(`${o.scheduleId}__${o.scheduleDate}`)
-      ).length;
+  isOccurrenceCompleted(o, entries)
+).length;
 
       const missed = Math.max(0, scheduled - completed);
       const rate = scheduled > 0 ? (completed / scheduled) * 100 : 0;
@@ -223,14 +243,19 @@ const [selectedSiteName, setSelectedSiteName] = useState<string | null>(null);
       const assigned = employeeOccurrences.length;
 
       const completed = employeeOccurrences.filter((o) =>
-        entries.some(
-          (e) =>
-            e.employeeId === employee.id &&
-            e.action === "out" &&
-            e.scheduleId === o.scheduleId &&
-            e.scheduleDate === o.scheduleDate
-        )
-      ).length;
+  entries.some((e) => {
+    if (e.employeeId !== employee.id) return false;
+    if (e.action !== "out") return false;
+
+    if (e.scheduleId && e.scheduleDate) {
+      return e.scheduleId === o.scheduleId && e.scheduleDate === o.scheduleDate;
+    }
+
+    const entryDate = format(new Date(e.ts), "yyyy-MM-dd");
+
+    return e.site === o.siteName && entryDate === o.scheduleDate;
+  })
+).length;
 
       const missed = Math.max(0, assigned - completed);
       const rate = assigned > 0 ? (completed / assigned) * 100 : 0;
@@ -316,12 +341,7 @@ const [selectedSiteName, setSelectedSiteName] = useState<string | null>(null);
       [],
       ["Date", "Site", "Schedule ID", "Status"],
       ...report.occurrences.map((o) => {
-        const completed = entries.some(
-          (e) =>
-            e.action === "out" &&
-            e.scheduleId === o.scheduleId &&
-            e.scheduleDate === o.scheduleDate
-        );
+        const completed = isOccurrenceCompleted(o, entries);
 
         return [
           o.scheduleDate,
@@ -472,12 +492,7 @@ const [selectedSiteName, setSelectedSiteName] = useState<string | null>(null);
 
         <TableBody>
           {selectedSiteOccurrences.map((o) => {
-            const completed = entries.some(
-              (e) =>
-                e.action === "out" &&
-                e.scheduleId === o.scheduleId &&
-                e.scheduleDate === o.scheduleDate
-            );
+            const completed = isOccurrenceCompleted(o, entries);
 
             return (
               <TableRow key={`${o.scheduleId}-${o.scheduleDate}`}>
