@@ -19,6 +19,7 @@ type Row = {
   mileage: number;
   other: number;
   net: number;
+  revenue: number;
 };
 
 function resolveToDirectorySiteId(
@@ -60,6 +61,7 @@ export function aggregateMonthlySiteProfit(params: {
     employees,
     mileageLogs,
     otherExpenses,
+    invoices = [],
     settings,
     monthISO,
   } = params;
@@ -101,6 +103,7 @@ export function aggregateMonthlySiteProfit(params: {
         mileage: 0,
         other: 0,
         net: 0,
+        revenue: 0,
       });
     }
     return rows.get(siteId)!;
@@ -209,6 +212,29 @@ set.add(dayKey);
     siteRow.other += e.amount || 0;
   }
 
+  // Revenue from invoices
+for (const inv of invoices ?? []) {
+  const ts = safeDate(
+    (inv as any).serviceEndDate ??
+      (inv as any).serviceDate ??
+      (inv as any).date ??
+      (inv as any).createdAt
+  );
+
+  if (ts < min || ts > max) continue;
+
+  const { siteId, siteName } = resolveToDirectorySiteId(
+    (inv as any).siteId,
+    inv.siteName,
+    idx
+  );
+
+  if (!siteId || !siteName) continue;
+
+  const siteRow = ensure(siteId, siteName);
+  siteRow.revenue += Number((inv as any).total ?? 0);
+}
+
   // Net & rounding
   for (const r of rows.values()) {
     r.net = round2(r.serviceCharge - r.labor - r.mileage - r.other);
@@ -216,6 +242,7 @@ set.add(dayKey);
     r.labor = round2(r.labor);
     r.mileage = round2(r.mileage);
     r.other = round2(r.other);
+    r.revenue = round2(r.revenue);
   }
 
   const list = [...rows.values()].sort((a, b) =>

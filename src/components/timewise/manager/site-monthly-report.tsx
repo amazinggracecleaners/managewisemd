@@ -46,6 +46,7 @@ export function SiteMonthlyReport({
   settings,
   deleteSiteAction,
 }: Props) {
+  const [selectedRow, setSelectedRow] = React.useState<any | null>(null);
   const monthISO = useMemo(() => {
     // derive "YYYY-MM" from fromDate if present
     if (!fromDate) return undefined;
@@ -104,7 +105,11 @@ export function SiteMonthlyReport({
           </thead>
           <tbody>
             {rows.map((r) => (
-              <tr key={r.siteId} className="border-b last:border-0">
+              <tr
+  key={r.siteId}
+  className="border-b last:border-0 cursor-pointer hover:bg-muted/50"
+  onClick={() => setSelectedRow(r)}
+>
                 <td className="py-2 pr-3">{r.siteName}</td>
                 <td className="py-2 pr-3 text-right">{r.serviceCharge.toFixed(2)}</td>
                 <td className="py-2 pr-3 text-right">{r.labor.toFixed(2)}</td>
@@ -116,7 +121,10 @@ export function SiteMonthlyReport({
                     <Button
                         variant="ghost"
                         size="icon"
-                        onClick={() => deleteSiteAction(r.siteId)}
+                          onClick={(e) => {
+      e.stopPropagation();
+      deleteSiteAction(r.siteId);
+    }}
                         title={`Delete ${r.siteName}`}
                     >
                         <Trash2 className="h-4 w-4 text-destructive" />
@@ -138,6 +146,67 @@ export function SiteMonthlyReport({
             </tr>
           </tfoot>
         </table>
+
+        {selectedRow && (
+  <div className="mt-4 rounded-xl border p-4 bg-muted/20">
+    <div className="flex justify-between items-start mb-3">
+      <h4 className="font-semibold text-base">
+        {selectedRow.siteName} — Detail
+      </h4>
+
+      <Button
+        variant="outline"
+        size="sm"
+        onClick={() => setSelectedRow(null)}
+      >
+        Close
+      </Button>
+    </div>
+
+    {(() => {
+      const revenue = Number(selectedRow.revenue ?? 0);
+      const serviceCharge = Number(selectedRow.serviceCharge ?? 0);
+      const labor = Number(selectedRow.labor ?? 0);
+      const mileage = Number(selectedRow.mileage ?? 0);
+      const other = Number(selectedRow.other ?? 0);
+
+      const revenueVsServiceCharge = revenue - serviceCharge;
+      const revenueProfit = revenue - labor - mileage - other;
+      const revenueMargin =
+        revenue > 0 ? (revenueProfit / revenue) * 100 : 0;
+
+      return (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+          <div>Service Charge: ${serviceCharge.toFixed(2)}</div>
+          <div>Revenue: ${revenue.toFixed(2)}</div>
+
+          <div
+            className={
+              revenueVsServiceCharge >= 0
+                ? "text-emerald-600"
+                : "text-red-600"
+            }
+          >
+            Revenue vs Service Charge: $
+            {revenueVsServiceCharge.toFixed(2)}
+          </div>
+
+          <div>Labor: ${labor.toFixed(2)}</div>
+          <div>Mileage: ${mileage.toFixed(2)}</div>
+          <div>Other Expenses: ${other.toFixed(2)}</div>
+
+          <div className="font-semibold">
+            Revenue-Based Profit: ${revenueProfit.toFixed(2)}
+          </div>
+
+          <div className="font-semibold">
+            Revenue-Based Margin: {revenueMargin.toFixed(2)}%
+          </div>
+        </div>
+      );
+    })()}
+  </div>
+)}
       </div>
     </div>
   );
