@@ -528,7 +528,17 @@ const routedDailySchedules = useMemo(() => {
     return filteredDailySchedules;
   }
 
-  const scheduleWithSites = filteredDailySchedules.map((schedule) => {
+  const incompleteSchedules = filteredDailySchedules.filter((schedule) => {
+    const status = currentSiteStatuses.get(schedule.siteName);
+    return status !== "complete";
+  });
+
+  const completedSchedules = filteredDailySchedules.filter((schedule) => {
+    const status = currentSiteStatuses.get(schedule.siteName);
+    return status === "complete";
+  });
+
+  const scheduleWithSites = incompleteSchedules.map((schedule) => {
     const site = settings.sites.find((s) => s.name === schedule.siteName);
 
     return {
@@ -539,11 +549,15 @@ const routedDailySchedules = useMemo(() => {
     };
   });
 
-  return optimizeRouteFromStart(scheduleWithSites, coord).map(
-  (x) => x.schedule
-);
+  const optimizedIncomplete = optimizeRouteFromStart(
+    scheduleWithSites,
+    coord
+  ).map((x) => x.schedule);
+
+  return [...optimizedIncomplete, ...completedSchedules];
 }, [
   filteredDailySchedules,
+  currentSiteStatuses,
   settings.enableRouteOptimization,
   settings.sites,
   coord,
