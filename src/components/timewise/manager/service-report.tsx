@@ -156,6 +156,7 @@ export function ServiceReport({
   const [toDate, setToDate] = useState(
     format(endOfMonth(today), "yyyy-MM-dd")
   );
+const [selectedSiteName, setSelectedSiteName] = useState<string | null>(null);
 
   const report = useMemo(() => {
     const from = parseISO(fromDate);
@@ -165,6 +166,8 @@ export function ServiceReport({
       start: startOfDay(from),
       end: startOfDay(to),
     });
+
+    
 
     const occurrences: ScheduleOccurrence[] = [];
 
@@ -257,6 +260,14 @@ export function ServiceReport({
       completionRate,
     };
   }, [fromDate, toDate, schedules, entries, employees, sites, weekStartsOn]);
+
+  const selectedSiteOccurrences = selectedSiteName
+  ? report.occurrences
+      .filter((o) => o.siteName === selectedSiteName)
+      .sort((a, b) =>
+        a.scheduleDate.localeCompare(b.scheduleDate)
+      )
+  : [];
 
   const setThisMonth = () => {
     setFromDate(format(startOfMonth(new Date()), "yyyy-MM-dd"));
@@ -427,7 +438,11 @@ export function ServiceReport({
 
             <TableBody>
               {report.siteRows.map((row) => (
-                <TableRow key={row.siteName}>
+                <TableRow
+  key={row.siteName}
+  className="cursor-pointer"
+  onClick={() => setSelectedSiteName(row.siteName)}
+>
                   <TableCell>{row.siteName}</TableCell>
                   <TableCell>{row.scheduled}</TableCell>
                   <TableCell>{row.completed}</TableCell>
@@ -439,6 +454,45 @@ export function ServiceReport({
           </Table>
         </CardContent>
       </Card>
+
+ {selectedSiteName && (
+  <Card>
+    <CardHeader>
+      <CardTitle>{selectedSiteName}</CardTitle>
+    </CardHeader>
+
+    <CardContent>
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead>Date</TableHead>
+            <TableHead>Status</TableHead>
+          </TableRow>
+        </TableHeader>
+
+        <TableBody>
+          {selectedSiteOccurrences.map((o) => {
+            const completed = entries.some(
+              (e) =>
+                e.action === "out" &&
+                e.scheduleId === o.scheduleId &&
+                e.scheduleDate === o.scheduleDate
+            );
+
+            return (
+              <TableRow key={`${o.scheduleId}-${o.scheduleDate}`}>
+                <TableCell>{o.scheduleDate}</TableCell>
+                <TableCell>
+                  {completed ? "Complete" : "Missed"}
+                </TableCell>
+              </TableRow>
+            );
+          })}
+        </TableBody>
+      </Table>
+    </CardContent>
+  </Card>
+)}
 
       <Card>
         <CardHeader>
