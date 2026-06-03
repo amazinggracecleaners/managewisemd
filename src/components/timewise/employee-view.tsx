@@ -1391,15 +1391,23 @@ const activeShiftForThisSchedule =
 
 const clockedInAtThisSite = !!activeShiftForThisSchedule;
   const status = currentSiteStatuses.get(schedule.siteName);
-  const employeeCompletedThisSite =
-  getHoursForSiteDay(schedule.siteName, currentDate) !== "00:00";
+  const employeeCompletedThisSchedule = entries.some((e) => {
+  if (e.employeeId !== employee.id) return false;
+  if (e.action !== "out") return false;
 
-const clockInDisabled = status === "complete" || employeeCompletedThisSite;
+  return (
+    e.scheduleId === schedule.id &&
+    e.scheduleDate === scheduleDateKey
+  );
+});
+
+const clockInDisabled =
+  status === "complete" && employeeCompletedThisSchedule;
 
   const hoursSpent =
-    status === "complete"
-      ? getHoursForSiteDay(schedule.siteName, currentDate)
-      : undefined;
+  employeeCompletedThisSchedule
+    ? getHoursForSiteDay(schedule.siteName, currentDate)
+    : undefined;
 
   return (
     <li
