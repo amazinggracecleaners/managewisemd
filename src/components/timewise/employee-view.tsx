@@ -1401,8 +1401,7 @@ const clockedInAtThisSite = !!activeShiftForThisSchedule;
   );
 });
 
-const clockInDisabled =
-  status === "complete" && employeeCompletedThisSchedule;
+const clockInDisabled = employeeCompletedThisSchedule;
 
   const hoursSpent =
   employeeCompletedThisSchedule

@@ -860,6 +860,48 @@ const dailySiteCount = new Set(
     return true;
   });
 }, [schedules]);
+
+const getScheduleHours = useCallback(
+  (
+    siteName: string,
+    employeeId: string,
+    scheduleId: string,
+    scheduleDate: string
+  ) => {
+    const employeeEntries = entries
+      .filter(
+        (e) =>
+          e.employeeId === employeeId &&
+          e.site === siteName &&
+          e.scheduleId === scheduleId &&
+          e.scheduleDate === scheduleDate
+      )
+      .slice()
+      .sort((a, b) => a.ts - b.ts);
+
+    let totalMinutes = 0;
+    let activeIn: Entry | null = null;
+
+    for (const entry of employeeEntries) {
+      if (entry.action === "in") {
+        activeIn = entry;
+      }
+
+      if (entry.action === "out" && activeIn) {
+        totalMinutes += Math.max(
+          0,
+          Math.round((entry.ts - activeIn.ts) / 60000)
+        );
+
+        activeIn = null;
+      }
+    }
+
+    return formatHHMM(totalMinutes);
+  },
+  [entries]
+);
+
   const renderAssignmentBadges = (s: CleaningSchedule) => {
   if (s.assignedTeamId) {
     const team = teamsById.get(s.assignedTeamId);
@@ -869,6 +911,7 @@ const dailySiteCount = new Set(
       </Badge>
     );
   }
+  
 
   return (
     <div className="flex flex-wrap gap-1">
@@ -1540,16 +1583,20 @@ const dailySiteCount = new Set(
                                 const emp = employeeMap.get(empName);
                                 if (!emp || !site) return null;
 
-                                const siteDuration = durationsForCurrentDate.get(
-                                  s.siteName
-                                );
-                                const empMinutes =
-                                  siteDuration?.byEmployee?.[empName] ?? 0;
-                                const formattedEmpTime =
-                                  empMinutes > 0 ? formatHHMM(empMinutes) : null;
+                                const scheduleDateKey = format(currentDate, "yyyy-MM-dd");
+
+const formattedEmpTime = getScheduleHours(
+  s.siteName,
+  emp.id,
+  s.id,
+  scheduleDateKey
+);
+
+const displayTime =
+  formattedEmpTime !== "00:00" ? formattedEmpTime : null;
 
                                 const clocked = isClockedIn(s.siteName, emp.id);
-                                const scheduleDateKey = format(currentDate, "yyyy-MM-dd");
+                                
 
 const employeeCompletedThisSite = entries.some((e) => {
   if (e.employeeId !== emp.id) return false;
@@ -1574,11 +1621,11 @@ const employeeCompletedThisSite = entries.some((e) => {
                                       <span className="font-medium text-sm">
                                         {emp.name}
                                       </span>
-                                      {formattedEmpTime && (
-                                        <span className="text-xs text-muted-foreground">
-                                          • {formattedEmpTime}
-                                        </span>
-                                      )}
+                                      {displayTime && (
+  <span className="text-xs text-muted-foreground">
+    • {displayTime}
+  </span>
+)}
                                     </div>
 
                                     <div className="flex items-center gap-2">
@@ -1626,7 +1673,7 @@ const employeeCompletedThisSite = entries.some((e) => {
   format(currentDate, "yyyy-MM-dd")
 )}
    
-                                          disabled={status === "complete" || employeeCompletedThisSite}
+                                          disabled={employeeCompletedThisSite}
                                         >
                                           <LogIn className="mr-1 h-4 w-4" />
                                           Clock In
