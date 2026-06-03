@@ -1549,8 +1549,17 @@ const dailySiteCount = new Set(
                                   empMinutes > 0 ? formatHHMM(empMinutes) : null;
 
                                 const clocked = isClockedIn(s.siteName, emp.id);
-                                const employeeCompletedThisSite =
-  empMinutes > 0 && !clocked;
+                                const scheduleDateKey = format(currentDate, "yyyy-MM-dd");
+
+const employeeCompletedThisSite = entries.some((e) => {
+  if (e.employeeId !== emp.id) return false;
+  if (e.action !== "out") return false;
+
+  return (
+    e.scheduleId === s.id &&
+    e.scheduleDate === scheduleDateKey
+  );
+});
 
                                 return (
                                   <div
