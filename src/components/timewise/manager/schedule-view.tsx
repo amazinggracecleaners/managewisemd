@@ -1595,7 +1595,23 @@ const formattedEmpTime = getScheduleHours(
 const displayTime =
   formattedEmpTime !== "00:00" ? formattedEmpTime : null;
 
-                                const clocked = isClockedIn(s.siteName, emp.id);
+                                const clocked = entries.some((entry) => {
+  if (entry.employeeId !== emp.id) return false;
+  if (entry.action !== "in") return false;
+
+  return (
+    entry.scheduleId === s.id &&
+    entry.scheduleDate === scheduleDateKey &&
+    !entries.some(
+      (out) =>
+        out.employeeId === emp.id &&
+        out.action === "out" &&
+        out.scheduleId === s.id &&
+        out.scheduleDate === scheduleDateKey &&
+        out.ts > entry.ts
+    )
+  );
+});
                                 
 
 const employeeCompletedThisSite = entries.some((e) => {
