@@ -1403,9 +1403,14 @@ const clockedInAtThisSite = !!activeShiftForThisSchedule;
 
 const clockInDisabled = employeeCompletedThisSchedule;
 
-  const hoursSpent =
-  employeeCompletedThisSchedule
-    ? getHoursForSiteDay(schedule.siteName, currentDate)
+  const hoursForThisSiteDay = getHoursForSiteDay(
+  schedule.siteName,
+  currentDate
+);
+
+const hoursSpent =
+  employeeCompletedThisSchedule || hoursForThisSiteDay !== "00:00"
+    ? hoursForThisSiteDay
     : undefined;
 
   return (

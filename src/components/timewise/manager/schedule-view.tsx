@@ -868,7 +868,7 @@ const getScheduleHours = useCallback(
     scheduleId: string,
     scheduleDate: string
   ) => {
-    const employeeEntries = entries
+    let employeeEntries = entries
       .filter(
         (e) =>
           e.employeeId === employeeId &&
@@ -878,6 +878,22 @@ const getScheduleHours = useCallback(
       )
       .slice()
       .sort((a, b) => a.ts - b.ts);
+
+    // Fallback for older entries
+    if (employeeEntries.length === 0) {
+      employeeEntries = entries
+        .filter((e) => {
+          if (e.employeeId !== employeeId) return false;
+          if (e.site !== siteName) return false;
+
+          return (
+            format(startOfDay(new Date(e.ts)), "yyyy-MM-dd") ===
+            scheduleDate
+          );
+        })
+        .slice()
+        .sort((a, b) => a.ts - b.ts);
+    }
 
     let totalMinutes = 0;
     let activeIn: Entry | null = null;
