@@ -828,7 +828,7 @@ const allPaid =
     () => lineItems.reduce((sum, item) => sum + (item.gross || 0), 0),
     [lineItems]
   );
-
+console.log("Payroll Confirmations", payrollConfirmations);
   const confirmedIds = useMemo(() => {
   if (!currentPeriod) return new Set<string>();
 
@@ -847,7 +847,7 @@ const allPaid =
 
         return (
           c.periodId === currentPeriod.id &&
-          c.confirmed &&
+         c.confirmed &&
           c.revision === revision
         );
       })
