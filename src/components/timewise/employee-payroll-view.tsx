@@ -371,15 +371,26 @@ const hasConfirmedThisRev =
               const netClass = net < 0 ? "text-red-600" : "";
 
               const onConfirm = async () => {
-                if (!employeeCanConfirm || submittingFor) return;
+  if (!employeeCanConfirm || submittingFor) return;
 
-                setSubmittingFor(period.id);
-                try {
-                  await confirmPayroll(period.id, employee.id, revision);
-                } finally {
-                  setSubmittingFor(null);
-                }
-              };
+  setSubmittingFor(period.id);
+  try {
+    await confirmPayroll(period.id, employee.id, revision);
+
+    // Clear the correction flag locally after employee reconfirms
+    period.lineItems = period.lineItems?.map((item) =>
+      item.employeeId === employee.id
+        ? {
+            ...item,
+            needsReconfirmation: false,
+            wasCorrected: false,
+          }
+        : item
+    );
+  } finally {
+    setSubmittingFor(null);
+  }
+};
 
               const safePeriodId = period.id || `${period.startDate}-${period.endDate}`;
 
