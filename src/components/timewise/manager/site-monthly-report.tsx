@@ -36,6 +36,46 @@ const chip = (v: number) => (
   </span>
 );
 
+const getRevenueProfit = (r: any) => {
+  const revenue = Number(r.revenue ?? 0);
+  const labor = Number(r.labor ?? 0);
+  const mileage = Number(r.mileage ?? 0);
+  const other = Number(r.other ?? 0);
+
+  return revenue - labor - mileage - other;
+};
+
+const getRevenueMargin = (r: any) => {
+  const revenue = Number(r.revenue ?? 0);
+  const profit = getRevenueProfit(r);
+
+  return revenue > 0 ? (profit / revenue) * 100 : 0;
+};
+
+const revenueMarginChip = (margin: number) => {
+  if (margin >= 20) {
+    return (
+      <span className="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium bg-green-100 text-green-800">
+        Healthy {margin.toFixed(2)}%
+      </span>
+    );
+  }
+
+  if (margin >= 10) {
+    return (
+      <span className="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium bg-yellow-100 text-yellow-800">
+        Watch {margin.toFixed(2)}%
+      </span>
+    );
+  }
+
+  return (
+    <span className="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium bg-red-100 text-red-800">
+      Action Needed {margin.toFixed(2)}%
+    </span>
+  );
+};
+
 export function SiteMonthlyReport({
   fromDate,
   entries,
@@ -99,7 +139,9 @@ export function SiteMonthlyReport({
               <th className="py-2 pr-3 text-right">Mileage</th>
               <th className="py-2 pr-3 text-right">Other</th>
               <th className="py-2 pr-3 text-right">Net</th>
-              <th className="py-2 pr-3">Status</th>
+<th className="py-2 pr-3 text-right">Revenue Profit</th>
+<th className="py-2 pr-3 text-right">Revenue Margin</th>
+<th className="py-2 pr-3">Status</th>
               <th className="py-2 pl-3 text-right">Actions</th>
             </tr>
           </thead>
@@ -116,7 +158,13 @@ export function SiteMonthlyReport({
                 <td className="py-2 pr-3 text-right">{r.mileage.toFixed(2)}</td>
                 <td className="py-2 pr-3 text-right">{r.other.toFixed(2)}</td>
                 <td className="py-2 pr-3 text-right font-medium">{r.net.toFixed(2)}</td>
-                <td className="py-2 pr-0">{chip(r.net)}</td>
+<td className="py-2 pr-3 text-right font-medium">
+  {getRevenueProfit(r).toFixed(2)}
+</td>
+<td className="py-2 pr-3 text-right">
+  {revenueMarginChip(getRevenueMargin(r))}
+</td>
+<td className="py-2 pr-0">{chip(r.net)}</td>
                 <td className="py-2 pl-3 text-right">
                     <Button
                         variant="ghost"
@@ -141,8 +189,10 @@ export function SiteMonthlyReport({
               <td className="py-2 pr-3 text-right">{totals.mileage.toFixed(2)}</td>
               <td className="py-2 pr-3 text-right">{totals.other.toFixed(2)}</td>
               <td className="py-2 pr-3 text-right">{totals.net.toFixed(2)}</td>
-              <td className="py-2 pr-0"></td>
-              <td className="py-2 pl-3"></td>
+<td className="py-2 pr-3 text-right"></td>
+<td className="py-2 pr-3 text-right"></td>
+<td className="py-2 pr-0"></td>
+<td className="py-2 pl-3"></td>
             </tr>
           </tfoot>
         </table>
