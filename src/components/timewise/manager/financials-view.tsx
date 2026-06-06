@@ -75,7 +75,29 @@ function InfoTip({ text }: { text: string }) {
     </Tooltip>
   );
 }
+function revenueMarginBadge(margin: number) {
+  if (margin >= 20) {
+    return (
+      <span className="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium bg-green-100 text-green-800">
+        Healthy {margin.toFixed(2)}%
+      </span>
+    );
+  }
 
+  if (margin >= 10) {
+    return (
+      <span className="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium bg-yellow-100 text-yellow-800">
+        Watch {margin.toFixed(2)}%
+      </span>
+    );
+  }
+
+  return (
+    <span className="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium bg-red-100 text-red-800">
+      Action Needed {margin.toFixed(2)}%
+    </span>
+  );
+}
 type MonthKey = `${number}-${string}`; // e.g. "2025-Jan"
 
 function toDateMaybe(x: any): Date | null {
@@ -511,19 +533,25 @@ if (minDate && maxDate) {
       const serviceCharge = serviceByMonth.get(k) ?? 0;
       const expenses = v.other + v.payroll + v.mileage;
       const net = v.revenue - expenses;
-      const revMinusService = v.revenue - serviceCharge;
+const revMinusService = v.revenue - serviceCharge;
 
-      return {
-        month: k,
-        serviceCharge,
-        revenue: v.revenue,
-        payroll: v.payroll,
-        other: v.other,
-        mileage: v.mileage,
-        expenses,
-        net,
-        revMinusService,
-      };
+const revenueMargin =
+  v.revenue > 0
+    ? (net / v.revenue) * 100
+    : 0;
+
+return {
+  month: k,
+  serviceCharge,
+  revenue: v.revenue,
+  payroll: v.payroll,
+  other: v.other,
+  mileage: v.mileage,
+  expenses,
+  net,
+  revMinusService,
+  revenueMargin,
+};
     });
 
     const totalRevenue = rows.reduce((s, r) => s + r.revenue, 0);
@@ -932,12 +960,19 @@ if (minDate && maxDate) {
                       <InfoTip text="Revenue minus total expenses for the month." />
                     </span>
                   </TableHead>
+                  <TableHead className="text-right">
+  <span className="inline-flex items-center justify-end w-full">
+    Revenue Margin
+    <InfoTip text="Net income divided by revenue. Measures overall profitability of the month." />
+  </span>
+</TableHead>
+ 
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {monthlyRows.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={9} className="h-24 text-center">
+                    <TableCell colSpan={10} className="h-24 text-center">
                       No financial data is available for this period.
                     </TableCell>
                   </TableRow>
@@ -984,6 +1019,9 @@ if (minDate && maxDate) {
                       >
                         ${r.net.toFixed(2)}
                       </TableCell>
+                      <TableCell className="text-right">
+  {revenueMarginBadge(r.revenueMargin)}
+</TableCell>
                     </TableRow>
                   ))
                 )}
