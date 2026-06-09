@@ -339,7 +339,7 @@ const [accountingView, setAccountingView] =
     return { minDate: start, maxDate: end };
   }, [viewType, selectedYear, selectedMonth, customFromDate, customToDate]);
 
-  const { kpis, monthlyRows, chartSeries, expenseBreakdown } = useMemo(() => {
+const buildFinancialData = (view: "operational" | "cash") => {  
     const monthly = new Map<
       MonthKey,
       { revenue: number; other: number; payroll: number; mileage: number }
@@ -350,7 +350,7 @@ const [accountingView, setAccountingView] =
 
     for (const inv of invs) {
   const d =
-  isCashView(accountingView)
+  view === "cash"
     ? toDateMaybe(
         (inv as any).paidDate ??
           (inv as any).paymentDate ??
@@ -376,7 +376,8 @@ const [accountingView, setAccountingView] =
 
     for (const exp of exps) {
       const d =
-  isCashView(accountingView)
+      view === "cash"
+  
     ? toDateMaybe(
         (exp as any).paidDate ??
           (exp as any).paymentDate ??
@@ -595,7 +596,10 @@ return {
       chartSeries: series,
       expenseBreakdown: breakdown,
     };
-  }, [
+  };
+  const operationalData = useMemo(
+  () => buildFinancialData("operational"),
+  [
     invs,
     exps,
     miles,
@@ -606,8 +610,41 @@ return {
     minDate,
     maxDate,
     mileageRate,
-    accountingView,
-  ]);
+  ]
+);
+
+const cashData = useMemo(
+  () => buildFinancialData("cash"),
+  [
+    invs,
+    exps,
+    miles,
+    pays,
+    allEntries,
+    emps,
+    settings,
+    minDate,
+    maxDate,
+    mileageRate,
+  ]
+);
+{accountingView === "both" && (
+  <p className="text-sm text-muted-foreground mb-2">
+    Chart and monthly breakdown are showing Operational P&amp;L data.
+  </p>
+)}
+
+const activeData =
+  accountingView === "cash"
+    ? cashData
+    : operationalData;
+
+const {
+  kpis,
+  monthlyRows,
+  chartSeries,
+  expenseBreakdown,
+} = activeData;
 
   const payrollProgress = useMemo(() => {
     if (viewType !== "monthly") return null;
@@ -724,8 +761,62 @@ return {
 </div>
           </CardContent>
         </Card>
+        {accountingView === "both" && (
+  <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+    <Card>
+      <CardHeader>
+        <CardTitle>Operational P&amp;L</CardTitle>
+        <CardDescription>
+          Revenue earned and expenses accrued.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-2 text-sm">
+        <div>Revenue: ${operationalData.kpis.totalRevenue.toFixed(2)}</div>
+        <div>Expenses: ${operationalData.kpis.totalExpenses.toFixed(2)}</div>
+        <div className="font-semibold">
+          Net Income: ${operationalData.kpis.netIncome.toFixed(2)}
+        </div>
+        <div>
+          Margin:{" "}
+          {revenueMarginBadge(
+            operationalData.kpis.totalRevenue > 0
+              ? (operationalData.kpis.netIncome /
+                  operationalData.kpis.totalRevenue) *
+                  100
+              : 0
+          )}
+        </div>
+      </CardContent>
+    </Card>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6 gap-4">
+    <Card>
+      <CardHeader>
+        <CardTitle>Cash Flow</CardTitle>
+        <CardDescription>
+          Cash collected and cash-based expenses.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-2 text-sm">
+        <div>Cash Revenue: ${cashData.kpis.totalRevenue.toFixed(2)}</div>
+        <div>Cash Expenses: ${cashData.kpis.totalExpenses.toFixed(2)}</div>
+        <div className="font-semibold">
+          Net Cash Flow: ${cashData.kpis.netIncome.toFixed(2)}
+        </div>
+        <div>
+          Margin:{" "}
+          {revenueMarginBadge(
+            cashData.kpis.totalRevenue > 0
+              ? (cashData.kpis.netIncome / cashData.kpis.totalRevenue) * 100
+              : 0
+          )}
+        </div>
+      </CardContent>
+    </Card>
+  </div>
+)}
+
+        {accountingView !== "both" && (
+  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6 gap-4">
           <Card className="shadow-sm">
             <CardHeader>
               <CardTitle className="flex items-center">
@@ -879,7 +970,7 @@ return {
               </ResponsiveContainer>
             </CardContent>
           </Card>
-        </div>
+        </div>)}
 
         <Card>
           <CardHeader>
@@ -989,7 +1080,7 @@ return {
               <TableBody>
                 {monthlyRows.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={10} className="h-24 text-center">
+                    <TableCell colSpan={12} className="h-24 text-center">
                       No financial data is available for this period.
                     </TableCell>
                   </TableRow>
