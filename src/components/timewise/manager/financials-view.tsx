@@ -98,6 +98,11 @@ function revenueMarginBadge(margin: number) {
     </span>
   );
 }
+type AccountingView = "operational" | "cash" | "both";
+
+function isCashView(view: AccountingView) {
+  return view === "cash";
+}
 type MonthKey = `${number}-${string}`; // e.g. "2025-Jan"
 
 function toDateMaybe(x: any): Date | null {
@@ -312,9 +317,8 @@ export function FinancialsView({
   const [selectedMonth, setSelectedMonth] = useState(
     String(new Date().getMonth())
   );
-const [accountingView, setAccountingView] = useState<
-  "operational" | "cash"
->("operational");
+const [accountingView, setAccountingView] =
+  useState<AccountingView>("operational");
 
   const { minDate, maxDate } = useMemo(() => {
     if (viewType === "monthly") {
@@ -346,19 +350,19 @@ const [accountingView, setAccountingView] = useState<
 
     for (const inv of invs) {
   const d =
-    accountingView === "cash"
-      ? toDateMaybe(
-          (inv as any).paidDate ??
-            (inv as any).paymentDate ??
-            (inv as any).paidAt
-        )
-      : toDateMaybe(
-          (inv as any).serviceEndDate ??
-            (inv as any).serviceDate ??
-            (inv as any).date ??
-            (inv as any).issuedAt ??
-            (inv as any).createdAt
-        );
+  isCashView(accountingView)
+    ? toDateMaybe(
+        (inv as any).paidDate ??
+          (inv as any).paymentDate ??
+          (inv as any).paidAt
+      )
+    : toDateMaybe(
+        (inv as any).serviceEndDate ??
+          (inv as any).serviceDate ??
+          (inv as any).date ??
+          (inv as any).issuedAt ??
+          (inv as any).createdAt
+      );
 
   if (!d || !inRange(d, minDate, maxDate)) continue;
 
@@ -372,7 +376,7 @@ const [accountingView, setAccountingView] = useState<
 
     for (const exp of exps) {
       const d =
-  accountingView === "cash"
+  isCashView(accountingView)
     ? toDateMaybe(
         (exp as any).paidDate ??
           (exp as any).paymentDate ??
@@ -621,7 +625,11 @@ return {
           <CardHeader>
             <CardTitle>
   Financial summary —{" "}
-  {accountingView === "operational" ? "Operational P&L" : "Cash Flow"}
+  {accountingView === "operational"
+    ? "Operational P&L"
+    : accountingView === "cash"
+    ? "Cash Flow"
+    : "Operational P&L vs Cash Flow"}
 </CardTitle>
             <CardDescription>
               Professional view of revenue, standard service charges, and
@@ -694,15 +702,24 @@ return {
   <Label>Accounting view</Label>
   <Select
     value={accountingView}
-    onValueChange={(v: "operational" | "cash") => setAccountingView(v)}
+    onValueChange={(v: AccountingView) => setAccountingView(v)}
   >
     <SelectTrigger>
       <SelectValue />
     </SelectTrigger>
     <SelectContent>
-      <SelectItem value="operational">Operational P&L</SelectItem>
-      <SelectItem value="cash">Cash Flow</SelectItem>
-    </SelectContent>
+  <SelectItem value="operational">
+    Operational P&L
+  </SelectItem>
+
+  <SelectItem value="cash">
+    Cash Flow
+  </SelectItem>
+
+  <SelectItem value="both">
+    Side-by-Side
+  </SelectItem>
+</SelectContent>
   </Select>
 </div>
           </CardContent>
