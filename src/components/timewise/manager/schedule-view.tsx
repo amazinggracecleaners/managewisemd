@@ -242,7 +242,11 @@ const { cloudReady } = useSettings();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingSchedule, setEditingSchedule] =
     useState<CleaningSchedule | null>(null);
-
+const [deleteTarget, setDeleteTarget] = useState<{
+  open: boolean;
+  schedule?: CleaningSchedule;
+  occurrenceDate?: Date;
+}>({ open: false });
   // form fields
   const [siteName, setSiteName] = useState("");
   const [tasks, setTasks] = useState("");
@@ -416,7 +420,7 @@ const openFixShiftModal = (data: {
       setBillingFrequency(schedule.billingFrequency);
 
       setEditingOccurrenceDate(occurrenceDate);
-      setApplyScope(occurrenceDate ? "single" : "series");
+      setApplyScope("single");
     } else {
       setSiteName("");
       setTasks("");
@@ -918,6 +922,40 @@ const getScheduleHours = useCallback(
   [entries]
 );
 
+ const handleDeleteScheduleChoice = (
+  scope: "single" | "future" | "series"
+) => {
+  const schedule = deleteTarget.schedule;
+  const occurrenceDate = deleteTarget.occurrenceDate;
+
+  if (!schedule) return;
+
+  if (scope === "series") {
+    deleteSchedule(schedule.id);
+  }
+
+  if (scope === "single" && occurrenceDate) {
+    const dateStr = format(occurrenceDate, "yyyy-MM-dd");
+
+    const existingExceptions =
+      (schedule.exceptionDates as string[] | undefined) || [];
+
+    updateSchedule(schedule.id, {
+      exceptionDates: Array.from(new Set([...existingExceptions, dateStr])),
+    });
+  }
+
+  if (scope === "future" && occurrenceDate) {
+    const dayBefore = format(addDays(occurrenceDate, -1), "yyyy-MM-dd");
+
+    updateSchedule(schedule.id, {
+      repeatUntil: dayBefore,
+    });
+  }
+
+  setDeleteTarget({ open: false });
+};
+
   const renderAssignmentBadges = (s: CleaningSchedule) => {
   if (s.assignedTeamId) {
     const team = teamsById.get(s.assignedTeamId);
@@ -1303,7 +1341,34 @@ const getScheduleHours = useCallback(
                       placeholder="e.g., Use the back entrance after 5 PM."
                     />
                    </div>
-                     
+                  {editingSchedule &&
+  editingOccurrenceDate &&
+  editingSchedule.repeatFrequency !== "does-not-repeat" && (
+    <div className="space-y-2 border rounded-md p-3">
+      <Label>Apply changes to:</Label>
+
+      <RadioGroup
+        value={applyScope}
+        onValueChange={(v) =>
+          setApplyScope(v as "single" | "series")
+        }
+      >
+        <div className="flex items-center space-x-2">
+          <RadioGroupItem value="single" id="single-day" />
+          <Label htmlFor="single-day">
+            Only this day ({format(editingOccurrenceDate, "MMM d, yyyy")})
+          </Label>
+        </div>
+
+        <div className="flex items-center space-x-2">
+          <RadioGroupItem value="series" id="future-series" />
+          <Label htmlFor="future-series">
+  This and all future occurrences
+</Label>
+        </div>
+      </RadioGroup>
+    </div>
+)}   
                 </div>
               </ScrollArea>
 
@@ -1399,7 +1464,19 @@ const getScheduleHours = useCallback(
               <Button
                 variant="ghost"
                 size="icon"
-                onClick={() => deleteSchedule(schedule.id)}
+               onClick={() => {
+  if (schedule.repeatFrequency === "does-not-repeat") {
+    deleteSchedule(schedule.id);
+  } else {
+    setDeleteTarget({
+      open: true,
+      schedule,
+      occurrenceDate: schedule.startDate
+        ? parseISO(schedule.startDate)
+        : new Date(),
+    });
+  }
+}}
               >
                 <Trash2 className="h-4 w-4 text-destructive" />
               </Button>
@@ -1824,7 +1901,7 @@ const employeeCompletedThisSite = entries.some((e) => {
                                         className="h-6 w-6"
                                         onClick={(e) => {
   e.stopPropagation();
-  handleOpenDialog(s);
+  handleOpenDialog(s, day);
 }}
                                       >
                                         <Edit className="h-3 w-3" />
@@ -1959,7 +2036,7 @@ const employeeCompletedThisSite = entries.some((e) => {
                                   className="h-5 w-5 absolute right-0 top-0.5 opacity-0 group-hover:opacity-100"
                                   onClick={(e) => {
   e.stopPropagation();
-  handleOpenDialog(s);
+  handleOpenDialog(s, day);
 }}
                                 >
                                   <Edit className="h-3 w-3" />
@@ -2017,6 +2094,60 @@ const employeeCompletedThisSite = entries.some((e) => {
         Cancel
       </Button>
       <Button onClick={handleFixShift}>Save Fix</Button>
+    </DialogFooter>
+  </DialogContent>
+</Dialog>
+<Dialog
+  open={deleteTarget.open}
+  onOpenChange={(open) =>
+    setDeleteTarget((prev) => ({ ...prev, open }))
+  }
+>
+  <DialogContent>
+    <DialogHeader>
+      <DialogTitle>Delete Schedule</DialogTitle>
+    </DialogHeader>
+
+    <div className="space-y-3 text-sm">
+      <p>
+        What do you want to delete for{" "}
+        <strong>{deleteTarget.schedule?.siteName}</strong>?
+      </p>
+
+      <Button
+        variant="outline"
+        className="w-full justify-start"
+        onClick={() => handleDeleteScheduleChoice("single")}
+        disabled={!deleteTarget.occurrenceDate}
+      >
+        This occurrence only
+      </Button>
+
+      <Button
+        variant="outline"
+        className="w-full justify-start"
+        onClick={() => handleDeleteScheduleChoice("future")}
+        disabled={!deleteTarget.occurrenceDate}
+      >
+        This and future occurrences
+      </Button>
+
+      <Button
+        variant="destructive"
+        className="w-full justify-start"
+        onClick={() => handleDeleteScheduleChoice("series")}
+      >
+        Entire series
+      </Button>
+    </div>
+
+    <DialogFooter>
+      <Button
+        variant="outline"
+        onClick={() => setDeleteTarget({ open: false })}
+      >
+        Cancel
+      </Button>
     </DialogFooter>
   </DialogContent>
 </Dialog>
