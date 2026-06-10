@@ -318,7 +318,7 @@ export function FinancialsView({
     String(new Date().getMonth())
   );
 const [accountingView, setAccountingView] =
-  useState<AccountingView>("operational");
+  useState<AccountingView>("both");
 
   const { minDate, maxDate } = useMemo(() => {
     if (viewType === "monthly") {
