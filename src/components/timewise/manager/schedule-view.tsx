@@ -1642,15 +1642,30 @@ const getScheduleHours = useCallback(
                               <div className="flex items-center gap-2">
                                 {status && getStatusIndicator(status, "daily")}
                                 {(() => {
-                                  const mins =
-                                    durationsForCurrentDate.get(s.siteName)
-                                      ?.minutes ?? 0;
-                                  return mins > 0 ? (
-                                    <span className="text-xs text-muted-foreground">
-                                      • {formatHHMM(mins)}
-                                    </span>
-                                  ) : null;
-                                })()}
+  const scheduleDateKey = format(currentDate, "yyyy-MM-dd");
+
+  const assignedEmployees = (s.assignedTo || [])
+    .map((empName) => employeeMap.get(empName))
+    .filter((emp): emp is Employee => !!emp);
+
+  const totalScheduleMinutes = assignedEmployees.reduce((sum, emp) => {
+    const time = getScheduleHours(
+      s.siteName,
+      emp.id,
+      s.id,
+      scheduleDateKey
+    );
+
+    const [h, m] = time.split(":").map(Number);
+    return sum + h * 60 + m;
+  }, 0);
+
+  return totalScheduleMinutes > 0 ? (
+    <span className="text-xs text-muted-foreground">
+      • {formatHHMM(totalScheduleMinutes)}
+    </span>
+  ) : null;
+})()}
                                 <Button
                                   variant="ghost"
                                   size="icon"
