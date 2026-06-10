@@ -1401,7 +1401,18 @@ const clockedInAtThisSite = !!activeShiftForThisSchedule;
   );
 });
 
-const clockInDisabled = employeeCompletedThisSchedule;
+const scheduleCompletedByAnyone = entries.some((e) => {
+  if (e.action !== "out") return false;
+
+  return (
+    e.scheduleId === schedule.id &&
+    e.scheduleDate === scheduleDateKey
+  );
+});
+
+const clockInDisabled =
+  employeeCompletedThisSchedule ||
+  scheduleCompletedByAnyone;
 
   const hoursForThisSiteDay = getHoursForSiteDay(
   schedule.siteName,
