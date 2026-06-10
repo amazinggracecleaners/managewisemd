@@ -1659,6 +1659,24 @@ const getScheduleHours = useCallback(
                                 >
                                   <Edit className="h-4 w-4" />
                                 </Button>
+                                <Button
+  variant="ghost"
+  size="icon"
+  className="h-7 w-7"
+  onClick={() => {
+    if (s.repeatFrequency === "does-not-repeat") {
+      deleteSchedule(s.id);
+    } else {
+      setDeleteTarget({
+        open: true,
+        schedule: s,
+        occurrenceDate: currentDate,
+      });
+    }
+  }}
+>
+  <Trash2 className="h-4 w-4 text-destructive" />
+</Button>
                               </div>
                             </div>
                           </CardHeader>
@@ -1709,6 +1727,15 @@ const displayTime =
 
 const employeeCompletedThisSite = entries.some((e) => {
   if (e.employeeId !== emp.id) return false;
+  if (e.action !== "out") return false;
+
+  return (
+    e.scheduleId === s.id &&
+    e.scheduleDate === scheduleDateKey
+  );
+});
+
+const siteScheduleCompleted = entries.some((e) => {
   if (e.action !== "out") return false;
 
   return (
@@ -1782,7 +1809,7 @@ const employeeCompletedThisSite = entries.some((e) => {
   format(currentDate, "yyyy-MM-dd")
 )}
    
-                                          disabled={employeeCompletedThisSite}
+                                         disabled={employeeCompletedThisSite || siteScheduleCompleted}
                                         >
                                           <LogIn className="mr-1 h-4 w-4" />
                                           Clock In
@@ -1889,25 +1916,42 @@ const employeeCompletedThisSite = entries.some((e) => {
                                     borderLeftWidth: "2px",
                                   }}
                                 >
-                                  <div className="flex justify-between items-center">
-                                    <p className="font-bold" style={{ color: siteColor }}>
-                                      {s.siteName}
-                                    </p>
-                                    <div className="flex items-center">
-                                      {status && getStatusIndicator(status, "weekly")}
-                                      <Button
-                                        variant="ghost"
-                                        size="icon"
-                                        className="h-6 w-6"
-                                        onClick={(e) => {
-  e.stopPropagation();
-  handleOpenDialog(s, day);
-}}
-                                      >
-                                        <Edit className="h-3 w-3" />
-                                      </Button>
-                                    </div>
-                                  </div>
+                                  <div className="flex items-center gap-1">
+  {status && getStatusIndicator(status, "weekly")}
+
+  <Button
+    variant="ghost"
+    size="icon"
+    className="h-6 w-6"
+    onClick={(e) => {
+      e.stopPropagation();
+      handleOpenDialog(s, day);
+    }}
+  >
+    <Edit className="h-3 w-3" />
+  </Button>
+
+  <Button
+    variant="ghost"
+    size="icon"
+    className="h-6 w-6"
+    onClick={(e) => {
+      e.stopPropagation();
+
+      if (s.repeatFrequency === "does-not-repeat") {
+        deleteSchedule(s.id);
+      } else {
+        setDeleteTarget({
+          open: true,
+          schedule: s,
+          occurrenceDate: day,
+        });
+      }
+    }}
+  >
+    <Trash2 className="h-3 w-3 text-destructive" />
+  </Button>
+</div>
 
                                   <p className="my-1 text-muted-foreground truncate">{s.tasks}</p>
 
@@ -2030,17 +2074,40 @@ const employeeCompletedThisSite = entries.some((e) => {
                                 >
                                   {s.siteName}
                                 </span>
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  className="h-5 w-5 absolute right-0 top-0.5 opacity-0 group-hover:opacity-100"
-                                  onClick={(e) => {
-  e.stopPropagation();
-  handleOpenDialog(s, day);
-}}
-                                >
-                                  <Edit className="h-3 w-3" />
-                                </Button>
+                                <div className="absolute right-0 top-0.5 flex opacity-0 group-hover:opacity-100">
+  <Button
+    variant="ghost"
+    size="icon"
+    className="h-5 w-5"
+    onClick={(e) => {
+      e.stopPropagation();
+      handleOpenDialog(s, day);
+    }}
+  >
+    <Edit className="h-3 w-3" />
+  </Button>
+
+  <Button
+    variant="ghost"
+    size="icon"
+    className="h-5 w-5"
+    onClick={(e) => {
+      e.stopPropagation();
+
+      if (s.repeatFrequency === "does-not-repeat") {
+        deleteSchedule(s.id);
+      } else {
+        setDeleteTarget({
+          open: true,
+          schedule: s,
+          occurrenceDate: day,
+        });
+      }
+    }}
+  >
+    <Trash2 className="h-3 w-3 text-destructive" />
+  </Button>
+</div>
                               </div>
                             );
                           })}
