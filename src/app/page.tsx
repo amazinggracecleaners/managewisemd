@@ -950,6 +950,13 @@ if (!isManagerOverride) {
     });
     return;
   }
+  console.log("Clock-out geofence check", {
+  requireClockOutGeofence: settings.requireClockOutGeofence,
+  requireGeofence: settings.requireGeofence,
+  currentCoord,
+  siteLat: site.lat,
+  siteLng: site.lng,
+});
 
   if (settings.requireClockOutGeofence && currentCoord) {
     if (!site.lat || !site.lng) {
