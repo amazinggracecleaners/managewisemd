@@ -982,6 +982,12 @@ if (!isManagerOverride) {
 
     const radiusInFeet =
       radiusMeters > 0 ? radiusMeters * METERS_TO_FEET : 150;
+      console.log("CLOCK OUT DISTANCE", {
+  distanceInFeet,
+  radiusInFeet,
+  distanceInMeters,
+  radiusMeters,
+});
 
     if (distanceInFeet > radiusInFeet) {
       toast({
