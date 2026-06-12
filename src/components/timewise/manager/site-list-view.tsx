@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
+import { TooltipProvider, Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import {
   User,
   KeyRound,
@@ -49,7 +50,7 @@ import {
 } from "@/components/ui/accordion";
 import { useToast } from "@/hooks/use-toast";
 import { uuid } from "@/lib/time-utils";
-import { TooltipProvider } from "@/components/ui/tooltip";
+
 
 interface SiteListViewProps {
   sites: Site[];
@@ -310,7 +311,9 @@ export function SiteListView({
                   <SelectContent>
                     <SelectItem value="none">No grouping</SelectItem>
                     <SelectItem value="city">Group by city</SelectItem>
-                    <SelectItem value="amount">Group by billing range</SelectItem>
+                    <SelectItem value="amount">
+  Group by revenue range
+</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -804,10 +807,26 @@ export function SiteListView({
       </p>
 
       <p>
-        <strong>R/S:</strong>{" "}
-        {site.rsFeeType && site.rsFeeType !== "none"
-          ? `${site.rsFeeType === "percent" ? `${site.rsFeeValue}%` : `$${rsAmount.toFixed(2)}`}`
-          : "Not set"}
+       <strong className="inline-flex items-center gap-1">
+  R/S
+  <Tooltip>
+    <TooltipTrigger asChild>
+      <button
+        type="button"
+        className="inline-flex h-4 w-4 items-center justify-center rounded-full border text-[10px] text-muted-foreground"
+      >
+        i
+      </button>
+    </TooltipTrigger>
+    <TooltipContent>
+      Royalty and Support Fee
+    </TooltipContent>
+  </Tooltip>
+  :
+</strong>{" "}
+{site.rsFeeType && site.rsFeeType !== "none"
+  ? `$${rsAmount.toFixed(2)}`
+  : "Not set"}
       </p>
 
       <p>
