@@ -70,6 +70,20 @@ const getCityFromAddress = (address?: string): string => {
   return "Unknown city";
 };
 
+const getSiteRevenue = (site: Partial<Site>) =>
+  Number(site.revenue ?? site.servicePrice ?? 0) || 0;
+
+const calculateFee = (
+  baseRevenue: number,
+  type?: "none" | "percent" | "fixed",
+  value?: number
+) => {
+  if (!type || type === "none") return 0;
+  if (type === "percent") return baseRevenue * ((Number(value) || 0) / 100);
+  if (type === "fixed") return Number(value) || 0;
+  return 0;
+};
+
 const getPriceRange = (price?: number): string => {
   const p = price || 0;
   if (p === 0) return "No price";
@@ -143,7 +157,7 @@ export function SiteListView({
       if (groupBy === "city") {
         key = getCityFromAddress(site.address);
       } else {
-        key = getPriceRange(site.servicePrice);
+        key = getPriceRange(getSiteRevenue(site));
       }
       if (!groups[key]) groups[key] = [];
       groups[key].push(site);
@@ -158,7 +172,17 @@ export function SiteListView({
 
   const handleOpenDialog = (site: Site | null) => {
     setEditingSite(site);
-    setSiteData(site ? { ...site } : { name: "", color: "#333333" });
+    setSiteData(
+  site
+    ? { status: "active", rsFeeType: "none", otherFeeType: "none", ...site }
+    : {
+        name: "",
+        color: "#333333",
+        status: "active",
+        rsFeeType: "none",
+        otherFeeType: "none",
+      }
+);
     setIsDialogOpen(true);
   };
 
@@ -468,75 +492,156 @@ export function SiteListView({
                         </div>
                       </div>
 
-                      <div className="pt-4 border-t">
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                          <div className="space-y-2">
-                            <Label htmlFor="servicePrice">
-                              Standard service amount ($)
-                            </Label>
-                            <Input
-                              id="servicePrice"
-                              type="number"
-                              value={siteData.servicePrice ?? ""}
-                              onChange={(e) =>
-                                handleDataChange(
-                                  "servicePrice",
-                                  e.target.value
-                                    ? parseFloat(e.target.value)
-                                    : undefined
-                                )
-                              }
-                              placeholder="Example: 250"
-                            />
-                          </div>
-                          <div className="space-y-2">
-                            <Label htmlFor="bonusType">Bonus structure</Label>
-                            <Select
-                              value={siteData.bonusType || "none"}
-                              onValueChange={(v) =>
-                                handleDataChange(
-                                  "bonusType",
-                                  v === "none" ? undefined : v
-                                )
-                              }
-                            >
-                              <SelectTrigger>
-                                <SelectValue placeholder="No bonus" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="none">No bonus</SelectItem>
-                                <SelectItem value="hourly">
-                                  Hourly bonus
-                                </SelectItem>
-                                <SelectItem value="flat">
-                                  Flat amount bonus
-                                </SelectItem>
-                              </SelectContent>
-                            </Select>
-                          </div>
-                        </div>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
-                          <div className="space-y-2 sm:col-start-2">
-                            <Label htmlFor="bonusAmount">
-                              Bonus amount ($)
-                            </Label>
-                            <Input
-                              id="bonusAmount"
-                              type="number"
-                              value={siteData.bonusAmount ?? ""}
-                              onChange={(e) =>
-                                handleDataChange(
-                                  "bonusAmount",
-                                  e.target.value
-                                    ? parseFloat(e.target.value)
-                                    : undefined
-                                )
-                              }
-                              disabled={!siteData.bonusType}
-                            />
-                          </div>
-                        </div>
-                      </div>
+                     <div className="pt-4 border-t space-y-4">
+  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+    <div className="space-y-2">
+      <Label htmlFor="status">Site status</Label>
+      <Select
+        value={siteData.status || "active"}
+        onValueChange={(v) => handleDataChange("status", v)}
+      >
+        <SelectTrigger>
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="active">Active</SelectItem>
+          <SelectItem value="inactive">Inactive</SelectItem>
+        </SelectContent>
+      </Select>
+    </div>
+
+    <div className="space-y-2">
+      <Label htmlFor="revenue">Revenue ($)</Label>
+      <Input
+        id="revenue"
+        type="number"
+        value={siteData.revenue ?? ""}
+        onChange={(e) =>
+          handleDataChange(
+            "revenue",
+            e.target.value ? parseFloat(e.target.value) : undefined
+          )
+        }
+        placeholder="Example: 750"
+      />
+    </div>
+  </div>
+
+  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+    <div className="space-y-2">
+      <Label>R/S Fee Type</Label>
+      <Select
+        value={siteData.rsFeeType || "none"}
+        onValueChange={(v) => handleDataChange("rsFeeType", v)}
+      >
+        <SelectTrigger>
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="none">None</SelectItem>
+          <SelectItem value="percent">% of Revenue</SelectItem>
+          <SelectItem value="fixed">Fixed Amount</SelectItem>
+        </SelectContent>
+      </Select>
+    </div>
+
+    <div className="space-y-2">
+      <Label>R/S Value</Label>
+      <Input
+        type="number"
+        value={siteData.rsFeeValue ?? ""}
+        onChange={(e) =>
+          handleDataChange(
+            "rsFeeValue",
+            e.target.value ? parseFloat(e.target.value) : undefined
+          )
+        }
+        disabled={!siteData.rsFeeType || siteData.rsFeeType === "none"}
+        placeholder={siteData.rsFeeType === "percent" ? "Example: 15" : "Example: 113.10"}
+      />
+    </div>
+  </div>
+
+  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+    <div className="space-y-2">
+      <Label>Other Fee Name</Label>
+      <Input
+        value={siteData.otherFeeLabel || ""}
+        onChange={(e) => handleDataChange("otherFeeLabel", e.target.value)}
+        placeholder="Example: Franchise fee"
+      />
+    </div>
+
+    <div className="space-y-2">
+      <Label>Other Fee Type</Label>
+      <Select
+        value={siteData.otherFeeType || "none"}
+        onValueChange={(v) => handleDataChange("otherFeeType", v)}
+      >
+        <SelectTrigger>
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="none">None</SelectItem>
+          <SelectItem value="percent">% of Revenue</SelectItem>
+          <SelectItem value="fixed">Fixed Amount</SelectItem>
+        </SelectContent>
+      </Select>
+    </div>
+
+    <div className="space-y-2">
+      <Label>Other Fee Value</Label>
+      <Input
+        type="number"
+        value={siteData.otherFeeValue ?? ""}
+        onChange={(e) =>
+          handleDataChange(
+            "otherFeeValue",
+            e.target.value ? parseFloat(e.target.value) : undefined
+          )
+        }
+        disabled={!siteData.otherFeeType || siteData.otherFeeType === "none"}
+      />
+    </div>
+  </div>
+
+  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+    <div className="space-y-2">
+      <Label htmlFor="bonusType">Bonus structure</Label>
+      <Select
+        value={siteData.bonusType || "none"}
+        onValueChange={(v) =>
+          handleDataChange("bonusType", v === "none" ? undefined : v)
+        }
+      >
+        <SelectTrigger>
+          <SelectValue placeholder="No bonus" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="none">No bonus</SelectItem>
+          <SelectItem value="hourly">Hourly bonus</SelectItem>
+          <SelectItem value="flat">Flat amount bonus</SelectItem>
+        </SelectContent>
+      </Select>
+    </div>
+
+    <div className="space-y-2">
+      <Label htmlFor="bonusAmount">Bonus amount ($)</Label>
+      <Input
+        id="bonusAmount"
+        type="number"
+        value={siteData.bonusAmount ?? ""}
+        onChange={(e) =>
+          handleDataChange(
+            "bonusAmount",
+            e.target.value ? parseFloat(e.target.value) : undefined
+          )
+        }
+        disabled={!siteData.bonusType}
+      />
+    </div>
+  </div>
+</div>
                     </div>
                   </ScrollArea>
                   <DialogFooter>
@@ -669,12 +774,56 @@ export function SiteListView({
                                         <DollarSign className="h-4 w-4" />
                                         Billing
                                       </h4>
-                                      <p>
-                                        <strong>Standard amount:</strong>{" "}
-                                        {site.servicePrice
-                                          ? `$${site.servicePrice.toFixed(2)}`
-                                          : "Not set"}
-                                      </p>
+                                      
+                                       <div className="space-y-1">
+ {(() => {
+  const revenue = getSiteRevenue(site);
+  const rsAmount = calculateFee(
+    revenue,
+    site.rsFeeType,
+    site.rsFeeValue
+  );
+  const otherAmount = calculateFee(
+    revenue,
+    site.otherFeeType,
+    site.otherFeeValue
+  );
+
+  return (
+    <>
+      <p>
+        <strong>Status:</strong>{" "}
+        <Badge variant={site.status === "inactive" ? "secondary" : "default"}>
+          {site.status || "active"}
+        </Badge>
+      </p>
+
+      <p>
+        <strong>Revenue:</strong>{" "}
+        {revenue ? `$${revenue.toFixed(2)}` : "Not set"}
+      </p>
+
+      <p>
+        <strong>R/S:</strong>{" "}
+        {site.rsFeeType && site.rsFeeType !== "none"
+          ? `${site.rsFeeType === "percent" ? `${site.rsFeeValue}%` : `$${rsAmount.toFixed(2)}`}`
+          : "Not set"}
+      </p>
+
+      <p>
+        <strong>Other fee:</strong>{" "}
+        {site.otherFeeType && site.otherFeeType !== "none"
+          ? `${site.otherFeeLabel || "Other fee"} · ${
+              site.otherFeeType === "percent"
+                ? `${site.otherFeeValue}%`
+                : `$${otherAmount.toFixed(2)}`
+            }`
+          : "Not set"}
+      </p>
+    </>
+  );
+})()}
+</div>
                                       {site.bonusType ? (
                                         <p>
                                           <strong>Bonus:</strong>{" "}

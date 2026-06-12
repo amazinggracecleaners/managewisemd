@@ -35,22 +35,38 @@ export type FirebaseOptions = {
 }
 
 export type Site = {
-  id: string; 
+  id: string;
   name: string;
+  status?: "active" | "inactive";
+
   address?: string;
   lat?: number;
   lng?: number;
   color?: string;
+
   contactName?: string;
   contactPhone?: string;
   contactEmail?: string;
+
   notes?: string;
   entranceMethod?: string;
   alarmCode?: string;
-  servicePrice?: number;
+
+  revenue?: number; // new site-level revenue
+  servicePrice?: number; // keep temporarily for old data compatibility
+
+  rsFeeType?: "none" | "percent" | "fixed";
+  rsFeeValue?: number;
+
+  otherFeeLabel?: string;
+  otherFeeType?: "none" | "percent" | "fixed";
+  otherFeeValue?: number;
+
   billingFrequency?: BillingFrequency;
-  bonusType?: 'hourly' | 'flat';
+
+  bonusType?: "hourly" | "flat";
   bonusAmount?: number;
+
   geofenceRadiusFeet?: number;
 };
 
