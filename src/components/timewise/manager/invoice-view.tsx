@@ -52,10 +52,13 @@ export function InvoiceView({ sites }: InvoiceViewProps) {
   const { toast } = useToast();
 
   const [monthISO, setMonthISO] = useState(new Date().toISOString().slice(0, 7));
-  const [filterMode, setFilterMode] = useState<"all" | "month" | "year">("all");
+  const [filterMode, setFilterMode] = useState<"all" | "month" | "year">("month");
   const [filterMonth, setFilterMonth] = useState(new Date().toISOString().slice(0, 7));
   const [filterYear, setFilterYear] = useState(String(new Date().getFullYear()));
   const [invoiceSearch, setInvoiceSearch] = useState("");
+  const [sortBy, setSortBy] = useState<
+  "site-asc" | "site-desc" | "date-newest" | "date-oldest" | "invoice"
+>("site-asc");
   const derivedTotals = useMemo(() => {
     const inv = withComputed({
       lineItems: draftInvoice.lineItems,
@@ -96,15 +99,48 @@ if (q) {
       .some((value) => String(value).toLowerCase().includes(q))
   );
 }
-    filtered.sort((a, b) => {
-      if (!a.date && !b.date) return 0;
-      if (!a.date) return 1;
-      if (!b.date) return -1;
-      return parseISO(b.date).getTime() - parseISO(a.date).getTime();
-    });
+   filtered.sort((a, b) => {
+  switch (sortBy) {
+    case "site-asc":
+      return (a.siteName || "").localeCompare(
+        b.siteName || "",
+        undefined,
+        { sensitivity: "base" }
+      );
+
+    case "site-desc":
+      return (b.siteName || "").localeCompare(
+        a.siteName || "",
+        undefined,
+        { sensitivity: "base" }
+      );
+
+    case "date-newest":
+      return (
+        (b.date ? parseISO(b.date).getTime() : 0) -
+        (a.date ? parseISO(a.date).getTime() : 0)
+      );
+
+    case "date-oldest":
+      return (
+        (a.date ? parseISO(a.date).getTime() : 0) -
+        (b.date ? parseISO(b.date).getTime() : 0)
+      );
+
+    case "invoice":
+      return (a.invoiceNumber || "").localeCompare(
+        b.invoiceNumber || "",
+        undefined,
+        { numeric: true, sensitivity: "base" }
+      );
+
+    default:
+      return 0;
+  }
+});
 
     return filtered;
-  }, [invoices, filterMode, filterMonth, filterYear, invoiceSearch]);
+  }, [invoices, filterMode, filterMonth, filterYear, invoiceSearch, sortBy]);
 
   const handleGenerateRecurring = () => {
     const newInvoices = generateRecurringInvoicesForMonth({
@@ -635,6 +671,40 @@ paidDate: (draftInvoice as any).paidDate || null,
   onChange={(e) => setInvoiceSearch(e.target.value)}
   className="w-72"
 />
+<div className="flex items-center gap-2">
+  <Label>Sort By</Label>
+
+  <Select
+    value={sortBy}
+    onValueChange={(v: any) => setSortBy(v)}
+  >
+    <SelectTrigger className="w-52">
+      <SelectValue />
+    </SelectTrigger>
+
+    <SelectContent>
+      <SelectItem value="site-asc">
+        Site (A-Z)
+      </SelectItem>
+
+      <SelectItem value="site-desc">
+        Site (Z-A)
+      </SelectItem>
+
+      <SelectItem value="date-newest">
+        Date (Newest)
+      </SelectItem>
+
+      <SelectItem value="date-oldest">
+        Date (Oldest)
+      </SelectItem>
+
+      <SelectItem value="invoice">
+        Invoice Number
+      </SelectItem>
+    </SelectContent>
+  </Select>
+</div>
           <div className="flex items-center gap-2">
             <Label>Show</Label>
             <Select
