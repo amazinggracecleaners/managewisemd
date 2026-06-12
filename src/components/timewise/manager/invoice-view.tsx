@@ -55,7 +55,7 @@ export function InvoiceView({ sites }: InvoiceViewProps) {
   const [filterMode, setFilterMode] = useState<"all" | "month" | "year">("all");
   const [filterMonth, setFilterMonth] = useState(new Date().toISOString().slice(0, 7));
   const [filterYear, setFilterYear] = useState(String(new Date().getFullYear()));
-
+  const [invoiceSearch, setInvoiceSearch] = useState("");
   const derivedTotals = useMemo(() => {
     const inv = withComputed({
       lineItems: draftInvoice.lineItems,
@@ -81,7 +81,21 @@ export function InvoiceView({ sites }: InvoiceViewProps) {
     if (filterMode === "year") {
       filtered = filtered.filter((inv) => inv.date?.startsWith(filterYear));
     }
+const q = invoiceSearch.trim().toLowerCase();
 
+if (q) {
+  filtered = filtered.filter((inv) =>
+    [
+      inv.invoiceNumber,
+      inv.siteName,
+      inv.status,
+      inv.date,
+      inv.dueDate,
+    ]
+      .filter(Boolean)
+      .some((value) => String(value).toLowerCase().includes(q))
+  );
+}
     filtered.sort((a, b) => {
       if (!a.date && !b.date) return 0;
       if (!a.date) return 1;
@@ -90,7 +104,7 @@ export function InvoiceView({ sites }: InvoiceViewProps) {
     });
 
     return filtered;
-  }, [invoices, filterMode, filterMonth, filterYear]);
+  }, [invoices, filterMode, filterMonth, filterYear, invoiceSearch]);
 
   const handleGenerateRecurring = () => {
     const newInvoices = generateRecurringInvoicesForMonth({
@@ -615,6 +629,12 @@ paidDate: (draftInvoice as any).paidDate || null,
         </div>
 
         <div className="flex flex-wrap items-center gap-3 pt-2">
+          <Input
+  placeholder="Search invoice #, site, status, date..."
+  value={invoiceSearch}
+  onChange={(e) => setInvoiceSearch(e.target.value)}
+  className="w-72"
+/>
           <div className="flex items-center gap-2">
             <Label>Show</Label>
             <Select
