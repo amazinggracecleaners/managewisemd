@@ -108,7 +108,24 @@ export function SiteListView({
   const { toast } = useToast();
   const [searchQuery, setSearchQuery] = useState("");
   const [groupBy, setGroupBy] = useState<"none" | "city" | "amount">("none");
+const activeSites = useMemo(
+  () =>
+    (sites ?? []).filter(
+      (site) => (site.status || "active").toLowerCase() !== "inactive"
+    ),
+  [sites]
+);
 
+const inactiveSitesCount = useMemo(
+  () =>
+    (sites ?? []).filter(
+      (site) => (site.status || "active").toLowerCase() === "inactive"
+    ).length,
+  [sites]
+);
+
+const activeSitesCount = activeSites.length;
+const allSitesCount = sites.length;
   // Ensure all sites have a stable ID
   useEffect(() => {
     const list = sites ?? [];
@@ -122,33 +139,38 @@ export function SiteListView({
   }, [sites, setSettings]);
 
   const sitesNeedingGPS = useMemo(
-    () =>
-      settings.requireGeofence
-        ? (sites ?? []).filter((s) => !s.lat || !s.lng).length
-        : 0,
-    [settings.requireGeofence, sites]
-  );
+  () =>
+    settings.requireGeofence
+      ? activeSites.filter((s) => !s.lat || !s.lng).length
+      : 0,
+  [settings.requireGeofence, activeSites]
+);
 
   const filteredSites = useMemo(() => {
-    if (!searchQuery.trim()) {
-      return sites;
-    }
-    const query = searchQuery.toLowerCase();
-    return sites.filter(
-      (site) =>
-        site.name.toLowerCase().includes(query) ||
-        site.address?.toLowerCase().includes(query) ||
-        site.contactName?.toLowerCase().includes(query)
-    );
-  }, [sites, searchQuery]);
+  if (!searchQuery.trim()) {
+    return activeSites;
+  }
+
+  const query = searchQuery.toLowerCase();
+
+  return (sites ?? []).filter(
+    (site) =>
+      site.name.toLowerCase().includes(query) ||
+      site.address?.toLowerCase().includes(query) ||
+      site.contactName?.toLowerCase().includes(query)
+  );
+}, [sites, activeSites, searchQuery]);
 
   const groupedSites = useMemo(() => {
     if (groupBy === "none") {
-      return {
-        "All sites": [...filteredSites].sort((a, b) =>
-          a.name.localeCompare(b.name)
-        ),
-      };
+     return {
+  [searchQuery.trim()
+    ? `Search Results (${filteredSites.length})`
+    : `Active Sites (${activeSitesCount})`
+  ]: [...filteredSites].sort((a, b) =>
+    a.name.localeCompare(b.name)
+  ),
+};
     }
 
     const groups: Record<string, Site[]> = {};
@@ -279,20 +301,37 @@ export function SiteListView({
       <Card>
         <CardHeader>
           <div className="flex justify-between items-start flex-wrap gap-4">
-            <div className="flex-grow space-y-1">
-              <CardTitle className="text-xl">Client sites</CardTitle>
-              <CardDescription>
-                Maintain addresses, contacts, access details, and rates for each
-                location.
-              </CardDescription>
-              {settings.requireGeofence && sitesNeedingGPS > 0 && (
-                <Badge variant="destructive" className="mt-2">
-                  {sitesNeedingGPS} site
-                  {sitesNeedingGPS !== 1 && "s"} require GPS coordinates while
-                  geofencing is enabled.
-                </Badge>
-              )}
-            </div>
+            <div className="flex-grow space-y-2">
+  <CardTitle className="text-xl">Client Sites</CardTitle>
+
+  <CardDescription>
+    Maintain addresses, contacts, access details, and rates for each
+    location.
+  </CardDescription>
+
+  <div className="flex flex-wrap gap-2">
+    <Badge>
+      Active Sites: {activeSitesCount}
+    </Badge>
+
+    <Badge variant="secondary">
+      Inactive Sites: {inactiveSitesCount}
+    </Badge>
+
+    <Badge variant="outline">
+      All Sites: {allSitesCount}
+    </Badge>
+  </div>
+
+  {settings.requireGeofence && sitesNeedingGPS > 0 && (
+    <Badge variant="destructive">
+      {sitesNeedingGPS} site
+      {sitesNeedingGPS !== 1 && "s"} require GPS coordinates while
+      geofencing is enabled.
+    </Badge>
+  )}
+</div>
+
             <div className="flex items-center gap-2">
               <Input
                 placeholder="Search by name, address, or contact…"
