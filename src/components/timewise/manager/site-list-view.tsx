@@ -147,16 +147,15 @@ const allSitesCount = sites.length;
   [settings.requireGeofence, activeSites]
 );
 
- const filteredSites = useMemo(() => {
+const filteredSites = useMemo(() => {
   let baseSites = sites ?? [];
 
   if (siteFilter === "active") {
     baseSites = activeSites;
-  }
-
-  if (siteFilter === "inactive") {
+  } else if (siteFilter === "inactive") {
     baseSites = baseSites.filter(
-      (site) => (site.status || "active").toLowerCase() === "inactive"
+      (site) =>
+        (site.status || "active").toLowerCase() === "inactive"
     );
   }
 
@@ -173,19 +172,22 @@ const allSitesCount = sites.length;
       site.contactName?.toLowerCase().includes(query)
   );
 }, [sites, activeSites, siteFilter, searchQuery]);
+const groupedSites = useMemo(() => {
+  if (groupBy === "none") {
+    const title = searchQuery.trim()
+      ? `Search Results (${filteredSites.length})`
+      : siteFilter === "active"
+      ? `Active Sites (${activeSitesCount})`
+      : siteFilter === "inactive"
+      ? `Inactive Sites (${inactiveSitesCount})`
+      : `All Sites (${allSitesCount})`;
 
-  const groupedSites = useMemo(() => {
-    if (groupBy === "none") {
-     return {
-  [searchQuery.trim()
-    ? `Search Results (${filteredSites.length})`
-    : `Active Sites (${activeSitesCount})`
-  ]: [...filteredSites].sort((a, b) =>
-    a.name.localeCompare(b.name)
-  ),
-};
-    }
-
+    return {
+      [title]: [...filteredSites].sort((a, b) =>
+        a.name.localeCompare(b.name)
+      ),
+    };
+  }
     const groups: Record<string, Site[]> = {};
 
     filteredSites.forEach((site) => {
@@ -204,7 +206,15 @@ const allSitesCount = sites.length;
     );
 
     return groups;
-  }, [filteredSites, groupBy]);
+  }, [
+  filteredSites,
+  groupBy,
+  searchQuery,
+  siteFilter,
+  activeSitesCount,
+  inactiveSitesCount,
+  allSitesCount,
+]);
 
   const handleOpenDialog = (site: Site | null) => {
     setEditingSite(site);
