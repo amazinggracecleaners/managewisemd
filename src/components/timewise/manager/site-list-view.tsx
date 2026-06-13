@@ -108,6 +108,7 @@ export function SiteListView({
   const { toast } = useToast();
   const [searchQuery, setSearchQuery] = useState("");
   const [groupBy, setGroupBy] = useState<"none" | "city" | "amount">("none");
+  const [siteFilter, setSiteFilter] = useState<"active" | "inactive" | "all">("active");
 const activeSites = useMemo(
   () =>
     (sites ?? []).filter(
@@ -146,20 +147,32 @@ const allSitesCount = sites.length;
   [settings.requireGeofence, activeSites]
 );
 
-  const filteredSites = useMemo(() => {
+ const filteredSites = useMemo(() => {
+  let baseSites = sites ?? [];
+
+  if (siteFilter === "active") {
+    baseSites = activeSites;
+  }
+
+  if (siteFilter === "inactive") {
+    baseSites = baseSites.filter(
+      (site) => (site.status || "active").toLowerCase() === "inactive"
+    );
+  }
+
   if (!searchQuery.trim()) {
-    return activeSites;
+    return baseSites;
   }
 
   const query = searchQuery.toLowerCase();
 
-  return (sites ?? []).filter(
+  return baseSites.filter(
     (site) =>
       site.name.toLowerCase().includes(query) ||
       site.address?.toLowerCase().includes(query) ||
       site.contactName?.toLowerCase().includes(query)
   );
-}, [sites, activeSites, searchQuery]);
+}, [sites, activeSites, siteFilter, searchQuery]);
 
   const groupedSites = useMemo(() => {
     if (groupBy === "none") {
@@ -339,6 +352,22 @@ const allSitesCount = sites.length;
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="w-full sm:w-56"
               />
+
+              <div className="w-36">
+  <Select
+    value={siteFilter}
+    onValueChange={(v: "active" | "inactive" | "all") => setSiteFilter(v)}
+  >
+    <SelectTrigger>
+      <SelectValue placeholder="Site filter" />
+    </SelectTrigger>
+    <SelectContent>
+      <SelectItem value="active">Active</SelectItem>
+      <SelectItem value="inactive">Inactive</SelectItem>
+      <SelectItem value="all">All Sites</SelectItem>
+    </SelectContent>
+  </Select>
+</div>
               <div className="w-40">
                 <Select
                   value={groupBy}
