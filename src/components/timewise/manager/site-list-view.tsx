@@ -749,7 +749,7 @@ const groupedSites = useMemo(() => {
                   .map(([groupName, sitesInGroup]) => (
                     <AccordionItem value={groupName} key={groupName}>
                       <AccordionTrigger className="text-base font-semibold">
-                        {groupName} ({sitesInGroup.length})
+                        {groupName}
                       </AccordionTrigger>
                       <AccordionContent>
                         <div className="space-y-6 pl-4">
