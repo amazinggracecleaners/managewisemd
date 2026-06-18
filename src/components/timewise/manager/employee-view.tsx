@@ -3,6 +3,7 @@
 import React, { useMemo, useState } from "react";
 import type { Employee } from "@/shared/types/domain";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import {
   Card,
   CardContent,
@@ -160,17 +161,17 @@ const allEmployeesCount = employees.length;
               Add, edit, or remove employees. Assign teams (manager-only).
             </CardDescription>
             <div className="flex flex-wrap gap-2 mt-2">
-  <span className="text-xs rounded-md border px-2 py-1">
-    Active Employees: {activeEmployeesCount}
-  </span>
+  <Badge>
+  Active Employees: {activeEmployeesCount}
+</Badge>
 
-  <span className="text-xs rounded-md border px-2 py-1">
-    Inactive Employees: {inactiveEmployeesCount}
-  </span>
+<Badge variant="destructive">
+  Inactive Employees: {inactiveEmployeesCount}
+</Badge>
 
-  <span className="text-xs rounded-md border px-2 py-1">
-    All Employees: {allEmployeesCount}
-  </span>
+<Badge variant="outline">
+  All Employees: {allEmployeesCount}
+</Badge>
 </div>
           </div>
 
@@ -208,7 +209,8 @@ const allEmployeesCount = employees.length;
                 <TableHead>Phone</TableHead>
                 <TableHead>Default Rate</TableHead>
                 <TableHead>Team</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
+<TableHead>Status</TableHead>
+<TableHead className="text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
 
@@ -284,6 +286,13 @@ const allEmployeesCount = employees.length;
                           )}
                         </div>
                       </TableCell>
+                      <TableCell>
+  <Badge
+  variant={emp.status === "inactive" ? "destructive" : "default"}
+>
+    {emp.status === "inactive" ? "Inactive" : "Active"}
+  </Badge>
+</TableCell>
 
                       <TableCell className="text-right">
                         <Button
@@ -307,7 +316,7 @@ const allEmployeesCount = employees.length;
                 })
               ) : (
                 <TableRow>
-                  <TableCell colSpan={5} className="h-24 text-center">
+                  <TableCell colSpan={6} className="h-24 text-center">
                     No employees yet.
                   </TableCell>
                 </TableRow>
