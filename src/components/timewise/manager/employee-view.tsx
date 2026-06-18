@@ -61,10 +61,44 @@ export function EmployeeManagerView({
   const [teamNameDrafts, setTeamNameDrafts] = useState<Record<string, string>>(
     {}
   );
+  const [employeeFilter, setEmployeeFilter] = useState<
+  "active" | "inactive" | "all"
+>("active");
+
+const activeEmployees = useMemo(
+  () =>
+    (employees ?? []).filter(
+      (emp) => (emp.status || "active").toLowerCase() !== "inactive"
+    ),
+  [employees]
+);
+
+const inactiveEmployeesCount = useMemo(
+  () =>
+    (employees ?? []).filter(
+      (emp) => (emp.status || "active").toLowerCase() === "inactive"
+    ).length,
+  [employees]
+);
+
+const activeEmployeesCount = activeEmployees.length;
+const allEmployeesCount = employees.length;
 
   const employeesSorted = useMemo(() => {
-    return (employees || []).slice().sort((a, b) => a.name.localeCompare(b.name));
-  }, [employees]);
+  let baseEmployees = employees ?? [];
+
+  if (employeeFilter === "active") {
+    baseEmployees = activeEmployees;
+  } else if (employeeFilter === "inactive") {
+    baseEmployees = baseEmployees.filter(
+      (emp) => (emp.status || "active").toLowerCase() === "inactive"
+    );
+  }
+
+  return baseEmployees
+    .slice()
+    .sort((a, b) => a.name.localeCompare(b.name));
+}, [employees, activeEmployees, employeeFilter]);
 
   const teamById = useMemo(() => {
     return new Map((teams || []).map((t) => [t.id, t]));
@@ -125,11 +159,43 @@ export function EmployeeManagerView({
             <CardDescription>
               Add, edit, or remove employees. Assign teams (manager-only).
             </CardDescription>
+            <div className="flex flex-wrap gap-2 mt-2">
+  <span className="text-xs rounded-md border px-2 py-1">
+    Active Employees: {activeEmployeesCount}
+  </span>
+
+  <span className="text-xs rounded-md border px-2 py-1">
+    Inactive Employees: {inactiveEmployeesCount}
+  </span>
+
+  <span className="text-xs rounded-md border px-2 py-1">
+    All Employees: {allEmployeesCount}
+  </span>
+</div>
           </div>
 
-          <Button onClick={() => openDialog(null)}>
-            <PlusCircle className="mr-2 h-4 w-4" /> Add Employee
-          </Button>
+          <div className="flex items-center gap-2">
+  <Select
+    value={employeeFilter}
+    onValueChange={(v: "active" | "inactive" | "all") =>
+      setEmployeeFilter(v)
+    }
+  >
+    <SelectTrigger className="w-40">
+      <SelectValue placeholder="Employee filter" />
+    </SelectTrigger>
+
+    <SelectContent>
+      <SelectItem value="active">Active</SelectItem>
+      <SelectItem value="inactive">Inactive</SelectItem>
+      <SelectItem value="all">All Employees</SelectItem>
+    </SelectContent>
+  </Select>
+
+  <Button onClick={() => openDialog(null)}>
+    <PlusCircle className="mr-2 h-4 w-4" /> Add Employee
+  </Button>
+</div>
         </div>
       </CardHeader>
 

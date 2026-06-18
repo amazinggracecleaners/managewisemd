@@ -148,6 +148,7 @@ export type Employee = {
   // Manager-only organization
   teamId?: string;
   teamName?: string;
+  status?: "active" | "inactive";
 
   emergencyContact?: {
     name: string;
