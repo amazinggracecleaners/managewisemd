@@ -87,7 +87,7 @@ export function EmployeeProfileDialog({
 
   // ✅ NEW: team state (manager-only editable)
   const [teamId, setTeamId] = useState<string>("");
-
+const [status, setStatus] = useState<"active" | "inactive">("active");
   useEffect(() => {
     if (employee) {
       setFirstName(employee.firstName || "");
@@ -111,6 +111,7 @@ export function EmployeeProfileDialog({
 
       // ✅ NEW: load teamId
       setTeamId((employee as any).teamId || "");
+      setStatus(employee.status || "active");
     } else {
       setFirstName("");
       setLastName("");
@@ -129,6 +130,7 @@ export function EmployeeProfileDialog({
 
       // ✅ NEW: default to no team
       setTeamId("");
+      setStatus("active");
     }
   }, [employee]);
 
@@ -234,6 +236,7 @@ export function EmployeeProfileDialog({
 
           // ✅ NEW: teamId on create
           ...(teamId ? ({ teamId } as any) : {}),
+          status,
         };
 
         const cleanedNew = cleanForFirestore(newEmployee) as Omit<Employee, "id">;
@@ -274,6 +277,7 @@ export function EmployeeProfileDialog({
 
         // ✅ NEW: teamId on update
         ...(teamId ? ({ teamId } as any) : ({ teamId: "" } as any)),
+        status,
       };
 
       const cleanedUpdates = cleanForFirestore(updatedEmployee);
@@ -455,6 +459,31 @@ export function EmployeeProfileDialog({
                   </p>
                 </div>
               )}
+              {isManager && (
+  <div className="space-y-2">
+    <Label>Employee Status</Label>
+
+    <Select
+      value={status}
+      onValueChange={(v) =>
+        setStatus(v as "active" | "inactive")
+      }
+    >
+      <SelectTrigger>
+        <SelectValue />
+      </SelectTrigger>
+
+      <SelectContent>
+        <SelectItem value="active">Active</SelectItem>
+        <SelectItem value="inactive">Inactive</SelectItem>
+      </SelectContent>
+    </Select>
+
+    <p className="text-[11px] text-muted-foreground">
+      Inactive employees are hidden from the default employee list but their records remain available.
+    </p>
+  </div>
+)}
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
