@@ -19,7 +19,11 @@ export async function createPayrollConfirmationNotifications(args: {
     )
   );
 
-  const targetEmployees = employees.filter((e) => employeeIds.includes(e.id));
+  const targetEmployees = employees.filter(
+  (e) =>
+    employeeIds.includes(e.id) &&
+    (e.status || "active") !== "inactive"
+);
 
   await Promise.all(
     targetEmployees.map((employee) =>

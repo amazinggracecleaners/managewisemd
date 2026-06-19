@@ -1242,9 +1242,11 @@ await addDoc(
 
     if (!idsToNotify.size) return;
 
-    const affectedEmployees = employees.filter((e) =>
-      idsToNotify.has(e.id)
-    );
+    const affectedEmployees = employees.filter(
+  (e) =>
+    idsToNotify.has(e.id) &&
+    (e.status || "active") !== "inactive"
+);
 
     if (!affectedEmployees.length) return;
 
@@ -1985,7 +1987,18 @@ await addDoc(
   const confirmPayroll = useCallback(
   async (periodId: string, employeeId: string, revision: number) => {
     if (!user) return;
+const employee = employees.find(
+  (e) => e.id === employeeId
+);
 
+if ((employee?.status || "active") === "inactive") {
+  toast({
+    variant: "destructive",
+    title: "Employee inactive",
+    description: "Inactive employees cannot confirm payroll.",
+  });
+  return;
+}
     const confirmation: PayrollConfirmation = {
       periodId,
       companyId: getCompanyId(settings),
@@ -2256,7 +2269,21 @@ await addDoc(
 
   const activeShifts = useMemo(() => sessions.filter((s) => s.active), [sessions]);
 
-  const handleLogin = useCallback((employee: Employee) => setLoggedInEmployee(employee), []);
+  const handleLogin = useCallback(
+  (employee: Employee) => {
+    if ((employee.status || "active") === "inactive") {
+      toast({
+        variant: "destructive",
+        title: "Account inactive",
+        description: "Please contact your manager.",
+      });
+      return;
+    }
+
+    setLoggedInEmployee(employee);
+  },
+  [toast]
+);
   const handleLogout = useCallback(() => setLoggedInEmployee(null), []);
 
   const managerChipDate = useMemo(() => (fromDate ? new Date(fromDate + "T00:00:00") : new Date()), [fromDate]);

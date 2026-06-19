@@ -78,13 +78,14 @@
     //  .get();
 
     //const targetEmployees = employeesSnap.docs
-    //  .map((doc) => ({ id: doc.id, ...doc.data() }))
-    //  .filter(
-    //    (emp: any) =>
-    //      employeeIds.includes(emp.id) &&
-     //     typeof emp.phone === "string" &&
-     //     emp.phone.trim()
-    //  );
+ // .map((doc) => ({ id: doc.id, ...doc.data() }))
+  //.filter(
+    //(emp: any) =>
+      //employeeIds.includes(emp.id) &&
+      //(emp.status || "active") !== "inactive" &&
+      //typeof emp.phone === "string" &&
+      //emp.phone.trim()
+  //);
 
    // const start = String(period.startDate ?? "").slice(0, 10);
    // const end = String(period.endDate ?? "").slice(0, 10);

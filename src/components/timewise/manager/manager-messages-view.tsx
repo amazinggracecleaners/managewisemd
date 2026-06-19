@@ -133,6 +133,10 @@ setMessages(items);
 
   const sendReply = async () => {
     if (!selectedEmployee || !replyText.trim()) return;
+    if ((selectedEmployee.status || "active") === "inactive") {
+  alert("This employee is inactive. You can view message history, but you cannot send new messages.");
+  return;
+}
 const attachment = replyFile
   ? await uploadMessageAttachment({
       companyId,
@@ -207,7 +211,14 @@ const attachment = replyFile
               }`}
             >
               <div className="flex justify-between items-center">
-                <span className="font-medium">{emp.name}</span>
+                <span className="font-medium">
+  {emp.name}
+  {(emp.status || "active") === "inactive" && (
+    <span className="ml-2 text-xs text-muted-foreground">
+      (Inactive)
+    </span>
+  )}
+</span>
 
                 {emp.unread > 0 && (
                   <Badge variant="destructive">{emp.unread}</Badge>

@@ -379,7 +379,10 @@ const paidProgressPct = useMemo(() => {
     const sessions = groupSessions(filteredEntries);
 
     const newLineItems = employees
-      .map((employee) => {
+  .filter(
+    (employee) => (employee.status || "active") !== "inactive"
+  )
+  .map((employee) => {
         const employeeSessions = sessions.filter(
           (
             s

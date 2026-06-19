@@ -140,6 +140,7 @@ updateEntry: (id: string, updates: Partial<Entry>) => Promise<void>;
 }
 
 
+
 const billingFrequencies: BillingFrequency[] = [
   "One-Time",
   "Daily",
@@ -160,6 +161,7 @@ const repeatFrequencies: RepeatFrequency[] = [
   "quarterly",
   "yearly",
 ];
+
 
 const getStatusIndicator = (
   status: SiteStatus | undefined,
@@ -239,6 +241,13 @@ updateEntry,
   process.env.NEXT_PUBLIC_COMPANY_ID ||
   "amazing-grace-cleaners";
 const { cloudReady } = useSettings();
+const activeEmployees = useMemo(
+  () =>
+    (employees ?? []).filter(
+      (emp: Employee) => (emp.status || "active") !== "inactive"
+    ),
+  [employees]
+); 
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingSchedule, setEditingSchedule] =
     useState<CleaningSchedule | null>(null);
@@ -1286,7 +1295,7 @@ const getScheduleHours = useCallback(
                         <Label>Employees</Label>
                         <ScrollArea className="h-32 rounded-md border p-2">
                           <div className="space-y-2">
-                            {employees.map((emp) => (
+                            {activeEmployees.map((emp) => (
                               <div
                                 key={emp.id}
                                 className="flex items-center space-x-2"

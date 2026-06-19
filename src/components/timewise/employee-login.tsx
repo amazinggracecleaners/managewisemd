@@ -45,18 +45,24 @@ export function EmployeeLogin({ employees, onLogin }: EmployeeLoginProps) {
                lastName === trimmedName;
     });
 
-    if (!employee) {
-      setError("Employee not found. Please check your name.");
-      return;
-    }
+   if (!employee) {
+  setError("Employee not found. Please check your name.");
+  return;
+}
 
-    if (employee.pin === pin) {
-      onLogin(employee);
-    } else {
-      setError("Incorrect PIN. Please try again.");
-    }
-  };
+if ((employee.status || "active") === "inactive") {
+  setError(
+    "Your employee account is inactive. Please contact your manager."
+  );
+  return;
+}
 
+if (employee.pin === pin) {
+  onLogin(employee);
+} else {
+  setError("Incorrect PIN. Please try again.");
+}
+};
   return (
     <div className="flex justify-center items-center py-12">
       <Card className="w-full max-w-sm">
