@@ -239,6 +239,22 @@ export type Session = {
 
 export type SiteStatus = 'incomplete' | 'in-process' | 'complete';
 
+export type ServiceFeedback = {
+  id: string;
+  siteId: string;
+  siteName: string;
+
+  scheduleId?: string | null;
+  scheduleDate: string; // YYYY-MM-DD
+
+  type: "none" | "complaint" | "compliment";
+  category?: string;
+  notes?: string;
+
+  resolved?: boolean;
+  createdAt?: any;
+};
+
 
 export type PayrollStatus =
   | "draft"

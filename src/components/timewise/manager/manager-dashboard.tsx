@@ -9,6 +9,7 @@ import type {
   MileageLog,
   OtherExpense,
   Invoice,
+ServiceFeedback,
 } from "@/shared/types/domain";
 
 import { DashboardFilters } from "./dashboard-filters";
@@ -45,6 +46,10 @@ interface ManagerDashboardProps {
   durationsBySite: Map<string, { minutes: number; byEmployee: Record<string, number> }>;
   deleteSite: (siteId: string) => void;
   settings: Settings;
+  serviceFeedbacks: ServiceFeedback[];
+onAddServiceFeedbackAction: (
+  feedback: Omit<ServiceFeedback, "id">
+) => void;
 }
 
 export function ManagerDashboard({
@@ -71,6 +76,8 @@ export function ManagerDashboard({
   invoices,
   deleteSite,
   settings,
+  serviceFeedbacks,
+onAddServiceFeedbackAction,
 }: ManagerDashboardProps) {
   return (
     <div className="space-y-6">
@@ -182,6 +189,8 @@ export function ManagerDashboard({
             otherExpenses={otherExpenses}
             invoices={invoices}
             settings={settings}
+            serviceFeedbacks={serviceFeedbacks}
+onAddServiceFeedbackAction={onAddServiceFeedbackAction}
             deleteSiteAction={deleteSite}
           />
         </CardContent>

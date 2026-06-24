@@ -10,6 +10,7 @@ import type {
   MileageLog,
   Employee,
   Invoice,
+ServiceFeedback,
   SiteStatus,
   OtherExpense,
   PayrollPeriod,
@@ -115,6 +116,12 @@ interface ManagerViewProps {
   addInvoice: (invoice: Omit<Invoice, "id">) => void;
   updateInvoice: (id: string, updates: Partial<Invoice>) => void;
   deleteInvoice: (id: string) => void;
+
+    // Service feedback
+  serviceFeedbacks: ServiceFeedback[];
+  onAddServiceFeedbackAction: (
+    feedback: Omit<ServiceFeedback, "id">
+  ) => void;
 
   // Payroll
   payrollPeriods: PayrollPeriod[];
@@ -367,6 +374,8 @@ useEffect(() => {
               durationsBySite={props.getDurationsBySite(new Date())}
               deleteSite={props.deleteSite}
               settings={props.settings}
+               serviceFeedbacks={props.serviceFeedbacks}
+  onAddServiceFeedbackAction={props.onAddServiceFeedbackAction}
             />
           </div>
           </div>

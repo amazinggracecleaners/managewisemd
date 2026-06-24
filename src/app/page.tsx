@@ -37,6 +37,7 @@ import type {
   EmployeeUpdateRequest,
   Session,
   ManagerNotification,
+  ServiceFeedback,
 } from "@/shared/types/domain";
 
 import {
@@ -140,6 +141,7 @@ const [selectedRole, setSelectedRole] = useState<"employee" | "manager" | null>(
   const [payrollPeriods, setPayrollPeriods] = useState<PayrollPeriod[]>([]);
   const [payrollConfirmations, setPayrollConfirmations] = useState<PayrollConfirmation[]>([]);
   const [employeeUpdateRequests, setEmployeeUpdateRequests] = useState<EmployeeUpdateRequest[]>([]);
+  const [serviceFeedbacks, setServiceFeedbacks] = useState<ServiceFeedback[]>([]);
 
   // UI state
   const [tab, setTab] = useState<"employee" | "manager">("employee");
@@ -235,6 +237,52 @@ useEffect(() => {
       localStorage.removeItem("ops_last_employee");
     }
   }, [loggedInEmployee]);
+
+  const onAddServiceFeedbackAction = useCallback(
+  async (feedback: Omit<ServiceFeedback, "id">) => {
+    if (engine === "cloud") {
+      const cId = getCompanyId(settings);
+      const newDocRef = doc(collection(db, "companies", cId, "service_feedbacks"));
+
+      const dataToSave: ServiceFeedback = {
+        ...feedback,
+        id: newDocRef.id,
+      };
+
+      try {
+        await setDoc(newDocRef, cleanForFirestore(dataToSave));
+        toast({ title: "Service feedback added" });
+      } catch (e: any) {
+        errorEmitter.emit(
+          "permission-error",
+          new FirestorePermissionError({
+            path: newDocRef.path,
+            operation: "create",
+            requestResourceData: dataToSave,
+          })
+        );
+
+        toast({
+          variant: "destructive",
+          title: "Could not add service feedback",
+          description: e.message || "Check connection and permissions.",
+          duration: 9000,
+        });
+      }
+    } else {
+      setServiceFeedbacks((prev) => [
+        ...prev,
+        {
+          id: uuid(),
+          ...feedback,
+        } as ServiceFeedback,
+      ]);
+
+      toast({ title: "Service feedback added" });
+    }
+  },
+  [engine, settings, toast]
+);
 
   const markNotificationRead = useCallback(
     async (id: string) => {
@@ -472,6 +520,18 @@ unsubs.push(
         handleSnapshotError("employee_update_requests")
       )
     );
+
+    unsubs.push(
+  onSnapshot(
+    query(collection(db, "companies", safeCId, "service_feedbacks"), orderBy("scheduleDate", "desc")),
+    (snap) =>
+      setServiceFeedbacks(
+        snap.docs.map((d) => ({ id: d.id, ...d.data() } as ServiceFeedback))
+      ),
+    handleSnapshotError("service_feedbacks")
+  )
+);
+
 unsubs.push(
   onSnapshot(
     query(collection(db, "companies", safeCId, "notifications"), orderBy("createdAt", "desc")),
@@ -2535,6 +2595,8 @@ return (
             addInvoice={addInvoice}
             updateInvoice={updateInvoice}
             deleteInvoice={deleteInvoice}
+            serviceFeedbacks={serviceFeedbacks}
+onAddServiceFeedbackAction={onAddServiceFeedbackAction}
             testGeofence={testGeofence}
             profitabilityBySite={profitabilityBySite}
             getDurationsBySite={getDurationsBySite}

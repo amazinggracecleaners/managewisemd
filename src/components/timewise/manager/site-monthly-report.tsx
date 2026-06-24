@@ -10,6 +10,7 @@ import type {
     OtherExpense,
     Invoice,
     Settings,
+    ServiceFeedback,
   } from "@/shared/types/domain";
 import { Button } from "@/components/ui/button";
 import { Trash2 } from "lucide-react";
@@ -22,6 +23,8 @@ type Props = {
   otherExpenses: any[];
   invoices: Invoice[];
   settings: Settings;
+  serviceFeedbacks: ServiceFeedback[];
+onAddServiceFeedbackAction: (feedback: Omit<ServiceFeedback, "id">) => void;
   deleteSiteAction: (siteId: string) => void;
 };
 
@@ -85,6 +88,8 @@ export function SiteMonthlyReport({
   invoices,
   settings,
   deleteSiteAction,
+serviceFeedbacks,
+onAddServiceFeedbackAction,
 }: Props) {
   const [selectedRow, setSelectedRow] = React.useState<any | null>(null);
   const monthISO = useMemo(() => {
@@ -255,6 +260,40 @@ export function SiteMonthlyReport({
         </div>
       );
     })()}
+
+    <div className="mt-4 border-t pt-4 space-y-3">
+      <h5 className="font-semibold">Client Feedback / Quality</h5>
+
+      <Button
+        variant="outline"
+        size="sm"
+        onClick={() =>
+          onAddServiceFeedbackAction({
+            siteId: selectedRow.siteId,
+            siteName: selectedRow.siteName,
+            scheduleDate: fromDate || new Date().toISOString().slice(0, 10),
+            type: "complaint",
+            category: "Other",
+            notes: "Client complaint recorded.",
+            resolved: false,
+            createdAt: new Date().toISOString(),
+          })
+        }
+      >
+        Add Complaint
+      </Button>
+
+      <div className="space-y-2 text-sm">
+        {(serviceFeedbacks || [])
+          .filter((f) => f.siteId === selectedRow.siteId)
+          .map((f) => (
+            <div key={f.id} className="rounded-md border p-2">
+              <strong>{f.type}</strong> — {f.category || "No category"}
+              {f.notes && <div>{f.notes}</div>}
+            </div>
+          ))}
+      </div>
+    </div>
   </div>
 )}
       </div>
