@@ -92,6 +92,12 @@ serviceFeedbacks,
 onAddServiceFeedbackAction,
 }: Props) {
   const [selectedRow, setSelectedRow] = React.useState<any | null>(null);
+  const [feedbackType, setFeedbackType] = React.useState<
+  "none" | "complaint" | "compliment"
+>("none");
+
+const [feedbackCategory, setFeedbackCategory] = React.useState("");
+const [feedbackNotes, setFeedbackNotes] = React.useState("");
   const monthISO = useMemo(() => {
     // derive "YYYY-MM" from fromDate if present
     if (!fromDate) return undefined;
@@ -262,38 +268,106 @@ onAddServiceFeedbackAction,
     })()}
 
     <div className="mt-4 border-t pt-4 space-y-3">
-      <h5 className="font-semibold">Client Feedback / Quality</h5>
+  <h5 className="font-semibold">Client Feedback / Quality</h5>
 
-      <Button
-        variant="outline"
-        size="sm"
-        onClick={() =>
-          onAddServiceFeedbackAction({
-            siteId: selectedRow.siteId,
-            siteName: selectedRow.siteName,
-            scheduleDate: fromDate || new Date().toISOString().slice(0, 10),
-            type: "complaint",
-            category: "Other",
-            notes: "Client complaint recorded.",
-            resolved: false,
-            createdAt: new Date().toISOString(),
-          })
-        }
-      >
-        Add Complaint
-      </Button>
+  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+    <select
+      className="border rounded-md px-3 py-2 text-sm bg-background"
+      value={feedbackType}
+      onChange={(e) => {
+        setFeedbackType(e.target.value as any);
+        setFeedbackCategory("");
+      }}
+    >
+      <option value="none">No issue reported</option>
+      <option value="complaint">Complaint received</option>
+      <option value="compliment">Compliment received</option>
+    </select>
 
-      <div className="space-y-2 text-sm">
-        {(serviceFeedbacks || [])
-          .filter((f) => f.siteId === selectedRow.siteId)
-          .map((f) => (
-            <div key={f.id} className="rounded-md border p-2">
-              <strong>{f.type}</strong> — {f.category || "No category"}
-              {f.notes && <div>{f.notes}</div>}
-            </div>
-          ))}
-      </div>
-    </div>
+    <select
+      className="border rounded-md px-3 py-2 text-sm bg-background"
+      value={feedbackCategory}
+      onChange={(e) => setFeedbackCategory(e.target.value)}
+    >
+      <option value="">Select category</option>
+
+      {feedbackType === "complaint" && (
+  <>
+    <option value="Restroom">Restroom</option>
+    <option value="Floors">Floors</option>
+    <option value="Trash Removal">Trash Removal</option>
+    <option value="Dusting">Dusting</option>
+    <option value="Glass">Glass</option>
+    <option value="Vacuuming">Vacuuming</option>
+    <option value="Mopping">Mopping</option>
+    <option value="Break Room">Break Room</option>
+    <option value="Supplies Not Refilled">Supplies Not Refilled</option>
+    <option value="Missed Area">Missed Area</option>
+    <option value="Missed Service">Missed Service</option>
+    <option value="Late Service">Late Service</option>
+    <option value="Quality of Cleaning">Quality of Cleaning</option>
+    <option value="Poor Communication">Poor Communication</option>
+    <option value="Security / Access">Security / Access</option>
+    <option value="Other">Other</option>
+  </>
+)}
+
+      {feedbackType === "compliment" && (
+        <>
+          <option value="Excellent Cleaning">Excellent Cleaning</option>
+          <option value="Professional Staff">Professional Staff</option>
+          <option value="Reliability">Reliability</option>
+          <option value="Good Communication">Good Communication</option>
+          <option value="Other">Other</option>
+        </>
+      )}
+
+      
+    </select>
+
+    <Button
+      variant="outline"
+      size="sm"
+      onClick={() => {
+        onAddServiceFeedbackAction({
+          siteId: selectedRow.siteId,
+          siteName: selectedRow.siteName,
+          scheduleDate: fromDate || new Date().toISOString().slice(0, 10),
+          type: feedbackType,
+          category: feedbackCategory || "Other",
+          notes: feedbackNotes,
+          resolved:
+            feedbackType === "none" || feedbackType === "compliment",
+          createdAt: new Date().toISOString(),
+        });
+
+        setFeedbackType("none");
+        setFeedbackCategory("");
+        setFeedbackNotes("");
+      }}
+    >
+      Save Feedback
+    </Button>
+  </div>
+
+  <textarea
+    className="w-full border rounded-md px-3 py-2 text-sm bg-background"
+    placeholder="What did the client say? Add details here..."
+    value={feedbackNotes}
+    onChange={(e) => setFeedbackNotes(e.target.value)}
+  />
+
+  <div className="space-y-2 text-sm">
+    {(serviceFeedbacks || [])
+      .filter((f) => f.siteId === selectedRow.siteId)
+      .map((f) => (
+        <div key={f.id} className="rounded-md border p-2">
+          <strong>{f.type}</strong> — {f.category || "No category"}
+          {f.notes && <div>{f.notes}</div>}
+        </div>
+      ))}
+  </div>
+</div>
   </div>
 )}
       </div>

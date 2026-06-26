@@ -564,6 +564,8 @@ updateEntry={props.updateEntry}
   employees={props.employees}
   sites={props.sites}
   weekStartsOn={props.settings.weekStartsOn as any}
+  serviceFeedbacks={props.serviceFeedbacks}
+  onAddServiceFeedbackAction={props.onAddServiceFeedbackAction}
 />
 </TabsContent>
 

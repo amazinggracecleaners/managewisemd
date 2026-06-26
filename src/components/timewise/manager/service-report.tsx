@@ -22,6 +22,7 @@ import type {
   Entry,
   Site,
   DayOfWeek,
+  ServiceFeedback,
 } from "@/shared/types/domain";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -42,6 +43,10 @@ type Props = {
   employees: Employee[];
   sites: Site[];
   weekStartsOn: 0 | 1 | 2 | 3 | 4 | 5 | 6;
+  serviceFeedbacks: ServiceFeedback[];
+  onAddServiceFeedbackAction: (
+    feedback: Omit<ServiceFeedback, "id">
+  ) => void;
 };
 
 type ScheduleOccurrence = {
@@ -171,6 +176,7 @@ export function ServiceReport({
   employees,
   sites,
   weekStartsOn,
+  serviceFeedbacks,
 }: Props) {
   const today = new Date();
 
@@ -285,6 +291,30 @@ const [selectedSiteName, setSelectedSiteName] = useState<string | null>(null);
       completionRate,
     };
   }, [fromDate, toDate, schedules, entries, employees, sites, weekStartsOn]);
+
+  const feedbackInRange = useMemo(() => {
+  return (serviceFeedbacks || []).filter((f) => {
+    return f.scheduleDate >= fromDate && f.scheduleDate <= toDate;
+  });
+}, [serviceFeedbacks, fromDate, toDate]);
+
+const complaints = feedbackInRange.filter((f) => f.type === "complaint");
+const compliments = feedbackInRange.filter((f) => f.type === "compliment");
+
+const topComplaintCategories = Object.entries(
+  complaints.reduce((acc, f) => {
+    const category = f.category || "Other";
+    acc[category] = (acc[category] || 0) + 1;
+    return acc;
+  }, {} as Record<string, number>)
+)
+  .sort((a, b) => b[1] - a[1])
+  .slice(0, 8);
+
+const recentFeedback = feedbackInRange
+  .slice()
+  .sort((a, b) => b.scheduleDate.localeCompare(a.scheduleDate))
+  .slice(0, 5);
 
   const selectedSiteOccurrences = selectedSiteName
   ? report.occurrences
@@ -437,7 +467,86 @@ const [selectedSiteName, setSelectedSiteName] = useState<string | null>(null);
             {report.completionRate.toFixed(2)}%
           </CardContent>
         </Card>
-      </div>
+            </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Service Quality</CardTitle>
+        </CardHeader>
+
+        <CardContent className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="rounded-lg border p-4">
+              <div className="text-sm text-muted-foreground">Complaints</div>
+              <div className="text-2xl font-bold">{complaints.length}</div>
+            </div>
+
+            <div className="rounded-lg border p-4">
+              <div className="text-sm text-muted-foreground">Compliments</div>
+              <div className="text-2xl font-bold">{compliments.length}</div>
+            </div>
+
+            <div className="rounded-lg border p-4">
+              <div className="text-sm text-muted-foreground">Top Issue</div>
+              <div className="text-lg font-semibold">
+                {topComplaintCategories[0]?.[0] || "None"}
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <h4 className="font-semibold mb-2">Top Complaint Categories</h4>
+
+            {topComplaintCategories.length ? (
+              <div className="space-y-2">
+                {topComplaintCategories.map(([category, count]) => (
+                  <div
+                    key={category}
+                    className="flex items-center justify-between rounded-md border px-3 py-2 text-sm"
+                  >
+                    <span>{category}</span>
+                    <span className="font-semibold">{count}</span>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                No complaints for this period.
+              </p>
+            )}
+          </div>
+
+          <div>
+            <h4 className="font-semibold mb-2">Recent Feedback</h4>
+
+            {recentFeedback.length ? (
+              <div className="space-y-2">
+                {recentFeedback.map((f) => (
+                  <div key={f.id} className="rounded-md border p-3 text-sm">
+                    <div className="font-medium">
+                      {f.scheduleDate} — {f.siteName}
+                    </div>
+
+                    <div>
+                      {f.type} • {f.category || "Other"}
+                    </div>
+
+                    {f.notes && (
+                      <div className="text-muted-foreground mt-1">
+                        {f.notes}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                No feedback recorded for this period.
+              </p>
+            )}
+          </div>
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader>
