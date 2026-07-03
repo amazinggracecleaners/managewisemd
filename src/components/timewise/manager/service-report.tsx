@@ -311,6 +311,8 @@ employeeRows.sort((a, b) =>
 
 const complaints = feedbackInRange.filter((f) => f.type === "complaint");
 const compliments = feedbackInRange.filter((f) => f.type === "compliment");
+const openComplaints = complaints.filter((f) => !f.resolved);
+const resolvedComplaints = complaints.filter((f) => f.resolved);
 const complaintRate =
   report.totalScheduled > 0
     ? (complaints.length / report.totalScheduled) * 100
@@ -341,6 +343,22 @@ const feedbackHistory = feedbackInRange
       )
   : [];
 
+const complaintsBySite = Object.entries(
+  complaints.reduce((acc, f) => {
+    acc[f.siteName] = (acc[f.siteName] || 0) + 1;
+    return acc;
+  }, {} as Record<string, number>)
+).sort((a, b) => b[1] - a[1]);
+
+const complimentsBySite = Object.entries(
+  compliments.reduce((acc, f) => {
+    acc[f.siteName] = (acc[f.siteName] || 0) + 1;
+    return acc;
+  }, {} as Record<string, number>)
+).sort((a, b) => b[1] - a[1]);
+
+const mostComplainedSite = complaintsBySite[0];
+const mostComplimentedSite = complimentsBySite[0];
   const setThisMonth = () => {
     setFromDate(format(startOfMonth(new Date()), "yyyy-MM-dd"));
     setToDate(format(endOfMonth(new Date()), "yyyy-MM-dd"));
@@ -509,7 +527,7 @@ const feedbackHistory = feedbackInRange
   </CardHeader>
 
   <CardContent className="space-y-5">
-    <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+    <div className="grid grid-cols-1 md:grid-cols-4 xl:grid-cols-8 gap-4">
       <div className="rounded-xl border bg-gradient-to-br from-red-100 via-red-50 to-white p-4 shadow-md transition-all hover:shadow-xl">
         <div className="text-sm text-red-700">Complaints</div>
         <div className="text-3xl font-bold text-red-600">{complaints.length}</div>
@@ -546,6 +564,39 @@ const feedbackHistory = feedbackInRange
           {complaints.length} of {report.totalScheduled} visits
         </div>
       </div>
+      <div className="rounded-xl border bg-orange-50 p-4">
+  <div className="text-sm font-medium">Open Complaints</div>
+  <div className="text-3xl font-bold text-orange-600">
+    {openComplaints.length}
+  </div>
+</div>
+
+<div className="rounded-xl border bg-blue-50 p-4">
+  <div className="text-sm font-medium">Resolved</div>
+  <div className="text-3xl font-bold text-blue-600">
+    {resolvedComplaints.length}
+  </div>
+</div>
+
+<div className="rounded-xl border bg-red-50 p-4">
+  <div className="text-sm font-medium">Most Complained Site</div>
+  <div className="font-bold mt-2">
+    {mostComplainedSite?.[0] ?? "None"}
+  </div>
+  <div className="text-sm text-muted-foreground">
+    {mostComplainedSite?.[1] ?? 0} complaints
+  </div>
+</div>
+
+<div className="rounded-xl border bg-green-50 p-4">
+  <div className="text-sm font-medium">Most Complimented Site</div>
+  <div className="font-bold mt-2">
+    {mostComplimentedSite?.[0] ?? "None"}
+  </div>
+  <div className="text-sm text-muted-foreground">
+    {mostComplimentedSite?.[1] ?? 0} compliments
+  </div>
+</div>
     </div>
 
     <div>
@@ -656,9 +707,27 @@ const feedbackHistory = feedbackInRange
             </TableCell>
 
             <TableCell>
-              <Button size="sm" variant="outline">
-                {f.type === "compliment" ? "View" : "Edit"}
-              </Button>
+              <Button
+  size="sm"
+  variant="outline"
+  onClick={() => {
+    const occurrence = report.occurrences.find(
+      (o) =>
+        o.scheduleId === f.scheduleId &&
+        o.scheduleDate === f.scheduleDate
+    );
+
+    if (!occurrence) return;
+
+    setFeedbackFor(occurrence);
+    setFeedbackType(f.type as "complaint" | "compliment");
+    setFeedbackCategory(f.category ?? "");
+    setFeedbackNotes(f.notes ?? "");
+    setFeedbackResolved(!!f.resolved);
+  }}
+>
+  {f.type === "compliment" ? "View" : "Edit"}
+</Button>
             </TableCell>
           </TableRow>
         ))}
