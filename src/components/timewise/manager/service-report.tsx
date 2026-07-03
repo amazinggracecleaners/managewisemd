@@ -177,6 +177,7 @@ export function ServiceReport({
   sites,
   weekStartsOn,
   serviceFeedbacks,
+   onAddServiceFeedbackAction,
 }: Props) {
   const today = new Date();
 
@@ -188,7 +189,11 @@ export function ServiceReport({
     format(endOfMonth(today), "yyyy-MM-dd")
   );
 const [selectedSiteName, setSelectedSiteName] = useState<string | null>(null);
-
+const [feedbackFor, setFeedbackFor] = useState<ScheduleOccurrence | null>(null);
+const [feedbackType, setFeedbackType] = useState<"complaint" | "compliment">("complaint");
+const [feedbackCategory, setFeedbackCategory] = useState("Floors");
+const [feedbackNotes, setFeedbackNotes] = useState("");
+const [feedbackResolved, setFeedbackResolved] = useState(false);
   const report = useMemo(() => {
     const from = parseISO(fromDate);
     const to = parseISO(toDate);
@@ -300,6 +305,10 @@ const [selectedSiteName, setSelectedSiteName] = useState<string | null>(null);
 
 const complaints = feedbackInRange.filter((f) => f.type === "complaint");
 const compliments = feedbackInRange.filter((f) => f.type === "compliment");
+const complaintRate =
+  report.totalScheduled > 0
+    ? (complaints.length / report.totalScheduled) * 100
+    : 0;
 
 const topComplaintCategories = Object.entries(
   complaints.reduce((acc, f) => {
@@ -431,7 +440,7 @@ const recentFeedback = feedbackInRange
         </CardContent>
       </Card>
 
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
         <Card>
           <CardHeader>
             <CardTitle className="text-sm">Scheduled Visits</CardTitle>
@@ -467,86 +476,176 @@ const recentFeedback = feedbackInRange
             {report.completionRate.toFixed(2)}%
           </CardContent>
         </Card>
+
+        <Card className="bg-gradient-to-br from-red-50 to-white shadow-sm">
+  <CardHeader>
+    <CardTitle className="text-sm text-red-700">Complaint Rate</CardTitle>
+  </CardHeader>
+  <CardContent>
+    <div className="text-2xl font-bold text-red-600">
+      {complaintRate.toFixed(2)}%
+    </div>
+    <div className="text-xs text-muted-foreground">
+      {complaints.length} of {report.totalScheduled} visits
+    </div>
+  </CardContent>
+</Card>
+
             </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Service Quality</CardTitle>
-        </CardHeader>
+      <Card className="border-0 bg-gradient-to-br from-purple-50 via-white to-blue-50 shadow-lg">
+  <CardHeader>
+    <CardTitle className="text-2xl font-bold text-purple-800">
+      Service Quality & Client Satisfaction
+    </CardTitle>
+  </CardHeader>
 
-        <CardContent className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="rounded-lg border p-4">
-              <div className="text-sm text-muted-foreground">Complaints</div>
-              <div className="text-2xl font-bold">{complaints.length}</div>
-            </div>
+  <CardContent className="space-y-5">
+    <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="rounded-xl border bg-gradient-to-br from-red-100 via-red-50 to-white p-4 shadow-md transition-all hover:shadow-xl">
+        <div className="text-sm text-red-700">Complaints</div>
+        <div className="text-3xl font-bold text-red-600">{complaints.length}</div>
+      </div>
 
-            <div className="rounded-lg border p-4">
-              <div className="text-sm text-muted-foreground">Compliments</div>
-              <div className="text-2xl font-bold">{compliments.length}</div>
-            </div>
+      <div className="rounded-xl border bg-gradient-to-br from-green-100 via-green-50 to-white p-4 shadow-md transition-all hover:shadow-xl">
+        <div className="text-sm text-green-700">Compliments</div>
+        <div className="text-3xl font-bold text-green-600">{compliments.length}</div>
+      </div>
 
-            <div className="rounded-lg border p-4">
-              <div className="text-sm text-muted-foreground">Top Issue</div>
-              <div className="text-lg font-semibold">
-                {topComplaintCategories[0]?.[0] || "None"}
-              </div>
-            </div>
-          </div>
+      <div className="rounded-xl border bg-gradient-to-br from-blue-100 via-blue-50 to-white p-4 shadow-md transition-all hover:shadow-xl">
+        <div className="text-sm text-blue-700">Top Issue</div>
+        <div className="text-xl font-bold text-blue-700">
+          {topComplaintCategories[0]?.[0] || "No complaints"}
+        </div>
+      </div>
 
-          <div>
-            <h4 className="font-semibold mb-2">Top Complaint Categories</h4>
+      <div className="rounded-xl border bg-gradient-to-br from-orange-100 via-orange-50 to-white p-4 shadow-md transition-all hover:shadow-xl">
+        <div className="text-sm text-orange-700">Complaint Rate</div>
+       <div
+  className={
+    complaintRate >= 10
+      ? "text-3xl font-bold text-red-600"
+      : complaintRate >= 5
+      ? "text-3xl font-bold text-orange-600"
+      : complaintRate >= 2
+      ? "text-3xl font-bold text-yellow-600"
+      : "text-3xl font-bold text-green-600"
+  }
+>
+          {complaintRate.toFixed(2)}%
+        </div>
+        <div className="text-xs text-muted-foreground">
+          {complaints.length} of {report.totalScheduled} visits
+        </div>
+      </div>
+    </div>
 
-            {topComplaintCategories.length ? (
-              <div className="space-y-2">
-                {topComplaintCategories.map(([category, count]) => (
+    <div>
+      <h4 className="font-semibold mb-3">Top Complaint Categories</h4>
+
+      {topComplaintCategories.length ? (
+        <div className="space-y-3">
+          {topComplaintCategories.map(([category, count]) => {
+            const percent =
+              complaints.length > 0 ? (count / complaints.length) * 100 : 0;
+
+            return (
+              <div key={category} className="rounded-lg border bg-white p-3">
+                <div className="mb-1 flex justify-between text-sm">
+                  <span className="flex items-center gap-2">
+  <span
+    className={
+      count >= 10
+        ? "h-3 w-3 rounded-full bg-red-500"
+        : count >= 5
+        ? "h-3 w-3 rounded-full bg-orange-500"
+        : count >= 2
+        ? "h-3 w-3 rounded-full bg-yellow-500"
+        : "h-3 w-3 rounded-full bg-green-500"
+    }
+  />
+  {category}
+</span>
+                  <span className="font-semibold">
+                    {count} ({percent.toFixed(0)}%)
+                  </span>
+                </div>
+
+                <div className="h-2 overflow-hidden rounded-full bg-gray-200">
                   <div
-                    key={category}
-                    className="flex items-center justify-between rounded-md border px-3 py-2 text-sm"
-                  >
-                    <span>{category}</span>
-                    <span className="font-semibold">{count}</span>
-                  </div>
-                ))}
+                    className="h-full rounded-full bg-red-500"
+                    style={{ width: `${percent}%` }}
+                  />
+                </div>
               </div>
-            ) : (
-              <p className="text-sm text-muted-foreground">
-                No complaints for this period.
-              </p>
-            )}
+            );
+          })}
+        </div>
+      ) : (
+        <p className="text-sm text-muted-foreground">
+        No complaints for this period.
+        </p>
+      )}
+    </div>
+    <div>
+  <h4 className="font-semibold mb-3">Recent Feedback</h4>
+
+  {recentFeedback.length ? (
+    <div className="space-y-3">
+      {recentFeedback.map((f) => (
+        <div
+          key={f.id}
+          className="rounded-lg border bg-white p-3 text-sm shadow-sm"
+        >
+          <div className="flex justify-between gap-3">
+            <div className="font-medium">
+              {format(parseISO(f.scheduleDate), "MMM d, yyyy")} — {f.siteName}
+            </div>
+
+            <span
+              className={
+                f.type === "complaint"
+                  ? "rounded-full bg-red-100 px-2 py-0.5 text-xs font-semibold text-red-700"
+                  : "rounded-full bg-green-100 px-2 py-0.5 text-xs font-semibold text-green-700"
+              }
+            >
+              {f.type}
+            </span>
           </div>
 
-          <div>
-            <h4 className="font-semibold mb-2">Recent Feedback</h4>
-
-            {recentFeedback.length ? (
-              <div className="space-y-2">
-                {recentFeedback.map((f) => (
-                  <div key={f.id} className="rounded-md border p-3 text-sm">
-                    <div className="font-medium">
-                      {f.scheduleDate} — {f.siteName}
-                    </div>
-
-                    <div>
-                      {f.type} • {f.category || "Other"}
-                    </div>
-
-                    {f.notes && (
-                      <div className="text-muted-foreground mt-1">
-                        {f.notes}
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <p className="text-sm text-muted-foreground">
-                No feedback recorded for this period.
-              </p>
-            )}
+          <div className="mt-1 font-semibold">
+            {f.category || "Other"}
           </div>
-        </CardContent>
-      </Card>
+
+          {f.notes && (
+            <div className="mt-1 text-muted-foreground">
+              {f.notes}
+            </div>
+          )}
+
+          <div className="mt-2">
+  {f.resolved ? (
+    <span className="rounded-full bg-green-100 px-2 py-1 text-xs text-green-700">
+      Resolved
+    </span>
+  ) : (
+    <span className="rounded-full bg-red-100 px-2 py-1 text-xs text-red-700">
+      Open
+    </span>
+  )}
+</div>
+
+        </div>
+      ))}
+    </div>
+  ) : (
+    <p className="text-sm text-muted-foreground">
+      No recent feedback for this period.
+    </p>
+  )}
+</div>
+  </CardContent>
+</Card>
 
       <Card>
         <CardHeader>
@@ -562,12 +661,21 @@ const recentFeedback = feedbackInRange
                 <TableHead>Completed</TableHead>
                 <TableHead>Missed</TableHead>
                 <TableHead>Rate</TableHead>
+                <TableHead>Complaint Rate</TableHead>
               </TableRow>
             </TableHeader>
 
             <TableBody>
-              {report.siteRows.map((row) => (
-                <TableRow
+             {report.siteRows.map((row) => {
+  const siteComplaints = complaints.filter(
+    (c) => c.siteName === row.siteName
+  );
+
+  const siteComplaintRate =
+    row.scheduled > 0 ? (siteComplaints.length / row.scheduled) * 100 : 0;
+
+  return (
+    <TableRow
   key={row.siteName}
   className="cursor-pointer"
   onClick={() => setSelectedSiteName(row.siteName)}
@@ -576,9 +684,38 @@ const recentFeedback = feedbackInRange
                   <TableCell>{row.scheduled}</TableCell>
                   <TableCell>{row.completed}</TableCell>
                   <TableCell>{row.missed}</TableCell>
-                  <TableCell>{row.rate.toFixed(2)}%</TableCell>
+                  <TableCell
+  className={
+    row.rate >= 95
+      ? "font-semibold text-green-600"
+      : row.rate >= 85
+      ? "font-semibold text-yellow-600"
+      : row.rate >= 70
+      ? "font-semibold text-orange-600"
+      : "font-semibold text-red-600"
+  }
+>
+  {row.rate.toFixed(2)}%
+</TableCell>
+                  <TableCell
+  className={
+  siteComplaintRate >= 10
+    ? "font-semibold text-red-600"
+
+    : siteComplaintRate >= 5
+    ? "font-semibold text-orange-600"
+
+    : siteComplaintRate >= 2
+    ? "font-semibold text-yellow-600"
+
+    : "font-semibold text-green-600"
+}
+>
+  {siteComplaintRate.toFixed(2)}%
+</TableCell>
                 </TableRow>
-              ))}
+                );
+})}
             </TableBody>
           </Table>
         </CardContent>
@@ -596,19 +733,65 @@ const recentFeedback = feedbackInRange
           <TableRow>
             <TableHead>Date</TableHead>
             <TableHead>Status</TableHead>
+            <TableHead>Feedback</TableHead>
           </TableRow>
         </TableHeader>
 
         <TableBody>
           {selectedSiteOccurrences.map((o) => {
             const completed = isOccurrenceCompleted(o, entries);
-
+const feedback = serviceFeedbacks.find(
+    f =>
+        f.scheduleId === o.scheduleId &&
+        f.scheduleDate === o.scheduleDate
+);
             return (
               <TableRow key={`${o.scheduleId}-${o.scheduleDate}`}>
                 <TableCell>{o.scheduleDate}</TableCell>
                 <TableCell>
                   {completed ? "Complete" : "Missed"}
                 </TableCell>
+                <TableCell>
+  {feedback ? (
+    <Button
+      size="sm"
+      variant="outline"
+      onClick={() => {
+        setFeedbackFor(o);
+        setFeedbackType(feedback.type as "complaint" | "compliment");
+        setFeedbackCategory(feedback.category ?? "");
+        setFeedbackNotes(feedback.notes ?? "");
+        setFeedbackResolved(!!feedback.resolved);
+      }}
+      className={
+        feedback.type === "complaint"
+          ? "border-red-200 bg-red-50 text-red-700 hover:bg-red-100"
+          : "border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100"
+      }
+    >
+      {feedback.resolved
+        ? "✔ Resolved"
+        : feedback.type === "complaint"
+        ? "⚠ Complaint"
+        : "⭐ Compliment"}
+    </Button>
+  ) : (
+    <Button
+      size="sm"
+      variant="outline"
+      onClick={() => {
+        setFeedbackFor(o);
+        setFeedbackType("complaint");
+        setFeedbackCategory(completed ? "Floors" : "Missed Service");
+        setFeedbackNotes("");
+        setFeedbackResolved(false);
+      }}
+      className="border-green-200 bg-green-50 text-green-700 hover:bg-green-100"
+    >
+      ✓ No Feedback
+    </Button>
+  )}
+</TableCell>
               </TableRow>
             );
           })}
@@ -618,7 +801,125 @@ const recentFeedback = feedbackInRange
   </Card>
 )}
 
-      <Card>
+      
+
+        {feedbackFor && (
+  <Card>
+    <CardHeader>
+      <CardTitle>
+        Record Feedback — {feedbackFor.siteName} / {feedbackFor.scheduleDate}
+      </CardTitle>
+    </CardHeader>
+
+    <CardContent className="space-y-3">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <div>
+          <label className="text-xs font-medium">Type</label>
+          <select
+            className="w-full border rounded-md px-3 py-2 text-sm"
+            value={feedbackType}
+            onChange={(e) => {
+              const value = e.target.value as "complaint" | "compliment";
+              setFeedbackType(value);
+              setFeedbackCategory(value === "complaint" ? "Floors" : "Excellent Cleaning");
+            }}
+          >
+            <option value="complaint">Complaint</option>
+            <option value="compliment">Compliment</option>
+          </select>
+        </div>
+
+        <div>
+          <label className="text-xs font-medium">Category</label>
+          <select
+            className="w-full border rounded-md px-3 py-2 text-sm"
+            value={feedbackCategory}
+            onChange={(e) => setFeedbackCategory(e.target.value)}
+          >
+            {feedbackType === "complaint" ? (
+              <>
+                <option value="Floors">Floors</option>
+                <option value="Restrooms">Restrooms</option>
+                <option value="Trash Removal">Trash Removal</option>
+                <option value="Dusting">Dusting</option>
+                <option value="Windows">Windows</option>
+                <option value="Kitchen / Break Room">Kitchen / Break Room</option>
+                <option value="Supplies Not Refilled">Supplies Not Refilled</option>
+                <option value="Missed Service">Missed Service</option>
+                <option value="Incomplete Cleaning">Incomplete Cleaning</option>
+                <option value="Poor Quality">Poor Quality</option>
+                <option value="Equipment Left Behind">Equipment Left Behind</option>
+                <option value="Door Left Unlocked">Door Left Unlocked</option>
+                <option value="Safety Issue">Safety Issue</option>
+                <option value="Communication">Communication</option>
+                <option value="Late Arrival">Late Arrival</option>
+                <option value="Other">Other</option>
+              </>
+            ) : (
+              <>
+                <option value="Excellent Cleaning">Excellent Cleaning</option>
+                <option value="Attention to Detail">Attention to Detail</option>
+                <option value="Professional Staff">Professional Staff</option>
+                <option value="Fast Response">Fast Response</option>
+                <option value="Great Communication">Great Communication</option>
+                <option value="Above Expectations">Above Expectations</option>
+                <option value="Customer Appreciation">Customer Appreciation</option>
+                <option value="Other">Other</option>
+              </>
+            )}
+          </select>
+        </div>
+      </div>
+
+      <div>
+        <label className="text-xs font-medium">Notes</label>
+        <textarea
+          className="w-full border rounded-md px-3 py-2 text-sm"
+          rows={3}
+          value={feedbackNotes}
+          onChange={(e) => setFeedbackNotes(e.target.value)}
+          placeholder="What did the client say?"
+        />
+      </div>
+
+      <label className="flex items-center gap-2 text-sm">
+        <input
+          type="checkbox"
+          checked={feedbackResolved}
+          onChange={(e) => setFeedbackResolved(e.target.checked)}
+        />
+        Mark as resolved
+      </label>
+
+      <div className="flex gap-2">
+        <Button
+          onClick={() => {
+            onAddServiceFeedbackAction({
+              siteId: feedbackFor.siteName,
+              siteName: feedbackFor.siteName,
+              scheduleId: feedbackFor.scheduleId,
+              scheduleDate: feedbackFor.scheduleDate,
+              type: feedbackType,
+              category: feedbackCategory,
+              notes: feedbackNotes,
+              resolved: feedbackResolved,
+              createdAt: new Date().toISOString(),
+            });
+
+            setFeedbackFor(null);
+          }}
+        >
+          Save Feedback
+        </Button>
+
+        <Button variant="outline" onClick={() => setFeedbackFor(null)}>
+          Cancel
+        </Button>
+      </div>
+    </CardContent>
+  </Card>
+)}
+<Card>
         <CardHeader>
           <CardTitle>Employee Performance</CardTitle>
         </CardHeader>
@@ -642,7 +943,20 @@ const recentFeedback = feedbackInRange
                   <TableCell>{row.assigned}</TableCell>
                   <TableCell>{row.completed}</TableCell>
                   <TableCell>{row.missed}</TableCell>
-                  <TableCell>{row.rate.toFixed(2)}%</TableCell>
+                  <TableCell
+  className={
+    row.rate >= 95
+      ? "font-semibold text-green-600"
+      : row.rate >= 85
+      ? "font-semibold text-yellow-600"
+      : row.rate >= 70
+      ? "font-semibold text-orange-600"
+      : "font-semibold text-red-600"
+  }
+>
+  {row.rate.toFixed(2)}%
+</TableCell>
+                    
                 </TableRow>
               ))}
             </TableBody>
