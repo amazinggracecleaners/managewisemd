@@ -246,6 +246,10 @@ const [feedbackResolved, setFeedbackResolved] = useState(false);
       };
     });
 
+siteRows.sort((a, b) =>
+  a.siteName.localeCompare(b.siteName)
+);
+
     const employeeRows = employees.map((employee) => {
       const employeeOccurrences = occurrences.filter((o) =>
         o.assignedEmployeeIds.includes(employee.id)
@@ -279,7 +283,9 @@ const [feedbackResolved, setFeedbackResolved] = useState(false);
         rate,
       };
     });
-
+employeeRows.sort((a, b) =>
+  a.employeeName.localeCompare(b.employeeName)
+);
     const totalScheduled = siteRows.reduce((sum, r) => sum + r.scheduled, 0);
     const totalCompleted = siteRows.reduce((sum, r) => sum + r.completed, 0);
     const totalMissed = siteRows.reduce((sum, r) => sum + r.missed, 0);
