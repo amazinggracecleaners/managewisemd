@@ -330,7 +330,9 @@ const recentFeedback = feedbackInRange
   .slice()
   .sort((a, b) => b.scheduleDate.localeCompare(a.scheduleDate))
   .slice(0, 5);
-
+const feedbackHistory = feedbackInRange
+  .slice()
+  .sort((a, b) => b.scheduleDate.localeCompare(a.scheduleDate));
   const selectedSiteOccurrences = selectedSiteName
   ? report.occurrences
       .filter((o) => o.siteName === selectedSiteName)
@@ -594,59 +596,77 @@ const recentFeedback = feedbackInRange
       )}
     </div>
     <div>
-  <h4 className="font-semibold mb-3">Recent Feedback</h4>
+  <h4 className="font-semibold mb-3">Feedback History</h4>
 
-  {recentFeedback.length ? (
-    <div className="space-y-3">
-      {recentFeedback.map((f) => (
-        <div
-          key={f.id}
-          className="rounded-lg border bg-white p-3 text-sm shadow-sm"
-        >
-          <div className="flex justify-between gap-3">
-            <div className="font-medium">
-              {format(parseISO(f.scheduleDate), "MMM d, yyyy")} — {f.siteName}
-            </div>
+  {feedbackHistory.length ? (
+    <Table>
+      <TableHeader>
+        <TableRow>
+          <TableHead>Date</TableHead>
+          <TableHead>Site</TableHead>
+          <TableHead>Type</TableHead>
+          <TableHead>Category</TableHead>
+          <TableHead>Status</TableHead>
+          <TableHead>Notes</TableHead>
+          <TableHead>Actions</TableHead>
+        </TableRow>
+      </TableHeader>
 
-            <span
-              className={
-                f.type === "complaint"
-                  ? "rounded-full bg-red-100 px-2 py-0.5 text-xs font-semibold text-red-700"
-                  : "rounded-full bg-green-100 px-2 py-0.5 text-xs font-semibold text-green-700"
-              }
-            >
-              {f.type}
-            </span>
-          </div>
+      <TableBody>
+        {feedbackHistory.map((f) => (
+          <TableRow key={f.id}>
+            <TableCell>
+              {format(parseISO(f.scheduleDate), "MMM d, yyyy")}
+            </TableCell>
 
-          <div className="mt-1 font-semibold">
-            {f.category || "Other"}
-          </div>
+            <TableCell>{f.siteName}</TableCell>
 
-          {f.notes && (
-            <div className="mt-1 text-muted-foreground">
-              {f.notes}
-            </div>
-          )}
+            <TableCell>
+              <span
+                className={
+                  f.type === "complaint"
+                    ? "rounded-full bg-red-100 px-2 py-1 text-xs font-semibold text-red-700"
+                    : "rounded-full bg-green-100 px-2 py-1 text-xs font-semibold text-green-700"
+                }
+              >
+                {f.type === "complaint" ? "Complaint" : "Compliment"}
+              </span>
+            </TableCell>
 
-          <div className="mt-2">
-  {f.resolved ? (
-    <span className="rounded-full bg-green-100 px-2 py-1 text-xs text-green-700">
-      Resolved
-    </span>
-  ) : (
-    <span className="rounded-full bg-red-100 px-2 py-1 text-xs text-red-700">
-      Open
-    </span>
-  )}
-</div>
+            <TableCell>{f.category || "Other"}</TableCell>
 
-        </div>
-      ))}
-    </div>
+            <TableCell>
+              {f.type === "compliment" ? (
+                <span className="rounded-full bg-blue-100 px-2 py-1 text-xs font-semibold text-blue-700">
+                  ⭐ Compliment
+                </span>
+              ) : f.resolved ? (
+                <span className="rounded-full bg-green-100 px-2 py-1 text-xs font-semibold text-green-700">
+                  🟢 Resolved
+                </span>
+              ) : (
+                <span className="rounded-full bg-red-100 px-2 py-1 text-xs font-semibold text-red-700">
+                  🔴 Open
+                </span>
+              )}
+            </TableCell>
+
+            <TableCell className="max-w-[260px] truncate">
+              {f.notes || "—"}
+            </TableCell>
+
+            <TableCell>
+              <Button size="sm" variant="outline">
+                {f.type === "compliment" ? "View" : "Edit"}
+              </Button>
+            </TableCell>
+          </TableRow>
+        ))}
+      </TableBody>
+    </Table>
   ) : (
     <p className="text-sm text-muted-foreground">
-      No recent feedback for this period.
+      No feedback recorded for this period.
     </p>
   )}
 </div>
