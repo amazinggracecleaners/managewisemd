@@ -118,10 +118,16 @@ interface ManagerViewProps {
   deleteInvoice: (id: string) => void;
 
     // Service feedback
-  serviceFeedbacks: ServiceFeedback[];
-  onAddServiceFeedbackAction: (
-    feedback: Omit<ServiceFeedback, "id">
-  ) => void;
+serviceFeedbacks: ServiceFeedback[];
+
+onAddServiceFeedbackAction: (
+  feedback: Omit<ServiceFeedback, "id">
+) => void;
+
+onUpdateServiceFeedbackAction: (
+  id: string,
+  updates: Partial<ServiceFeedback>
+) => void;
 
   // Payroll
   payrollPeriods: PayrollPeriod[];
@@ -566,6 +572,7 @@ updateEntry={props.updateEntry}
   weekStartsOn={props.settings.weekStartsOn as any}
   serviceFeedbacks={props.serviceFeedbacks}
   onAddServiceFeedbackAction={props.onAddServiceFeedbackAction}
+  onUpdateServiceFeedbackAction={props.onUpdateServiceFeedbackAction}
 />
 </TabsContent>
 

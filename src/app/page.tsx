@@ -284,6 +284,58 @@ useEffect(() => {
   [engine, settings, toast]
 );
 
+const onUpdateServiceFeedbackAction = useCallback(
+  async (
+    id: string,
+    updates: Partial<ServiceFeedback>
+  ) => {
+    if (engine === "cloud") {
+      const cId = getCompanyId(settings);
+
+      const docRef = doc(
+        db,
+        "companies",
+        cId,
+        "service_feedbacks",
+        id
+      );
+
+      try {
+        await updateDoc(
+          docRef,
+          cleanForFirestore(updates)
+        );
+
+        toast({
+          title: "Feedback updated",
+        });
+      } catch (e: any) {
+        toast({
+          variant: "destructive",
+          title: "Could not update feedback",
+          description: e.message,
+        });
+      }
+    } else {
+      setServiceFeedbacks((prev) =>
+        prev.map((f) =>
+          f.id === id
+            ? {
+                ...f,
+                ...updates,
+              }
+            : f
+        )
+      );
+
+      toast({
+        title: "Feedback updated",
+      });
+    }
+  },
+  [engine, settings, toast]
+);
+
   const markNotificationRead = useCallback(
     async (id: string) => {
       if (engine !== "cloud") {
@@ -2595,8 +2647,9 @@ return (
             addInvoice={addInvoice}
             updateInvoice={updateInvoice}
             deleteInvoice={deleteInvoice}
-            serviceFeedbacks={serviceFeedbacks}
-onAddServiceFeedbackAction={onAddServiceFeedbackAction}
+           serviceFeedbacks={serviceFeedbacks}
+  onAddServiceFeedbackAction={onAddServiceFeedbackAction}
+  onUpdateServiceFeedbackAction={onUpdateServiceFeedbackAction}
             testGeofence={testGeofence}
             profitabilityBySite={profitabilityBySite}
             getDurationsBySite={getDurationsBySite}
