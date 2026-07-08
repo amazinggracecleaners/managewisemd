@@ -208,6 +208,9 @@ export function ServiceReport({
     format(endOfMonth(today), "yyyy-MM-dd")
   );
 const [selectedSiteName, setSelectedSiteName] = useState<string | null>(null);
+const [sitePerformanceFilter, setSitePerformanceFilter] = useState<
+  "all" | "missed" | "complaints" | "compliments" | "low-completion"
+>("all");
 const [feedbackFor, setFeedbackFor] = useState<ScheduleOccurrence | null>(null);
 const [editingFeedbackId, setEditingFeedbackId] =
   useState<string | null>(null);
@@ -472,7 +475,17 @@ const mostComplimentedSite = complimentsBySite[0];
       }),
     ]);
   };
+const filteredSiteRows = report.siteRows.filter((row) => {
+  const siteComplaints = complaints.filter((c) => c.siteName === row.siteName);
+  const siteCompliments = compliments.filter((c) => c.siteName === row.siteName);
 
+  if (sitePerformanceFilter === "missed") return row.missed > 0;
+  if (sitePerformanceFilter === "complaints") return siteComplaints.length > 0;
+  if (sitePerformanceFilter === "compliments") return siteCompliments.length > 0;
+  if (sitePerformanceFilter === "low-completion") return row.rate < 95;
+
+  return true;
+});
   return (
     <div className="space-y-4">
       <Card>
@@ -813,6 +826,21 @@ const mostComplimentedSite = complimentsBySite[0];
         </CardHeader>
 
         <CardContent>
+          <div className="mb-3 flex flex-wrap items-center gap-2">
+  <label className="text-sm font-medium">Filter:</label>
+
+  <select
+    className="rounded-md border px-3 py-2 text-sm"
+    value={sitePerformanceFilter}
+    onChange={(e) => setSitePerformanceFilter(e.target.value as any)}
+  >
+    <option value="all">All Sites</option>
+    <option value="missed">Sites with Missed Visits</option>
+    <option value="complaints">Sites with Complaints</option>
+    <option value="compliments">Sites with Compliments</option>
+    <option value="low-completion">Completion Under 95%</option>
+  </select>
+</div>
           <Table>
             <TableHeader>
               <TableRow>
@@ -842,7 +870,7 @@ const mostComplimentedSite = complimentsBySite[0];
             </TableHeader>
 
             <TableBody>
-             {report.siteRows.map((row) => {
+             {filteredSiteRows.map((row) => {
   const siteComplaints = complaints.filter(
     (c) => c.siteName === row.siteName
   );
@@ -994,6 +1022,9 @@ const assignedEmployees = employees
   .filter((emp) => o.assignedEmployeeIds.includes(emp.id))
   .map((emp) => emp.name)
   .join(", ");
+
+  
+
             return (
               <TableRow
     key={`${o.scheduleId}-${o.scheduleDate}`}
