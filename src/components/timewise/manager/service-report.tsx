@@ -888,8 +888,39 @@ const missedServiceReason =
                   <TableCell
   className="max-w-[320px] truncate"
   title={missedServiceReason}
+  onClick={(e) => {
+    e.stopPropagation();
+
+    const latestMissedService = feedbackInRange
+      .filter(
+        (f) =>
+          f.siteName === row.siteName &&
+          f.type === "complaint" &&
+          f.category === "Missed Service"
+      )
+      .sort((a, b) => b.scheduleDate.localeCompare(a.scheduleDate))[0];
+
+    const occurrence =
+      report.occurrences.find(
+        (o) =>
+          o.siteName === row.siteName &&
+          o.scheduleDate === latestMissedService?.scheduleDate
+      ) ||
+      report.occurrences.find((o) => o.siteName === row.siteName);
+
+    if (!occurrence) return;
+
+    setFeedbackFor(occurrence);
+    setFeedbackType("complaint");
+    setFeedbackCategory("Missed Service");
+    setFeedbackNotes(latestMissedService?.notes ?? "");
+    setFeedbackResolved(!!latestMissedService?.resolved);
+    setEditingFeedbackId(latestMissedService?.id ?? null);
+  }}
 >
-  {missedServiceReason}
+  <span className="cursor-pointer underline decoration-dotted">
+    {missedServiceReason}
+  </span>
 </TableCell>
                   <TableCell
   className={
