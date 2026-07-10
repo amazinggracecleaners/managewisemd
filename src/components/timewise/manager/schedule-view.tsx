@@ -454,10 +454,11 @@ const openFixShiftModal = (data: {
     setIsDialogOpen(true);
   };
 
- const handleSubmit = () => {
+ 
+ const handleSubmit = async () => {
   if (!siteName || !tasks || !startDate || !validateAssignment()) {
     alert(
-      "Please fill out required fields: Site, Start Date, Tasks, and Assignment (Team or Employees)."
+      "Please fill out required fields: Site, Start Date, Tasks, and Assignment."
     );
     return;
   }
@@ -475,59 +476,203 @@ const openFixShiftModal = (data: {
   }
 
   const assignedEmployeeIds =
-    assignMode === "team" ? [] : resolveAssignedEmployeeIds(assignedTo);
+    assignMode === "team"
+      ? []
+      : resolveAssignedEmployeeIds(assignedTo);
 
   const baseData: Omit<CleaningSchedule, "id"> = {
     siteName,
     tasks,
     note,
-    assignedTeamId: assignMode === "team" ? assignedTeamId : undefined,
-    assignedTo: assignMode === "team" ? [] : assignedTo,
+
+    assignedTeamId:
+      assignMode === "team" ? assignedTeamId : undefined,
+
+    assignedTo:
+      assignMode === "team" ? [] : assignedTo,
+
     assignedEmployeeIds,
+
     startDate: format(startDate, "yyyy-MM-dd"),
     repeatFrequency,
-    daysOfWeek: repeatFrequency.includes("week") ? daysOfWeek : undefined,
-    repeatUntil: repeatUntil ? format(repeatUntil, "yyyy-MM-dd") : undefined,
+
+    daysOfWeek: repeatFrequency.includes("week")
+      ? daysOfWeek
+      : undefined,
+
+    repeatUntil: repeatUntil
+      ? format(repeatUntil, "yyyy-MM-dd")
+      : undefined,
+
     servicePrice,
     billingFrequency,
   };
 
-  const cleanedData = cleanForFirestore(baseData) as Omit<
-    CleaningSchedule,
-    "id"
-  >;
+  const cleanedData = cleanForFirestore(
+    baseData
+  ) as Omit<CleaningSchedule, "id">;
 
- if (editingSchedule) {
-  const hasOccurrenceContext =
-    !!editingOccurrenceDate &&
+  /*
+   * Creating a completely new schedule
+   */
+  if (!editingSchedule) {
+    await Promise.resolve(addSchedule(cleanedData));
+
+    setIsDialogOpen(false);
+    setEditingOccurrenceDate(undefined);
+    setApplyScope("series");
+    return;
+  }
+
+  const isRecurring =
     editingSchedule.repeatFrequency !== "does-not-repeat";
 
-  if (hasOccurrenceContext && applyScope === "single") {
-    const dateStr = format(editingOccurrenceDate!, "yyyy-MM-dd");
+  const hasOccurrenceContext =
+    isRecurring && !!editingOccurrenceDate;
 
+  /*
+   * Editing from the List tab:
+   * There is no selected occurrence date.
+   * This continues to edit the entire schedule.
+   */
+  if (!hasOccurrenceContext) {
+    await Promise.resolve(
+      updateSchedule(editingSchedule.id, cleanedData)
+    );
+
+    setIsDialogOpen(false);
+    setEditingOccurrenceDate(undefined);
+    setApplyScope("series");
+    return;
+  }
+
+  const selectedDate = startOfDay(editingOccurrenceDate!);
+  const selectedDateStr = format(selectedDate, "yyyy-MM-dd");
+
+  /*
+   * OPTION 1:
+   * Change only the selected scheduled day.
+   *
+   * The original recurring schedule remains unchanged for
+   * past and future dates, except that this date becomes
+   * an exception.
+   */
+  if (applyScope === "single") {
     const existingExceptions =
-      (editingSchedule.exceptionDates as string[] | undefined) || [];
-    const newExceptions = Array.from(new Set([...existingExceptions, dateStr]));
+      editingSchedule.exceptionDates || [];
 
-    updateSchedule(editingSchedule.id, { exceptionDates: newExceptions });
+    const updatedExceptions = Array.from(
+      new Set([...existingExceptions, selectedDateStr])
+    );
 
-    const singleOccurrenceData: Omit<CleaningSchedule, "id"> = {
+    await Promise.resolve(
+      updateSchedule(editingSchedule.id, {
+        exceptionDates: updatedExceptions,
+      })
+    );
+
+    const singleDaySchedule: Omit<CleaningSchedule, "id"> = {
       ...baseData,
-      startDate: dateStr,
+
+      startDate: selectedDateStr,
       repeatFrequency: "does-not-repeat",
       daysOfWeek: undefined,
       repeatUntil: undefined,
+      exceptionDates: undefined,
     };
 
-    addSchedule(
-      cleanForFirestore(singleOccurrenceData) as Omit<CleaningSchedule, "id">
+    await Promise.resolve(
+      addSchedule(
+        cleanForFirestore(
+          singleDaySchedule
+        ) as Omit<CleaningSchedule, "id">
+      )
     );
-  } else {
-    updateSchedule(editingSchedule.id, cleanedData);
+
+    setIsDialogOpen(false);
+    setEditingOccurrenceDate(undefined);
+    setApplyScope("series");
+    return;
   }
-} else {
-  addSchedule(cleanedData);
-}
+
+  /*
+   * OPTION 2:
+   * Change the selected day and all future occurrences.
+   *
+   * We split the recurring schedule into:
+   *
+   * 1. Historical schedule ending one day before selected date.
+   * 2. New schedule beginning on selected date.
+   *
+   * This preserves past schedule assignments.
+   */
+  const originalStartDate = startOfDay(
+    parseISO(editingSchedule.startDate)
+  );
+
+  /*
+   * When editing from the first date of the schedule,
+   * there is no historical portion to preserve.
+   */
+  if (
+    selectedDate.getTime() <= originalStartDate.getTime()
+  ) {
+    await Promise.resolve(
+      updateSchedule(editingSchedule.id, {
+        ...cleanedData,
+        startDate: selectedDateStr,
+      })
+    );
+
+    setIsDialogOpen(false);
+    setEditingOccurrenceDate(undefined);
+    setApplyScope("series");
+    return;
+  }
+
+  const historicalEndDate = format(
+    addDays(selectedDate, -1),
+    "yyyy-MM-dd"
+  );
+
+  /*
+   * Keep the original schedule and its original employee
+   * assignments for all past dates.
+   */
+  await Promise.resolve(
+    updateSchedule(editingSchedule.id, {
+      repeatUntil: historicalEndDate,
+    })
+  );
+
+  /*
+   * Only future exception dates should move to the new series.
+   */
+  const futureExceptionDates = (
+    editingSchedule.exceptionDates || []
+  ).filter((date) => date >= selectedDateStr);
+
+  /*
+   * Create the new future series using the edited information.
+   */
+  const futureSchedule: Omit<CleaningSchedule, "id"> = {
+    ...baseData,
+
+    startDate: selectedDateStr,
+
+    exceptionDates:
+      futureExceptionDates.length > 0
+        ? futureExceptionDates
+        : undefined,
+  };
+
+  await Promise.resolve(
+    addSchedule(
+      cleanForFirestore(
+        futureSchedule
+      ) as Omit<CleaningSchedule, "id">
+    )
+  );
 
   setIsDialogOpen(false);
   setEditingOccurrenceDate(undefined);
@@ -636,59 +781,7 @@ const openFixShiftModal = (data: {
     setCurrentDate((prev) => add(prev, { [unit + "s"]: amount } as any));
   };
 
- const handleRemoveEmployeeFromSchedule = async (
-  scheduleId: string,
-  employeeName: string
-) => {
-  if (
-    !window.confirm(
-      `Are you sure you want to remove ${employeeName} from this schedule?`
-    )
-  ) {
-    return;
-  }
-
-  const schedule = schedules.find((s) => s.id === scheduleId);
-  if (!schedule) return;
-
-  const employee = employees.find((e) => e.name === employeeName);
-  if (!employee) return;
-
-  const updatedAssignedTo = (schedule.assignedTo || []).filter(
-    (name) => name !== employeeName
-  );
-
-  const updatedAssignedEmployeeIds =
-    resolveAssignedEmployeeIds(updatedAssignedTo);
-
-  // ✅ Update schedule first
-  await updateSchedule(scheduleId, {
-    assignedTo: updatedAssignedTo,
-    assignedEmployeeIds: updatedAssignedEmployeeIds,
-  });
-
-  // 🔥 NEW: notify removed employee
-  if (engine === "cloud") {
-    const cId =
-    settings.companyId?.trim() ||
-    process.env.NEXT_PUBLIC_COMPANY_ID ||
-    "amazing-grace-cleaners";
-
-    await addDoc(
-      collection(db, "companies", cId, "employee_notifications"),
-      {
-        employeeId: employee.id,
-        type: "schedule-change",
-        title: "Schedule changed",
-        message: `You were removed from the schedule for ${schedule.siteName}.`,
-        siteName: schedule.siteName,
-        scheduleId: scheduleId,
-        createdAt: serverTimestamp(),
-        read: false,
-      }
-    );
-  }
-};
+ 
 const handleManagerClock = useCallback(
   async (
     action: "in" | "out",
@@ -1714,10 +1807,16 @@ const getScheduleHours = useCallback(
 
                             {/* ✅ Only show employee rows if this schedule is assigned to employees */}
                             {!s.assignedTeamId &&
-                              (s.assignedTo || []).map((empName) => {
-                                const emp = employeeMap.get(empName);
-                                if (!emp || !site) return null;
-
+  (
+    s.assignedEmployeeIds?.length
+      ? s.assignedEmployeeIds
+          .map((id) => employeeById.get(id))
+          .filter((emp): emp is Employee => !!emp)
+      : (s.assignedTo || [])
+          .map((name) => employeeMap.get(name))
+          .filter((emp): emp is Employee => !!emp)
+  ).map((emp) => {
+if (!site) return null;
                                 const scheduleDateKey = format(currentDate, "yyyy-MM-dd");
 
 const formattedEmpTime = getScheduleHours(
@@ -1793,12 +1892,7 @@ const siteScheduleCompleted = entries.some((e) => {
                                         variant="ghost"
                                         size="icon"
                                         className="h-7 w-7 opacity-0 group-hover:opacity-100"
-                                        onClick={() =>
-                                          handleRemoveEmployeeFromSchedule(
-                                            s.id,
-                                            empName
-                                          )
-                                        }
+                                        onClick={() => handleOpenDialog(s, currentDate)}
                                       >
                                         <Trash2 className="h-4 w-4 text-destructive" />
                                       </Button>

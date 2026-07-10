@@ -446,14 +446,56 @@ const isAssignedViaTeam =
   !!s.assignedTeamId &&
   !!employeeTeamId &&
   s.assignedTeamId === employeeTeamId;
+const dateStr = format(date, "yyyy-MM-dd");
 
-const isAssigned = isAssignedDirect || isAssignedViaTeam;
+const viewingPast =
+  startOfDay(date) < startOfToday();
 
-if (!isAssigned) return false;
+const isAssigned =
+  isAssignedDirect || isAssignedViaTeam;
 
-      const schStart = parseISO(s.startDate);
-      const dateStr = format(date, "yyyy-MM-dd");
+/*
+ * True when this employee has a saved clock-in or clock-out
+ * for this exact schedule occurrence.
+ */
+const workedThisOccurrence = entries.some((entry) => {
+  if (entry.employeeId !== employee.id) {
+    return false;
+  }
 
+  /*
+   * Newer entries contain scheduleId and scheduleDate.
+   */
+  if (entry.scheduleId && entry.scheduleDate) {
+    return (
+      entry.scheduleId === s.id &&
+      entry.scheduleDate === dateStr
+    );
+  }
+
+  /*
+   * Older entries may not contain scheduleId.
+   * Use the site and entry date as a fallback.
+   */
+  return (
+    entry.site === s.siteName &&
+    format(new Date(entry.ts), "yyyy-MM-dd") === dateStr
+  );
+});
+
+/*
+ * Today and future:
+ * show only when currently assigned.
+ *
+ * Past:
+ * show when assigned to the historical schedule
+ * or when the employee has saved clock entries.
+ */
+if (!isAssigned && !(viewingPast && workedThisOccurrence)) {
+  return false;
+}
+
+const schStart = parseISO(s.startDate);
 if (s.exceptionDates?.includes(dateStr)) return false;
       if (date < startOfDay(schStart)) return false;
 
@@ -884,20 +926,39 @@ const getHoursForSiteDay = useCallback(
 
 
 const dailyWorkedMinutes = useMemo(() => {
-  let total = 0;
+  const selectedDayStart =
+    startOfDay(currentDate).getTime();
 
-  for (const s of dailySchedules) {
-    const hhmm = getHoursForSiteDay(s.siteName, currentDate);
+  let totalMinutes = 0;
 
-    if (!hhmm || !hhmm.includes(":")) continue;
+  for (const session of sessionsForEmployee) {
+    if (!session.in || !session.out) {
+      continue;
+    }
 
-    const [hours, minutes] = hhmm.split(":").map(Number);
+    /*
+     * Hours are attached to the day the employee clocked in.
+     */
+    const clockInDayStart =
+      startOfDay(new Date(session.in.ts)).getTime();
 
-    total += hours * 60 + minutes;
+    if (clockInDayStart !== selectedDayStart) {
+      continue;
+    }
+
+    totalMinutes += Math.max(
+      0,
+      Math.round(
+        (session.out.ts - session.in.ts) / 60000
+      )
+    );
   }
 
-  return total;
-}, [dailySchedules, getHoursForSiteDay, currentDate]);
+  return totalMinutes;
+}, [
+  sessionsForEmployee,
+  currentDate,
+]);
 
 const dailyWorkedHHMM = useMemo(() => {
   return minutesToHHMM(dailyWorkedMinutes);
