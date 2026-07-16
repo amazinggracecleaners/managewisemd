@@ -52,6 +52,21 @@ export type Site = {
   entranceMethod?: string;
   alarmCode?: string;
 
+   /*
+   * Estimated amount of active work time required to service this site.
+   *
+   * Store the value in minutes.
+   *
+   * Examples:
+   * 45 minutes = 45
+   * 1 hour = 60
+   * 1 hour 30 minutes = 90
+   * 2 hours 15 minutes = 135
+   *
+   * This field is intended for manager planning only.
+   */
+  estimatedWorkMinutes?: number;
+
   revenue?: number; // new site-level revenue
   servicePrice?: number; // keep temporarily for old data compatibility
 
@@ -99,6 +114,37 @@ export type CleaningSchedule = {
   billingFrequency?: BillingFrequency;
   exceptionDates?: string[];
   assignedTeamId?: string; // references settings.teams[].id
+
+  /*
+   * Determines how travel time is calculated for this schedule stop.
+   *
+   * automatic:
+   * Use the travel estimate generated from the suggested route.
+   *
+   * custom:
+   * Use the manager-entered customTravelMinutes value.
+   */
+  travelTimeMode?: "automatic" | "custom";
+
+  /*
+   * Manager override for travel time from the previous route stop
+   * to this schedule stop.
+   *
+   * Only used when travelTimeMode is "custom".
+   */
+  customTravelMinutes?: number;
+
+  /*
+   * Optional time by which the full route should be completed.
+   *
+   * Store in 24-hour format.
+   *
+   * Examples:
+   * "08:00"
+   * "17:30"
+   * "23:00"
+   */
+  finishByTime?: string;
 };
 
 

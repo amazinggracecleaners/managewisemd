@@ -111,3 +111,61 @@ export function optimizeRouteFromStart<T extends {
 
   return [...ordered, ...noCoords];
 }
+
+export type RouteStopWithTravel<T> = {
+  item: T;
+  distanceMiles: number;
+  automaticTravelMinutes: number;
+};
+
+export function addTravelEstimates<
+  T extends {
+    lat?: number;
+    lng?: number;
+  }
+>(
+  orderedStops: T[],
+  start?: { lat: number; lng: number } | null
+): RouteStopWithTravel<T>[] {
+  let previousLat = start?.lat;
+  let previousLng = start?.lng;
+
+  return orderedStops.map((item) => {
+    let distanceMiles = 0;
+    let automaticTravelMinutes = 0;
+
+    const currentLat = item.lat;
+const currentLng = item.lng;
+
+if (
+  previousLat !== undefined &&
+  previousLng !== undefined &&
+  currentLat !== undefined &&
+  currentLng !== undefined
+) {
+  distanceMiles = haversineMiles(
+    previousLat,
+    previousLng,
+    currentLat,
+    currentLng
+  );
+
+  automaticTravelMinutes =
+    estimateDriveMinutes(distanceMiles);
+}
+
+if (
+  currentLat !== undefined &&
+  currentLng !== undefined
+) {
+  previousLat = currentLat;
+  previousLng = currentLng;
+}
+
+    return {
+      item,
+      distanceMiles,
+      automaticTravelMinutes,
+    };
+  });
+}

@@ -463,24 +463,19 @@ const workedThisOccurrence = entries.some((entry) => {
     return false;
   }
 
-  /*
-   * Newer entries contain scheduleId and scheduleDate.
-   */
-  if (entry.scheduleId && entry.scheduleDate) {
-    return (
-      entry.scheduleId === s.id &&
-      entry.scheduleDate === dateStr
-    );
-  }
+  const entryDate =
+    entry.scheduleDate ||
+    format(new Date(entry.ts), "yyyy-MM-dd");
 
-  /*
-   * Older entries may not contain scheduleId.
-   * Use the site and entry date as a fallback.
-   */
-  return (
+  const exactScheduleMatch =
+    entry.scheduleId === s.id &&
+    entryDate === dateStr;
+
+  const siteAndDateMatch =
     entry.site === s.siteName &&
-    format(new Date(entry.ts), "yyyy-MM-dd") === dateStr
-  );
+    entryDate === dateStr;
+
+  return exactScheduleMatch || siteAndDateMatch;
 });
 
 /*

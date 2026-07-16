@@ -94,6 +94,27 @@ const getPriceRange = (price?: number): string => {
   return "$501+";
 };
 
+const formatDuration = (minutes?: number): string => {
+  const totalMinutes = Math.max(0, Number(minutes) || 0);
+
+  if (totalMinutes === 0) {
+    return "Not set";
+  }
+
+  const hours = Math.floor(totalMinutes / 60);
+  const remainingMinutes = totalMinutes % 60;
+
+  if (hours === 0) {
+    return `${remainingMinutes}m`;
+  }
+
+  if (remainingMinutes === 0) {
+    return `${hours}h`;
+  }
+
+  return `${hours}h ${remainingMinutes}m`;
+};
+
 export function SiteListView({
   sites,
   settings,
@@ -606,6 +627,87 @@ const groupedSites = useMemo(() => {
         placeholder="Example: 750"
       />
     </div>
+
+    </div>
+
+  <div className="space-y-2">
+    <Label>Estimated work time</Label>
+
+    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      <div className="space-y-2">
+        <Label
+          htmlFor="estimatedWorkHours"
+          className="text-xs text-muted-foreground"
+        >
+          Hours
+        </Label>
+
+        <Input
+          id="estimatedWorkHours"
+          type="number"
+          min="0"
+          step="1"
+          value={Math.floor((siteData.estimatedWorkMinutes ?? 0) / 60)}
+          onChange={(e) => {
+            const hours = Math.max(
+              0,
+              Math.floor(Number(e.target.value) || 0)
+            );
+
+            const currentMinutes =
+              (siteData.estimatedWorkMinutes ?? 0) % 60;
+
+            handleDataChange(
+              "estimatedWorkMinutes",
+              hours * 60 + currentMinutes
+            );
+          }}
+          placeholder="0"
+        />
+      </div>
+
+      <div className="space-y-2">
+        <Label
+          htmlFor="estimatedWorkMinutes"
+          className="text-xs text-muted-foreground"
+        >
+          Minutes
+        </Label>
+
+        <Input
+          id="estimatedWorkMinutes"
+          type="number"
+          min="0"
+          max="59"
+          step="5"
+          value={(siteData.estimatedWorkMinutes ?? 0) % 60}
+          onChange={(e) => {
+            const minutes = Math.min(
+              59,
+              Math.max(
+                0,
+                Math.floor(Number(e.target.value) || 0)
+              )
+            );
+
+            const currentHours = Math.floor(
+              (siteData.estimatedWorkMinutes ?? 0) / 60
+            );
+
+            handleDataChange(
+              "estimatedWorkMinutes",
+              currentHours * 60 + minutes
+            );
+          }}
+          placeholder="0"
+        />
+      </div>
+    </div>
+
+    <p className="text-xs text-muted-foreground">
+      Average time required to complete service at this site.
+      This information is for manager planning.
+    </p>
   </div>
 
   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -883,7 +985,10 @@ const groupedSites = useMemo(() => {
         <strong>Revenue:</strong>{" "}
         {revenue ? `$${revenue.toFixed(2)}` : "Not set"}
       </p>
-
+<p>
+        <strong>Estimated work time:</strong>{" "}
+        {formatDuration(site.estimatedWorkMinutes)}
+      </p>
       <p>
        <strong className="inline-flex items-center gap-1">
   R/S

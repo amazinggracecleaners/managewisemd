@@ -99,6 +99,14 @@ import { db } from "@/firebase/client";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { useEngine } from "@/providers/EngineProvider";
 import { useSettings } from "@/features/settings/hooks/useSettings";
+import {
+  buildDailyRoutePlan,
+  formatClockTime,
+  formatMinutes,
+  subtractMinutesFromTime,
+} from "@/lib/route-planning";
+
+
 interface Team {
   id: string;
   name: string;
@@ -278,7 +286,14 @@ const [deleteTarget, setDeleteTarget] = useState<{
     useState<BillingFrequency | undefined>();
 
   const [currentDate, setCurrentDate] = useState(startOfDay(new Date()));
-  const [activeTab, setActiveTab] = useState("list");
+const [activeTab, setActiveTab] = useState("list");
+
+/*
+ * Employee selected for manager route planning.
+ * This is separate from the search and status filters.
+ */
+const [planningEmployeeId, setPlanningEmployeeId] =
+  useState<string>("");
 const [fixModal, setFixModal] = useState<{
   open: boolean;
   employeeId?: string;
@@ -922,6 +937,116 @@ const filteredDailySchedules = useMemo(() => {
   teamsById,
   dailyStatuses,
 ]);
+
+/*
+ * Manager-only route planning schedules for the selected employee.
+ *
+ * A schedule is included when:
+ * 1. The employee is assigned directly by ID.
+ * 2. The employee is assigned through the legacy assignedTo name list.
+ * 3. The employee belongs to the team assigned to the schedule.
+ */
+const planningSchedules = useMemo(() => {
+  if (!planningEmployeeId) {
+    return [];
+  }
+
+  const planningEmployee =
+    employeeById.get(planningEmployeeId);
+
+  if (!planningEmployee) {
+    return [];
+  }
+
+  return dailySchedules.filter((schedule) => {
+    const assignedById =
+      schedule.assignedEmployeeIds?.includes(
+        planningEmployee.id
+      ) ?? false;
+
+    const assignedByLegacyName =
+      schedule.assignedTo?.includes(
+        planningEmployee.name
+      ) ?? false;
+
+    const assignedByTeam =
+      Boolean(schedule.assignedTeamId) &&
+      schedule.assignedTeamId === planningEmployee.teamId;
+
+    return (
+      assignedById ||
+      assignedByLegacyName ||
+      assignedByTeam
+    );
+  });
+}, [
+  planningEmployeeId,
+  dailySchedules,
+  employeeById,
+]);
+
+/*
+ * Uses the suggested route order, then calculates:
+ * - estimated cleaning time
+ * - estimated travel time
+ * - total estimated time
+ */
+const planningRoutePlan = useMemo(() => {
+  return buildDailyRoutePlan({
+    schedules: planningSchedules,
+    sites,
+
+    /*
+     * No starting location is available in ScheduleView yet.
+     * Therefore, travel to the first site is currently zero.
+     * Travel between sites is still calculated automatically.
+     */
+    startingLocation: null,
+  });
+}, [
+  planningSchedules,
+  sites,
+]);
+
+/*
+ * For this first implementation, the finish time is stored on
+ * the first schedule in the employee's route.
+ */
+const routeFinishByTime =
+  planningSchedules.find(
+    (schedule) => Boolean(schedule.finishByTime)
+  )?.finishByTime ?? "";
+
+const recommendedStartTime = useMemo(() => {
+  if (
+    !routeFinishByTime ||
+    planningRoutePlan.totalEstimatedMinutes <= 0
+  ) {
+    return null;
+  }
+
+  return subtractMinutesFromTime(
+    routeFinishByTime,
+    planningRoutePlan.totalEstimatedMinutes
+  );
+}, [
+  routeFinishByTime,
+  planningRoutePlan.totalEstimatedMinutes,
+]);
+
+const handleFinishByTimeChange = (
+  value: string
+) => {
+  const firstSchedule = planningSchedules[0];
+
+  if (!firstSchedule) {
+    return;
+  }
+
+  updateSchedule(firstSchedule.id, {
+    finishByTime: value || undefined,
+  });
+};
 
 const dailySiteCount = new Set(
   filteredDailySchedules.map((s) => s.siteName)
@@ -1695,6 +1820,279 @@ const getScheduleHours = useCallback(
     </SelectContent>
   </Select>
 </div>
+
+{/* Manager-only estimated workload planner */}
+<div className="mb-4 rounded-lg border p-4 space-y-4">
+  <div>
+    <h3 className="font-semibold">
+      Estimated Workload
+    </h3>
+
+    <p className="text-sm text-muted-foreground">
+      Select an employee to calculate cleaning time,
+      automatic travel time, and the recommended start time.
+    </p>
+  </div>
+
+  <div className="space-y-2">
+    <Label htmlFor="planningEmployee">
+      Employee
+    </Label>
+
+    <Select
+      value={planningEmployeeId}
+      onValueChange={setPlanningEmployeeId}
+    >
+      <SelectTrigger id="planningEmployee">
+        <SelectValue placeholder="Select an employee..." />
+      </SelectTrigger>
+
+      <SelectContent>
+        {activeEmployees.map((employee) => (
+          <SelectItem
+            key={employee.id}
+            value={employee.id}
+          >
+            {employee.name}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  </div>
+
+  {planningEmployeeId ? (
+    planningSchedules.length > 0 ? (
+      <>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+          <div className="rounded-md border p-3">
+            <p className="text-xs text-muted-foreground">
+              Cleaning time
+            </p>
+
+            <p className="text-lg font-semibold">
+              {formatMinutes(
+                planningRoutePlan.totalCleaningMinutes
+              )}
+            </p>
+          </div>
+
+          <div className="rounded-md border p-3">
+            <p className="text-xs text-muted-foreground">
+              Travel time
+            </p>
+
+            <p className="text-lg font-semibold">
+              {formatMinutes(
+                planningRoutePlan.totalTravelMinutes
+              )}
+            </p>
+          </div>
+
+          <div className="rounded-md border p-3">
+            <p className="text-xs text-muted-foreground">
+              Total estimated time
+            </p>
+
+            <p className="text-lg font-semibold">
+              {formatMinutes(
+                planningRoutePlan.totalEstimatedMinutes
+              )}
+            </p>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div className="space-y-2">
+            <Label htmlFor="finishByTime">
+              Finish by
+            </Label>
+
+            <Input
+              id="finishByTime"
+              type="time"
+              value={routeFinishByTime}
+              onChange={(event) =>
+                handleFinishByTimeChange(
+                  event.target.value
+                )
+              }
+            />
+
+            <p className="text-xs text-muted-foreground">
+              ManageWiseMD works backward using
+              estimated cleaning and travel time.
+            </p>
+          </div>
+
+          <div className="rounded-md border p-3">
+            <p className="text-xs text-muted-foreground">
+              Recommended start time
+            </p>
+
+            <p className="text-xl font-semibold">
+              {recommendedStartTime
+                ? formatClockTime(
+                    recommendedStartTime
+                  )
+                : "Set a finish time"}
+            </p>
+          </div>
+        </div>
+
+        <div className="space-y-3">
+          <p className="text-sm font-medium">
+            Suggested route order
+          </p>
+
+          {planningRoutePlan.stops.map(
+            (stop, index) => {
+              const usesCustomTravel =
+                stop.schedule.travelTimeMode ===
+                "custom";
+
+              return (
+                <div
+                  key={`${stop.schedule.id}-${index}`}
+                  className="rounded-md border p-3 space-y-3"
+                >
+                  <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                    <div>
+                      <p className="font-medium">
+                        {index + 1}.{" "}
+                        {stop.schedule.siteName}
+                      </p>
+
+                      <p className="text-xs text-muted-foreground">
+                        Cleaning:{" "}
+                        {formatMinutes(
+                          stop.cleaningMinutes
+                        )}
+                      </p>
+                    </div>
+
+                    <div className="sm:text-right">
+                      <p className="text-sm">
+                        Travel:{" "}
+                        {formatMinutes(
+                          stop.effectiveTravelMinutes
+                        )}
+                      </p>
+
+                      {stop.distanceMiles > 0 && (
+                        <p className="text-xs text-muted-foreground">
+                          Approximately{" "}
+                          {stop.distanceMiles.toFixed(1)}{" "}
+                          miles
+                        </p>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                    <div className="space-y-2">
+                      <Label>
+                        Travel time source
+                      </Label>
+
+                      <Select
+                        value={
+                          stop.schedule.travelTimeMode ??
+                          "automatic"
+                        }
+                        onValueChange={(
+                          value:
+                            | "automatic"
+                            | "custom"
+                        ) =>
+                          updateSchedule(
+                            stop.schedule.id,
+                            {
+                              travelTimeMode: value,
+                            }
+                          )
+                        }
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+
+                        <SelectContent>
+                          <SelectItem value="automatic">
+                            Automatic — recommended
+                          </SelectItem>
+
+                          <SelectItem value="custom">
+                            Custom
+                          </SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    {usesCustomTravel && (
+                      <div className="space-y-2">
+                        <Label>
+                          Custom travel minutes
+                        </Label>
+
+                        <Input
+                          type="number"
+                          min="0"
+                          step="1"
+                          value={
+                            stop.schedule
+                              .customTravelMinutes ?? ""
+                          }
+                          onChange={(event) =>
+                            updateSchedule(
+                              stop.schedule.id,
+                              {
+                                customTravelMinutes:
+                                  event.target.value === ""
+                                    ? undefined
+                                    : Math.max(
+                                        0,
+                                        Number(
+                                          event.target
+                                            .value
+                                        ) || 0
+                                      ),
+                              }
+                            )
+                          }
+                        />
+                      </div>
+                    )}
+                  </div>
+
+                  {index === 0 &&
+                    stop.automaticTravelMinutes ===
+                      0 && (
+                      <p className="text-xs text-muted-foreground">
+                        Travel to the first site is not
+                        included because no starting
+                        location has been selected.
+                      </p>
+                    )}
+                </div>
+              );
+            }
+          )}
+        </div>
+      </>
+    ) : (
+      <p className="text-sm text-muted-foreground">
+        This employee has no schedules for{" "}
+        {format(currentDate, "MMMM d, yyyy")}.
+      </p>
+    )
+  ) : (
+    <p className="text-sm text-muted-foreground">
+      Select an employee to view the estimated
+      workload.
+    </p>
+  )}
+</div>
+
               <ScrollArea className="h-[60vh]">
       
                      {filteredDailySchedules.length > 0 ? (
