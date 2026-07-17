@@ -41,6 +41,11 @@ import {
   LogIn,
   LogOut,
   MessageSquare,
+  Clock3,
+  Timer,
+  TrendingDown,
+  TrendingUp,
+  Equal,
 } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Calendar } from "@/components/ui/calendar";
@@ -222,6 +227,56 @@ const formatHHMM = (totalMinutes: number) => {
   return `${hours.toString().padStart(2, "0")}:${minutes
     .toString()
     .padStart(2, "0")}`;
+};
+
+interface ScheduleCanvasProps {
+  children: React.ReactNode;
+  minWidth?: string;
+  className?: string;
+}
+
+const ScheduleCanvas = ({
+  children,
+  minWidth = "min-w-[1120px]",
+  className,
+}: ScheduleCanvasProps) => {
+  return (
+    <div
+      className={cn(
+        `
+          relative w-full max-w-full overflow-x-auto
+          overscroll-x-contain rounded-2xl
+          border border-slate-200/80
+          bg-gradient-to-br from-white via-white to-slate-50/70
+          shadow-[0_10px_35px_rgba(15,23,42,0.06)]
+          dark:border-slate-800
+          dark:from-slate-950
+          dark:via-slate-950
+          dark:to-slate-900/70
+
+          [scrollbar-width:thin]
+          [scrollbar-color:rgb(148_163_184)_transparent]
+
+          [&::-webkit-scrollbar]:h-2
+          [&::-webkit-scrollbar-track]:bg-transparent
+          [&::-webkit-scrollbar-thumb]:rounded-full
+          [&::-webkit-scrollbar-thumb]:bg-slate-300
+          hover:[&::-webkit-scrollbar-thumb]:bg-slate-400
+
+          dark:[&::-webkit-scrollbar-thumb]:bg-slate-700
+          dark:hover:[&::-webkit-scrollbar-thumb]:bg-slate-600
+
+          [-webkit-overflow-scrolling:touch]
+          touch-pan-x
+        `,
+        className
+      )}
+    >
+      <div className={cn(minWidth, "p-3 sm:p-4 lg:p-5")}>
+        {children}
+      </div>
+    </div>
+  );
 };
 
 type AssignMode = "employees" | "team";
@@ -1223,13 +1278,29 @@ const getScheduleHours = useCallback(
   return (
     <TooltipProvider>
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <div className="flex justify-between items-center mb-4 flex-wrap gap-2">
-          <TabsList>
+        <div
+  className="
+    mb-4 flex max-w-full flex-col gap-3
+    rounded-2xl border border-slate-200/80
+    bg-white/95 p-3 shadow-sm
+    dark:border-slate-800 dark:bg-slate-950/90
+    sm:flex-row sm:items-center sm:justify-between
+  "
+>
+          <div
+  className="
+    max-w-full overflow-x-auto
+    [scrollbar-width:none]
+    [&::-webkit-scrollbar]:hidden
+  "
+>
+  <TabsList className="w-max min-w-full justify-start rounded-xl bg-slate-100 p-1 dark:bg-slate-900 sm:min-w-0">
             <TabsTrigger value="list">List</TabsTrigger>
             <TabsTrigger value="daily">Daily</TabsTrigger>
             <TabsTrigger value="weekly">Weekly</TabsTrigger>
             <TabsTrigger value="monthly">Monthly</TabsTrigger>
-          </TabsList>
+            </TabsList>
+</div>
 
           <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
             <DialogTrigger asChild>
@@ -1610,8 +1681,9 @@ const getScheduleHours = useCallback(
         </div>
 
         {/* LIST */}
-        <TabsContent value="list">
-          <Card>
+        <TabsContent value="list" className="mt-0">
+  <ScheduleCanvas minWidth="min-w-[1180px]">
+    <Card className="overflow-hidden border-0 bg-transparent shadow-none">
             <CardHeader>
               <CardTitle>Cleaning Schedules</CardTitle>
               <CardDescription>
@@ -1620,8 +1692,8 @@ const getScheduleHours = useCallback(
             </CardHeader>
             <CardContent>
               <ScrollArea className="h-[60vh]">
-                <Table>
-                  <TableHeader>
+                <Table className="min-w-[1080px]">
+                  <TableHeader className="bg-slate-100/90 dark:bg-slate-900/90">
                     <TableRow>
                       <TableHead>Site</TableHead>
                       <TableHead>Repeats</TableHead>
@@ -1646,7 +1718,14 @@ const getScheduleHours = useCallback(
           schedule.repeatFrequency || "does-not-repeat";
 
         return (
-          <TableRow key={schedule.id}>
+          <TableRow
+  key={schedule.id}
+  className="
+    transition-colors
+    hover:bg-sky-50/70
+    dark:hover:bg-sky-950/20
+  "
+>
             <TableCell>{schedule.siteName}</TableCell>
             <TableCell className="capitalize">
               {repeatFreq.replace(/-/g, " ")}
@@ -1722,16 +1801,41 @@ const getScheduleHours = useCallback(
                 </Table>
               </ScrollArea>
             </CardContent>
-          </Card>
-        </TabsContent>
+              </Card>
+  </ScheduleCanvas>
+</TabsContent>
 
         {/* DAILY */}
-        <TabsContent value="daily">
-          <Card>
-            <CardHeader>
+        <TabsContent value="daily" className="mt-0">
+  <ScheduleCanvas minWidth="min-w-[1180px]">
+    <Card
+      className="
+        overflow-hidden border-0 bg-transparent shadow-none
+      "
+    >
+           <CardHeader
+  className="
+    rounded-2xl border border-slate-200/80
+    bg-gradient-to-r from-sky-50 via-white to-violet-50
+    px-5 py-5 shadow-sm
+    dark:border-slate-800
+    dark:from-sky-950/35
+    dark:via-slate-950
+    dark:to-violet-950/30
+  "
+>
               <div className="flex items-center justify-between gap-3 flex-wrap">
                 <div>
-                  <CardTitle>Daily Schedule</CardTitle>
+                  <CardTitle
+  className="
+    bg-gradient-to-r from-sky-700 to-violet-700
+    bg-clip-text text-2xl font-bold tracking-tight
+    text-transparent
+    dark:from-sky-300 dark:to-violet-300
+  "
+>
+  Daily Schedule
+</CardTitle>
                   <CardDescription>
                     {formatDateHeader(currentDate)} • {dailySiteCount} site
                     {dailySiteCount === 1 ? "" : "s"} scheduled
@@ -1793,14 +1897,27 @@ const getScheduleHours = useCallback(
               </div>
             </CardHeader>
 
-            <CardContent>
-                        <div className="flex flex-wrap items-center gap-2 mb-3">
-  <div className="w-full sm:w-72">
+            <CardContent className="px-5 py-4">
+                        <div
+  className="
+    mb-4 flex flex-wrap items-center gap-3
+    rounded-2xl border border-slate-200/80
+    bg-white p-3 shadow-sm
+    dark:border-slate-800 dark:bg-slate-950
+  "
+>
+  <div className="w-full min-w-[280px] flex-1">
     <Input
-      placeholder="Search site, employee, team..."
-      value={dailySearch}
-      onChange={(e) => setDailySearch(e.target.value)}
-    />
+  placeholder="Search site, employee, team..."
+  value={dailySearch}
+  onChange={(e) => setDailySearch(e.target.value)}
+  className="
+    rounded-xl border-slate-200
+    bg-white shadow-sm
+    focus-visible:ring-sky-500
+    dark:border-slate-800 dark:bg-slate-950
+  "
+/>
   </div>
 
   <Select
@@ -1809,7 +1926,7 @@ const getScheduleHours = useCallback(
       setStatusFilter(v)
     }
   >
-    <SelectTrigger className="w-[180px]">
+    <SelectTrigger className="w-[210px] rounded-xl bg-white dark:bg-slate-950">
       <SelectValue placeholder="Filter by status" />
     </SelectTrigger>
     <SelectContent>
@@ -1822,11 +1939,41 @@ const getScheduleHours = useCallback(
 </div>
 
 {/* Manager-only estimated workload planner */}
-<div className="mb-4 rounded-lg border p-4 space-y-4">
+<div
+  className="
+    mb-5 space-y-5 overflow-hidden rounded-2xl
+    border border-violet-200/80
+    bg-gradient-to-br from-white via-violet-50/40 to-sky-50/50
+    p-5 shadow-[0_12px_35px_rgba(76,29,149,0.08)]
+    dark:border-violet-900/70
+    dark:from-slate-950
+    dark:via-violet-950/20
+    dark:to-sky-950/20
+  "
+>
   <div>
-    <h3 className="font-semibold">
+    <div className="flex items-center gap-3">
+  <div
+    className="
+      flex h-10 w-10 items-center justify-center
+      rounded-xl bg-gradient-to-br
+      from-violet-500 to-sky-500
+      text-white shadow-md
+    "
+  >
+    <Timer className="h-5 w-5" />
+  </div>
+
+  <div>
+    <h3 className="text-lg font-bold tracking-tight">
       Estimated Workload
     </h3>
+
+    <p className="text-sm text-muted-foreground">
+      Smart workforce and route planning
+    </p>
+  </div>
+</div>
 
     <p className="text-sm text-muted-foreground">
       Select an employee to calculate cleaning time,
@@ -1864,41 +2011,65 @@ const getScheduleHours = useCallback(
     planningSchedules.length > 0 ? (
       <>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-          <div className="rounded-md border p-3">
-            <p className="text-xs text-muted-foreground">
-              Cleaning time
-            </p>
+          <div
+  className="
+    rounded-2xl border border-sky-200
+    bg-gradient-to-br from-sky-50 to-cyan-50
+    p-4 shadow-sm
+    dark:border-sky-900
+    dark:from-sky-950/60 dark:to-cyan-950/30
+  "
+>
+  <p className="text-xs font-semibold uppercase tracking-wide text-sky-700 dark:text-sky-300">
+    Cleaning time
+  </p>
 
-            <p className="text-lg font-semibold">
-              {formatMinutes(
-                planningRoutePlan.totalCleaningMinutes
-              )}
-            </p>
-          </div>
+  <p className="mt-1 text-2xl font-bold tabular-nums text-sky-950 dark:text-sky-50">
+    {formatMinutes(
+      planningRoutePlan.totalCleaningMinutes
+    )}
+  </p>
+</div>
 
-          <div className="rounded-md border p-3">
-            <p className="text-xs text-muted-foreground">
-              Travel time
-            </p>
+          <div
+  className="
+    rounded-2xl border border-amber-200
+    bg-gradient-to-br from-amber-50 to-orange-50
+    p-4 shadow-sm
+    dark:border-amber-900
+    dark:from-amber-950/60 dark:to-orange-950/30
+  "
+>
+  <p className="text-xs font-semibold uppercase tracking-wide text-amber-700 dark:text-amber-300">
+    Travel time
+  </p>
 
-            <p className="text-lg font-semibold">
-              {formatMinutes(
-                planningRoutePlan.totalTravelMinutes
-              )}
-            </p>
-          </div>
+  <p className="mt-1 text-2xl font-bold tabular-nums text-amber-950 dark:text-amber-50">
+    {formatMinutes(
+      planningRoutePlan.totalTravelMinutes
+    )}
+  </p>
+</div>
 
-          <div className="rounded-md border p-3">
-            <p className="text-xs text-muted-foreground">
-              Total estimated time
-            </p>
+          <div
+  className="
+    rounded-2xl border border-violet-200
+    bg-gradient-to-br from-violet-50 to-fuchsia-50
+    p-4 shadow-sm
+    dark:border-violet-900
+    dark:from-violet-950/60 dark:to-fuchsia-950/30
+  "
+>
+  <p className="text-xs font-semibold uppercase tracking-wide text-violet-700 dark:text-violet-300">
+    Total estimated time
+  </p>
 
-            <p className="text-lg font-semibold">
-              {formatMinutes(
-                planningRoutePlan.totalEstimatedMinutes
-              )}
-            </p>
-          </div>
+  <p className="mt-1 text-2xl font-bold tabular-nums text-violet-950 dark:text-violet-50">
+    {formatMinutes(
+      planningRoutePlan.totalEstimatedMinutes
+    )}
+  </p>
+</div>
         </div>
 
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -1953,11 +2124,27 @@ const getScheduleHours = useCallback(
               return (
                 <div
                   key={`${stop.schedule.id}-${index}`}
-                  className="rounded-md border p-3 space-y-3"
+                  className="
+  group relative space-y-4 overflow-hidden
+  rounded-2xl border border-slate-200
+  bg-white p-4 shadow-sm transition-all
+  hover:-translate-y-0.5
+  hover:border-sky-300
+  hover:shadow-lg
+  dark:border-slate-800
+  dark:bg-slate-950
+  dark:hover:border-sky-800
+"
                 >
+                  <div
+  className="
+    absolute inset-y-0 left-0 w-1.5
+    bg-gradient-to-b from-sky-500 to-violet-500
+  "
+/>
                   <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                     <div>
-                      <p className="font-medium">
+                      <p className="text-base font-bold tracking-tight">
                         {index + 1}.{" "}
                         {stop.schedule.siteName}
                       </p>
@@ -1972,7 +2159,9 @@ const getScheduleHours = useCallback(
 
                     <div className="sm:text-right">
                       <p className="text-sm">
-                        Travel:{" "}
+                       <span className="font-semibold text-amber-700 dark:text-amber-300">
+  Travel:
+</span>{" "}
                         {formatMinutes(
                           stop.effectiveTravelMinutes
                         )}
@@ -2111,8 +2300,31 @@ const getScheduleHours = useCallback(
                           : "";
 
                       return (
-                        <Card key={s.id}>
-                          <CardHeader className="pb-2">
+                       <Card
+  key={s.id}
+  className="
+    group overflow-hidden rounded-2xl
+    border border-slate-200/90
+    bg-white shadow-sm transition-all
+    hover:-translate-y-0.5
+    hover:border-sky-300
+    hover:shadow-[0_14px_35px_rgba(15,23,42,0.10)]
+    dark:border-slate-800
+    dark:bg-slate-950
+    dark:hover:border-sky-800
+  "
+>
+                         <CardHeader
+  className="
+    border-b border-slate-100
+    bg-gradient-to-r from-white via-white to-slate-50/80
+    px-5 py-4
+    dark:border-slate-900
+    dark:from-slate-950
+    dark:via-slate-950
+    dark:to-slate-900/60
+  "
+>
                             <div className="flex justify-between items-start">
                               <div>
                                 <CardTitle className="text-lg flex items-center gap-2">
@@ -2160,11 +2372,23 @@ const getScheduleHours = useCallback(
     return sum + h * 60 + m;
   }, 0);
 
-  return totalScheduleMinutes > 0 ? (
-    <span className="text-xs text-muted-foreground">
-      • {formatHHMM(totalScheduleMinutes)}
-    </span>
-  ) : null;
+  const estimatedMinutes = site?.estimatedWorkMinutes ?? 0;
+
+return totalScheduleMinutes > 0 || estimatedMinutes > 0 ? (
+  <span className="text-xs text-muted-foreground whitespace-nowrap">
+    {totalScheduleMinutes > 0 && (
+      <>
+        • Worked {formatHHMM(totalScheduleMinutes)}
+      </>
+    )}
+
+    {estimatedMinutes > 0 && (
+      <>
+        {" "}• Est. {formatHHMM(estimatedMinutes)}
+      </>
+    )}
+  </span>
+) : null;
 })()}
                                 <Button
                                   variant="ghost"
@@ -2363,12 +2587,14 @@ const siteScheduleCompleted = entries.some((e) => {
                 )}
               </ScrollArea>
             </CardContent>
-          </Card>
-        </TabsContent>
+              </Card>
+  </ScheduleCanvas>
+</TabsContent>
 
         {/* WEEKLY */}
         <TabsContent value="weekly">
-          <Card>
+  <ScheduleCanvas minWidth="min-w-[1180px]">
+    <Card className="overflow-hidden border-0 bg-transparent shadow-none">
             <CardHeader>
               <div className="flex justify-between items-center">
                 <div>
@@ -2498,11 +2724,13 @@ const siteScheduleCompleted = entries.some((e) => {
               </ScrollArea>
             </CardContent>
           </Card>
-        </TabsContent>
+  </ScheduleCanvas>
+</TabsContent>
 
         {/* MONTHLY */}
         <TabsContent value="monthly">
-          <Card>
+  <ScheduleCanvas minWidth="min-w-[1320px]">
+    <Card className="overflow-hidden border-0 bg-transparent shadow-none">
             <CardHeader>
               <div className="flex justify-between items-center">
                 <div>
@@ -2533,7 +2761,16 @@ const siteScheduleCompleted = entries.some((e) => {
 
             <CardContent>
               <ScrollArea className="h-[60vh]">
-                <div className="grid grid-cols-7 border-t border-l">
+                <div
+  className="
+    grid min-w-[1240px] grid-cols-7
+    overflow-hidden rounded-2xl
+    border-l border-t
+    border-slate-200
+    bg-white shadow-sm
+    dark:border-slate-800 dark:bg-slate-950
+  "
+>
                   {weekDays.map((day) => (
                     <div
                       key={day}
@@ -2634,8 +2871,9 @@ const siteScheduleCompleted = entries.some((e) => {
                 </div>
               </ScrollArea>
             </CardContent>
-          </Card>
-        </TabsContent>
+           </Card>
+  </ScheduleCanvas>
+</TabsContent>
         <Dialog
   open={fixModal.open}
   onOpenChange={(open) =>
