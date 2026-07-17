@@ -349,6 +349,15 @@ const [activeTab, setActiveTab] = useState("list");
  */
 const [planningEmployeeId, setPlanningEmployeeId] =
   useState<string>("");
+  /*
+ * Number of employees expected to work together on this route.
+ *
+ * Assumption:
+ * Cleaning work is divided evenly among employees working
+ * simultaneously. Travel time is not divided.
+ */
+const [planningCrewSize, setPlanningCrewSize] =
+  useState<number>(1);
 const [fixModal, setFixModal] = useState<{
   open: boolean;
   employeeId?: string;
@@ -1063,6 +1072,27 @@ const planningRoutePlan = useMemo(() => {
   sites,
 ]);
 
+const adjustedCleaningMinutes = useMemo(() => {
+  const crewSize = Math.max(1, planningCrewSize);
+
+  return Math.ceil(
+    planningRoutePlan.totalCleaningMinutes / crewSize
+  );
+}, [
+  planningRoutePlan.totalCleaningMinutes,
+  planningCrewSize,
+]);
+
+const adjustedTotalEstimatedMinutes = useMemo(() => {
+  return (
+    adjustedCleaningMinutes +
+    planningRoutePlan.totalTravelMinutes
+  );
+}, [
+  adjustedCleaningMinutes,
+  planningRoutePlan.totalTravelMinutes,
+]);
+
 /*
  * For this first implementation, the finish time is stored on
  * the first schedule in the employee's route.
@@ -1073,20 +1103,20 @@ const routeFinishByTime =
   )?.finishByTime ?? "";
 
 const recommendedStartTime = useMemo(() => {
-  if (
-    !routeFinishByTime ||
-    planningRoutePlan.totalEstimatedMinutes <= 0
-  ) {
+ if (
+  !routeFinishByTime ||
+  adjustedTotalEstimatedMinutes <= 0
+) {
     return null;
   }
 
   return subtractMinutesFromTime(
-    routeFinishByTime,
-    planningRoutePlan.totalEstimatedMinutes
-  );
+  routeFinishByTime,
+  adjustedTotalEstimatedMinutes
+);
 }, [
   routeFinishByTime,
-  planningRoutePlan.totalEstimatedMinutes,
+  adjustedTotalEstimatedMinutes,
 ]);
 
 const handleFinishByTimeChange = (
@@ -1981,16 +2011,20 @@ const getScheduleHours = useCallback(
     </p>
   </div>
 
+  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
   <div className="space-y-2">
     <Label htmlFor="planningEmployee">
-      Employee
+      Lead employee
     </Label>
 
     <Select
       value={planningEmployeeId}
       onValueChange={setPlanningEmployeeId}
     >
-      <SelectTrigger id="planningEmployee">
+      <SelectTrigger
+        id="planningEmployee"
+        className="rounded-xl bg-white dark:bg-slate-950"
+      >
         <SelectValue placeholder="Select an employee..." />
       </SelectTrigger>
 
@@ -2006,6 +2040,60 @@ const getScheduleHours = useCallback(
       </SelectContent>
     </Select>
   </div>
+
+  <div className="space-y-2">
+    <Label htmlFor="planningCrewSize">
+      Crew size
+    </Label>
+
+    <Select
+      value={String(planningCrewSize)}
+      onValueChange={(value) =>
+        setPlanningCrewSize(
+          Math.max(1, Number(value) || 1)
+        )
+      }
+    >
+      <SelectTrigger
+        id="planningCrewSize"
+        className="rounded-xl bg-white dark:bg-slate-950"
+      >
+        <SelectValue />
+      </SelectTrigger>
+
+      <SelectContent>
+        <SelectItem value="1">
+          1 employee
+        </SelectItem>
+
+        <SelectItem value="2">
+          2 employees
+        </SelectItem>
+
+        <SelectItem value="3">
+          3 employees
+        </SelectItem>
+
+        <SelectItem value="4">
+          4 employees
+        </SelectItem>
+
+        <SelectItem value="5">
+          5 employees
+        </SelectItem>
+
+        <SelectItem value="6">
+          6 employees
+        </SelectItem>
+      </SelectContent>
+    </Select>
+
+    <p className="text-xs text-muted-foreground">
+      Assumes the employees work together and divide
+      the cleaning work evenly.
+    </p>
+  </div>
+</div>
 
   {planningEmployeeId ? (
     planningSchedules.length > 0 ? (
@@ -2025,10 +2113,18 @@ const getScheduleHours = useCallback(
   </p>
 
   <p className="mt-1 text-2xl font-bold tabular-nums text-sky-950 dark:text-sky-50">
+    {formatMinutes(adjustedCleaningMinutes)}
+  </p>
+
+  {planningCrewSize > 1 && (
+  <p className="mt-1 text-xs text-sky-700/80 dark:text-sky-300/80">
+    Original work:{" "}
     {formatMinutes(
       planningRoutePlan.totalCleaningMinutes
-    )}
+    )} divided among {planningCrewSize} employees
   </p>
+)}
+
 </div>
 
           <div
@@ -2066,8 +2162,8 @@ const getScheduleHours = useCallback(
 
   <p className="mt-1 text-2xl font-bold tabular-nums text-violet-950 dark:text-violet-50">
     {formatMinutes(
-      planningRoutePlan.totalEstimatedMinutes
-    )}
+  adjustedTotalEstimatedMinutes
+)}
   </p>
 </div>
         </div>
@@ -2120,6 +2216,11 @@ const getScheduleHours = useCallback(
               const usesCustomTravel =
                 stop.schedule.travelTimeMode ===
                 "custom";
+                const adjustedStopCleaningMinutes =
+  Math.ceil(
+    stop.cleaningMinutes /
+      Math.max(1, planningCrewSize)
+  );
 
               return (
                 <div
@@ -2135,12 +2236,18 @@ const getScheduleHours = useCallback(
   dark:bg-slate-950
   dark:hover:border-sky-800
 "
+style={{
+  boxShadow: `0 8px 24px ${
+    stop.site?.color || "#64748b"
+  }18`,
+}}
                 >
                   <div
-  className="
-    absolute inset-y-0 left-0 w-1.5
-    bg-gradient-to-b from-sky-500 to-violet-500
-  "
+  className="absolute inset-y-0 left-0 w-1.5"
+  style={{
+    backgroundColor:
+      stop.site?.color || "#64748b",
+  }}
 />
                   <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                     <div>
@@ -2151,9 +2258,15 @@ const getScheduleHours = useCallback(
 
                       <p className="text-xs text-muted-foreground">
                         Cleaning:{" "}
-                        {formatMinutes(
-                          stop.cleaningMinutes
-                        )}
+{formatMinutes(
+  adjustedStopCleaningMinutes
+)}
+
+{planningCrewSize > 1 && (
+  <span className="ml-1 text-[11px] text-muted-foreground">
+    with {planningCrewSize} employees
+  </span>
+)}
                       </p>
                     </div>
 
@@ -2307,12 +2420,17 @@ const getScheduleHours = useCallback(
     border border-slate-200/90
     bg-white shadow-sm transition-all
     hover:-translate-y-0.5
-    hover:border-sky-300
+    
     hover:shadow-[0_14px_35px_rgba(15,23,42,0.10)]
     dark:border-slate-800
     dark:bg-slate-950
-    dark:hover:border-sky-800
+    
   "
+  style={{
+  borderLeftWidth: "6px",
+  borderLeftColor:
+    site?.color || "#64748b",
+}}
 >
                          <CardHeader
   className="
