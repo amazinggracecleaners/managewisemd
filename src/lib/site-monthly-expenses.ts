@@ -27,6 +27,7 @@ type MonthlyFeeDefinition = {
   source: "site-rs-fee" | "site-other-fee";
   keySuffix: "rs-fee" | "other-fee";
   category: string;
+  vendor?: string;
   feeType?: "none" | "percent" | "fixed";
   feeValue?: number;
 };
@@ -159,23 +160,25 @@ export async function ensureMonthlySiteExpenses({
     serviceDate.slice(0, 7);
 
   const feeDefinitions: MonthlyFeeDefinition[] = [
-    {
-      source: "site-rs-fee",
-      keySuffix: "rs-fee",
-      category: "R/S Fee",
-      feeType: site.rsFeeType,
-      feeValue: site.rsFeeValue,
-    },
-    {
-      source: "site-other-fee",
-      keySuffix: "other-fee",
-      category:
-        site.otherFeeLabel?.trim() ||
-        "Other Fee",
-      feeType: site.otherFeeType,
-      feeValue: site.otherFeeValue,
-    },
-  ];
+  {
+    source: "site-rs-fee",
+    keySuffix: "rs-fee",
+    category: "R/S",
+    vendor: site.rsFeeVendor?.trim(),
+    feeType: site.rsFeeType,
+    feeValue: site.rsFeeValue,
+  },
+  {
+    source: "site-other-fee",
+    keySuffix: "other-fee",
+    category:
+      site.otherFeeLabel?.trim() ||
+      "Other Fee",
+    vendor: site.otherFeeVendor?.trim(),
+    feeType: site.otherFeeType,
+    feeValue: site.otherFeeValue,
+  },
+];
 
   /*
    * Build all eligible expense candidates before starting
@@ -222,7 +225,9 @@ export async function ensureMonthlySiteExpenses({
         expenseDate: serviceDate,
         paidDate: null,
 
-        vendor: safeSiteName,
+        vendor:
+  fee.vendor ||
+  safeSiteName,
         description:
           `${fee.category} for ${safeSiteName} — ${expensePeriod}`,
         amount,

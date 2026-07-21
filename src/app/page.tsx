@@ -15,6 +15,7 @@ import {
   collection,
   writeBatch,
   getDoc,
+  getDocs,
   type DocumentReference,
   type DocumentData,
 } from "firebase/firestore";
@@ -939,6 +940,44 @@ function buildTsOnDayWithRoll(forDate: Date, now: Date, minTs?: number) {
   return ts;
 }
 
+async function getCloudSiteActiveStatus(
+  companyId: string,
+  siteName: string
+): Promise<boolean> {
+  const normalizedSiteName = siteName.trim();
+
+  const entriesQuery = query(
+    collection(
+      db,
+      "companies",
+      companyId,
+      "timeclock_entries"
+    ),
+    where("site", "==", normalizedSiteName)
+  );
+
+  const snapshot = await getDocs(entriesQuery);
+
+  const cloudEntries = snapshot.docs
+    .map(
+      (entryDoc) =>
+        ({
+          id: entryDoc.id,
+          ...entryDoc.data(),
+        } as Entry)
+    )
+    .sort((a, b) => a.ts - b.ts);
+
+  const cloudSessions = groupSessions(cloudEntries);
+
+  return cloudSessions.some(
+    (session) =>
+      session.active &&
+      !!session.in &&
+      (session.in.site || "").trim() === normalizedSiteName
+  );
+}
+
 const recordEntry = useCallback(
   async (
     action: "in" | "out",
@@ -1043,13 +1082,25 @@ const recordEntry = useCallback(
  * Only generate monthly expenses if no employees remain
  * clocked in at this site.
  */
-const anotherEmployeeStillActive = sessions.some(
-  (session) =>
-    session.active &&
-    (session.in?.site || session.out?.site || "") === site.name
-);
+let employeesStillActive =
+  await getCloudSiteActiveStatus(
+    cId,
+    site.name
+  );
 
-if (!anotherEmployeeStillActive) {
+if (employeesStillActive) {
+  await new Promise((resolve) =>
+    setTimeout(resolve, 750)
+  );
+
+  employeesStillActive =
+    await getCloudSiteActiveStatus(
+      cId,
+      site.name
+    );
+}
+
+if (!employeesStillActive) {
   const completedServiceDate =
     scheduleDate ||
     format(forDate, "yyyy-MM-dd");
@@ -1074,13 +1125,15 @@ if (!anotherEmployeeStillActive) {
 
     toast({
       variant: "destructive",
-      title: "Clock-out saved, but monthly fees were not created",
+      title:
+        "Clock-out saved, but monthly fees were not created",
       description:
         "The manual time entry was recorded. Check the site's fee configuration.",
       duration: 9000,
     });
   }
 }
+
 } else {
       setEntries((prev) => [
         ...prev,
@@ -1297,46 +1350,78 @@ if (!isManagerOverride) {
    * Therefore, exclude the employee who is clocking out and check
    * whether another employee remains active at this site.
    */
-  const anotherEmployeeStillActive = sessions.some(
-    (session) =>
-      session.active &&
-      session.employeeId !== targetEmployee.id &&
-      (session.in?.site || session.out?.site || "") === site.name
-  );
+   const completedServiceDate =
+    scheduleDate ||
+    format(forDate, "yyyy-MM-dd");
 
-  if (!anotherEmployeeStillActive) {
-    const completedServiceDate =
-      scheduleDate ||
-      format(forDate, "yyyy-MM-dd");
+  try {
+    /*
+     * The clock-out has already been committed.
+     * Read the latest cloud state instead of relying on a possibly
+     * delayed React snapshot.
+     */
+    let employeesStillActive =
+      await getCloudSiteActiveStatus(
+        cId,
+        site.name
+      );
 
-    try {
+    /*
+     * A second check protects against two employees clocking out
+     * almost simultaneously from different devices.
+     */
+    if (employeesStillActive) {
+      await new Promise((resolve) =>
+        setTimeout(resolve, 750)
+      );
+
+      employeesStillActive =
+        await getCloudSiteActiveStatus(
+          cId,
+          site.name
+        );
+    }
+
+    if (!employeesStillActive) {
       await ensureMonthlySiteExpenses({
         companyId: cId,
         site,
         serviceDate: completedServiceDate,
       });
-    } catch (expenseError) {
-      console.error(
-        "[MONTHLY SITE EXPENSES] generation failed",
+
+      console.log(
+        "[MONTHLY SITE EXPENSES] ensured after final clock-out",
         {
           companyId: cId,
           siteId: site.id,
           siteName: site.name,
           serviceDate: completedServiceDate,
-          error: expenseError,
         }
       );
-
-      toast({
-        variant: "destructive",
-        title: "Clock-out saved, but monthly fees were not created",
-        description:
-          "The time entry was recorded. Check the site's revenue and fee configuration.",
-        duration: 9000,
-      });
     }
+  } catch (expenseError) {
+    console.error(
+      "[MONTHLY SITE EXPENSES] generation failed",
+      {
+        companyId: cId,
+        siteId: site.id,
+        siteName: site.name,
+        serviceDate: completedServiceDate,
+        error: expenseError,
+      }
+    );
+
+    toast({
+      variant: "destructive",
+      title:
+        "Clock-out saved, but monthly fees were not created",
+      description:
+        "The employee was clocked out successfully. Check the site's fee configuration and cloud permissions.",
+      duration: 9000,
+    });
   }
 }
+
 
       const source = context?.source;
 

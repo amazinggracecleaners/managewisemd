@@ -238,9 +238,15 @@ setPaidDate('');
                 key = expense.vendor || 'Other';
             } else if (groupBy === 'site') {
                 key = (expense.siteId ? siteNameMap.get(expense.siteId) : undefined) || expense.siteName || expense.site || 'No Site';
-            } else if (groupBy === 'description') {
-                key = expense.description || 'Uncategorized';
-            }
+           } else if (groupBy === "description") {
+  if (expense.source === "site-rs-fee") {
+    key = "R/S";
+  } else if (expense.source === "site-other-fee") {
+    key = expense.category || "Other Fee";
+  } else {
+    key = expense.description || expense.category || "Uncategorized";
+  }
+}
             const entry = summary.get(key) || { totalAmount: 0, count: 0 };
             entry.totalAmount += expense.amount;
             entry.count += 1;

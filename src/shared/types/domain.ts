@@ -72,10 +72,12 @@ export type Site = {
 
   rsFeeType?: "none" | "percent" | "fixed";
   rsFeeValue?: number;
+  rsFeeVendor?: string;
 
   otherFeeLabel?: string;
   otherFeeType?: "none" | "percent" | "fixed";
   otherFeeValue?: number;
+  otherFeeVendor?: string;
 
   billingFrequency?: BillingFrequency;
 
@@ -177,7 +179,7 @@ export type OtherExpense = {
    * Flexible display category.
    *
    * Examples:
-   * "R/S Fee"
+   * "R/S"
    * "Insurance"
    * "Supplies"
    * "Fuel"

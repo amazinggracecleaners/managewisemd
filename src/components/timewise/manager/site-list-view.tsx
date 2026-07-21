@@ -710,7 +710,7 @@ const groupedSites = useMemo(() => {
     </p>
   </div>
 
-  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+ <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
     <div className="space-y-2">
       <Label>R/S Fee Type</Label>
       <Select
@@ -744,6 +744,28 @@ const groupedSites = useMemo(() => {
       />
     </div>
   </div>
+
+  <div className="space-y-2">
+  <Label htmlFor="rsFeeVendor">
+    R/S Vendor
+  </Label>
+
+  <Input
+    id="rsFeeVendor"
+    value={siteData.rsFeeVendor || ""}
+    onChange={(e) =>
+      handleDataChange(
+        "rsFeeVendor",
+        e.target.value
+      )
+    }
+    placeholder="Example: Coverall"
+    disabled={
+      !siteData.rsFeeType ||
+      siteData.rsFeeType === "none"
+    }
+  />
+</div>
 
   <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
     <div className="space-y-2">
@@ -787,6 +809,28 @@ const groupedSites = useMemo(() => {
       />
     </div>
   </div>
+
+  <div className="space-y-2">
+  <Label htmlFor="otherFeeVendor">
+    Other Fee Vendor
+  </Label>
+
+  <Input
+    id="otherFeeVendor"
+    value={siteData.otherFeeVendor || ""}
+    onChange={(e) =>
+      handleDataChange(
+        "otherFeeVendor",
+        e.target.value
+      )
+    }
+    placeholder="Enter vendor name"
+    disabled={
+      !siteData.otherFeeType ||
+      siteData.otherFeeType === "none"
+    }
+  />
+</div>
 
   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
     <div className="space-y-2">
