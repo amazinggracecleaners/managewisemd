@@ -1,12 +1,12 @@
 // src/lib/profit.ts
 import type {
   Entry,
-  Invoice,
   OtherExpense,
   Settings,
   Employee,
   MileageLog,
   CleaningSchedule,
+  Site,
 } from "@/shared/types/domain";
 import { indexSites } from "@/lib/site-index";
 import {
@@ -54,9 +54,9 @@ const getMonthRange = (isoYYYYMM?: string) => {
 export function aggregateMonthlySiteProfit(params: {
   entries: Entry[];
   employees: Employee[];
+   sites: Site[];
   mileageLogs: MileageLog[];
   otherExpenses: OtherExpense[];
-  invoices?: Invoice[]; 
   schedules: CleaningSchedule[];
   settings?: Settings | null;
   monthISO?: string; // "YYYY-MM"
@@ -64,16 +64,16 @@ export function aggregateMonthlySiteProfit(params: {
   const {
     entries,
     employees,
+     sites,
     mileageLogs,
     otherExpenses,
-    invoices = [],
     schedules,
     settings,
     monthISO,
   } = params;
   const { min, max } = getMonthRange(monthISO);
 
-  const directorySites = settings?.sites ?? [];
+ const directorySites = sites;
   const idx = indexSites(directorySites);
 
   if (!directorySites.length) {
@@ -86,6 +86,7 @@ export function aggregateMonthlySiteProfit(params: {
         mileage: number;
         other: number;
         net: number;
+          revenue: number;
       }>,
       totals: {
         serviceCharge: 0,
@@ -100,20 +101,28 @@ export function aggregateMonthlySiteProfit(params: {
   const rows = new Map<string, Row>(); // key: siteId from directory
 
   const ensure = (siteId: string, siteName: string) => {
-    if (!rows.has(siteId)) {
-      rows.set(siteId, {
-        siteId,
-        siteName,
-        serviceCharge: 0,
-        labor: 0,
-        mileage: 0,
-        other: 0,
-        net: 0,
-        revenue: 0,
-      });
-    }
-    return rows.get(siteId)!;
-  };
+  if (!rows.has(siteId)) {
+    const directorySite =
+      idx.byId.get(siteId) ??
+      idx.byName.get(siteName.trim().toLowerCase());
+
+    rows.set(siteId, {
+      siteId,
+      siteName,
+      serviceCharge: 0,
+      labor: 0,
+      mileage: 0,
+      other: 0,
+      net: 0,
+
+      // Monthly contract revenue stored in the Site profile.
+      // It is counted once for the month.
+      revenue: Number(directorySite?.revenue ?? 0),
+    });
+  }
+
+  return rows.get(siteId)!;
+};
 
   // Pay rates
   const hourlyRatesByEmployee = new Map<string, number>();
@@ -242,28 +251,7 @@ for (const [siteId, daySet] of visitDaysBySite.entries()) {
     siteRow.other += e.amount || 0;
   }
 
-  // Revenue from invoices
-for (const inv of invoices ?? []) {
-  const ts = safeDate(
-    (inv as any).serviceEndDate ??
-      (inv as any).serviceDate ??
-      (inv as any).date ??
-      (inv as any).createdAt
-  );
-
-  if (ts < min || ts > max) continue;
-
-  const { siteId, siteName } = resolveToDirectorySiteId(
-    (inv as any).siteId,
-    inv.siteName,
-    idx
-  );
-
-  if (!siteId || !siteName) continue;
-
-  const siteRow = ensure(siteId, siteName);
-  siteRow.revenue += Number((inv as any).total ?? 0);
-}
+  
 
   // Net & rounding
   for (const r of rows.values()) {

@@ -12,6 +12,7 @@ import type {
      CleaningSchedule,
     Settings,
     ServiceFeedback,
+     Site,
   } from "@/shared/types/domain";
 import { Button } from "@/components/ui/button";
 import { Trash2 } from "lucide-react";
@@ -20,6 +21,7 @@ type Props = {
   fromDate?: string; // "YYYY-MM-DD" from Manager filters (optional)
   entries: any[];
   employees: any[];
+  sites: Site[];
   mileageLogs: any[];
   otherExpenses: any[];
   invoices: Invoice[];
@@ -85,6 +87,7 @@ export function SiteMonthlyReport({
   fromDate,
   entries,
   employees,
+   sites,
   mileageLogs,
   otherExpenses,
   invoices,
@@ -114,14 +117,14 @@ const [feedbackNotes, setFeedbackNotes] = React.useState("");
       aggregateMonthlySiteProfit({
         entries,
         employees,
+         sites,
         mileageLogs,
         otherExpenses,
-        invoices,
         schedules,
         settings,
         monthISO,
       }),
-    [entries, employees, mileageLogs, otherExpenses, invoices, schedules,monthISO, settings]
+    [entries, employees,  sites, mileageLogs, otherExpenses, schedules,monthISO, settings]
   );
 
   if (!rows.length) {
