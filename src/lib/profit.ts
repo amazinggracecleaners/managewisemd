@@ -189,33 +189,62 @@ set.add(dayKey);
  */
 for (const [siteId, daySet] of visitDaysBySite.entries()) {
   const directorySite = idx.byId.get(siteId);
+const existingRow = rows.get(siteId);
 
-  const siteName =
-    directorySite?.name ??
-    rows.get(siteId)?.siteName ??
-    "";
+const siteName =
+  directorySite?.name ??
+  existingRow?.siteName ??
+  "";
 
   if (!siteName) continue;
 
+  const normalizedSiteName =
+    siteName.trim().toLowerCase();
+
   /*
-   * Service Charge now belongs to CleaningSchedule
-   * instead of Site.
+   * A site may have multiple schedule documents.
+   * Match by siteId first, then fall back to siteName.
    */
-  const schedule = schedules.find(
-  (item) =>
-    item.siteName.trim().toLowerCase() ===
-    siteName.trim().toLowerCase()
-);
+  const matchingSchedules = schedules.filter((schedule) => {
+    const scheduleSiteId =
+      String((schedule as any).siteId ?? "").trim();
+
+    const scheduleSiteName =
+      String(
+        (schedule as any).siteName ??
+        (schedule as any).site ??
+        ""
+      )
+        .trim()
+        .toLowerCase();
+
+    return (
+      (scheduleSiteId && scheduleSiteId === siteId) ||
+      scheduleSiteName === normalizedSiteName
+    );
+  });
+
+  /*
+   * Use the most recently listed schedule that has
+   * a valid service charge.
+   *
+   * This avoids an older schedule with serviceCharge 0
+   * being selected before the edited schedule.
+   */
+  const scheduleWithCharge = [...matchingSchedules]
+    .reverse()
+    .find(
+      (schedule) =>
+        Number(schedule.serviceCharge ?? 0) > 0
+    );
 
   const serviceCharge =
-    Number(schedule?.serviceCharge ?? 0);
-
-  if (!serviceCharge) continue;
+    Number(scheduleWithCharge?.serviceCharge ?? 0);
 
   const siteRow = ensure(siteId, siteName);
 
-  siteRow.serviceCharge +=
-    serviceCharge * daySet.size;
+  siteRow.serviceCharge =
+    round2(serviceCharge * daySet.size);
 }
 
   // Mileage
