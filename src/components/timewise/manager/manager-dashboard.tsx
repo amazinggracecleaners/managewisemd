@@ -10,6 +10,7 @@ import type {
   OtherExpense,
   Invoice,
 ServiceFeedback,
+CleaningSchedule,
 } from "@/shared/types/domain";
 
 import { DashboardFilters } from "./dashboard-filters";
@@ -43,6 +44,7 @@ interface ManagerDashboardProps {
   otherExpenses: OtherExpense[];
   allEntries: Entry[];
   invoices: Invoice[];
+  schedules: CleaningSchedule[];
   durationsBySite: Map<string, { minutes: number; byEmployee: Record<string, number> }>;
   deleteSite: (siteId: string) => void;
   settings: Settings;
@@ -74,6 +76,7 @@ export function ManagerDashboard({
   otherExpenses,
   allEntries,
   invoices,
+   schedules,
   deleteSite,
   settings,
   serviceFeedbacks,
@@ -188,6 +191,7 @@ onAddServiceFeedbackAction,
             mileageLogs={mileageLogs}
             otherExpenses={otherExpenses}
             invoices={invoices}
+            schedules={schedules}
             settings={settings}
             serviceFeedbacks={serviceFeedbacks}
 onAddServiceFeedbackAction={onAddServiceFeedbackAction}

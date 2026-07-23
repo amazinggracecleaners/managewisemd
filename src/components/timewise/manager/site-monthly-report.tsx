@@ -9,6 +9,7 @@ import type {
     MileageLog,
     OtherExpense,
     Invoice,
+     CleaningSchedule,
     Settings,
     ServiceFeedback,
   } from "@/shared/types/domain";
@@ -22,6 +23,7 @@ type Props = {
   mileageLogs: any[];
   otherExpenses: any[];
   invoices: Invoice[];
+  schedules: CleaningSchedule[];
   settings: Settings;
   serviceFeedbacks: ServiceFeedback[];
 onAddServiceFeedbackAction: (feedback: Omit<ServiceFeedback, "id">) => void;
@@ -86,6 +88,7 @@ export function SiteMonthlyReport({
   mileageLogs,
   otherExpenses,
   invoices,
+   schedules,
   settings,
   deleteSiteAction,
 serviceFeedbacks,
@@ -114,10 +117,11 @@ const [feedbackNotes, setFeedbackNotes] = React.useState("");
         mileageLogs,
         otherExpenses,
         invoices,
+        schedules,
         settings,
         monthISO,
       }),
-    [entries, employees, mileageLogs, otherExpenses, invoices, monthISO, settings]
+    [entries, employees, mileageLogs, otherExpenses, invoices, schedules,monthISO, settings]
   );
 
   if (!rows.length) {
@@ -149,10 +153,10 @@ const [feedbackNotes, setFeedbackNotes] = React.useState("");
               <th className="py-2 pr-3 text-right">Labor</th>
               <th className="py-2 pr-3 text-right">Mileage</th>
               <th className="py-2 pr-3 text-right">Other</th>
-              <th className="py-2 pr-3 text-right">Net</th>
+              <th className="py-2 pr-3">Status</th>
 <th className="py-2 pr-3 text-right">Revenue Profit</th>
 <th className="py-2 pr-3 text-right">Revenue Margin</th>
-<th className="py-2 pr-3">Status</th>
+
               <th className="py-2 pl-3 text-right">Actions</th>
             </tr>
           </thead>
@@ -167,15 +171,22 @@ const [feedbackNotes, setFeedbackNotes] = React.useState("");
                 <td className="py-2 pr-3 text-right">{r.serviceCharge.toFixed(2)}</td>
                 <td className="py-2 pr-3 text-right">{r.labor.toFixed(2)}</td>
                 <td className="py-2 pr-3 text-right">{r.mileage.toFixed(2)}</td>
-                <td className="py-2 pr-3 text-right">{r.other.toFixed(2)}</td>
-                <td className="py-2 pr-3 text-right font-medium">{r.net.toFixed(2)}</td>
+                <td className="py-2 pr-3 text-right">
+  {r.other.toFixed(2)}
+</td>
+
+<td className="py-2 pr-3">
+  {chip(r.net)}
+</td>
+
 <td className="py-2 pr-3 text-right font-medium">
   {getRevenueProfit(r).toFixed(2)}
 </td>
+
 <td className="py-2 pr-3 text-right">
   {revenueMarginChip(getRevenueMargin(r))}
 </td>
-<td className="py-2 pr-0">{chip(r.net)}</td>
+
                 <td className="py-2 pl-3 text-right">
                     <Button
                         variant="ghost"
@@ -192,20 +203,39 @@ const [feedbackNotes, setFeedbackNotes] = React.useState("");
               </tr>
             ))}
           </tbody>
-          <tfoot>
-            <tr className="border-t font-semibold">
-              <td className="py-2 pr-3">Total</td>
-              <td className="py-2 pr-3 text-right">{totals.serviceCharge.toFixed(2)}</td>
-              <td className="py-2 pr-3 text-right">{totals.labor.toFixed(2)}</td>
-              <td className="py-2 pr-3 text-right">{totals.mileage.toFixed(2)}</td>
-              <td className="py-2 pr-3 text-right">{totals.other.toFixed(2)}</td>
-              <td className="py-2 pr-3 text-right">{totals.net.toFixed(2)}</td>
-<td className="py-2 pr-3 text-right"></td>
-<td className="py-2 pr-3 text-right"></td>
-<td className="py-2 pr-0"></td>
-<td className="py-2 pl-3"></td>
-            </tr>
-          </tfoot>
+         <tfoot>
+  <tr className="border-t font-semibold">
+    <td className="py-2 pr-3">Total</td>
+
+    <td className="py-2 pr-3 text-right">
+      {totals.serviceCharge.toFixed(2)}
+    </td>
+
+    <td className="py-2 pr-3 text-right">
+      {totals.labor.toFixed(2)}
+    </td>
+
+    <td className="py-2 pr-3 text-right">
+      {totals.mileage.toFixed(2)}
+    </td>
+
+    <td className="py-2 pr-3 text-right">
+      {totals.other.toFixed(2)}
+    </td>
+
+    {/* Status */}
+    <td className="py-2 pr-3"></td>
+
+    {/* Revenue Profit */}
+    <td className="py-2 pr-3 text-right"></td>
+
+    {/* Revenue Margin */}
+    <td className="py-2 pr-3 text-right"></td>
+
+    {/* Actions */}
+    <td className="py-2 pl-3"></td>
+  </tr>
+</tfoot>
         </table>
 
         {selectedRow && (

@@ -6,15 +6,19 @@ import type {
   Settings,
   Employee,
   MileageLog,
+  CleaningSchedule,
 } from "@/shared/types/domain";
 import { indexSites } from "@/lib/site-index";
-import { startOfMonth, endOfMonth } from "date-fns";
+import {
+  startOfMonth,
+  endOfMonth,
+} from "date-fns";
 import { groupSessions } from "./time-utils";
 
 type Row = {
   siteId: string;
   siteName: string;
-  serviceCharge: number; // Standard service amount for the month
+  serviceCharge: number; // Service charge × completed visit days
   labor: number;
   mileage: number;
   other: number;
@@ -52,7 +56,8 @@ export function aggregateMonthlySiteProfit(params: {
   employees: Employee[];
   mileageLogs: MileageLog[];
   otherExpenses: OtherExpense[];
-  invoices?: Invoice[]; // kept for compatibility but not used
+  invoices?: Invoice[]; 
+  schedules: CleaningSchedule[];
   settings?: Settings | null;
   monthISO?: string; // "YYYY-MM"
 }) {
@@ -62,6 +67,7 @@ export function aggregateMonthlySiteProfit(params: {
     mileageLogs,
     otherExpenses,
     invoices = [],
+    schedules,
     settings,
     monthISO,
   } = params;
@@ -166,18 +172,42 @@ set.add(dayKey);
     siteRow.labor += cost;
   }
 
-  // Service charge (Standard service amount * number of serviced days)
-  for (const [siteId, daySet] of visitDaysBySite.entries()) {
-    const directorySite = idx.byId.get(siteId);
-    const siteName = directorySite?.name ?? rows.get(siteId)?.siteName ?? "";
-    if (!siteName) continue;
+  /*
+ * Service Charge
+ *
+ * Same calculation as the former Site servicePrice:
+ * schedule.serviceCharge × number of completed site visits.
+ */
+for (const [siteId, daySet] of visitDaysBySite.entries()) {
+  const directorySite = idx.byId.get(siteId);
 
-    const servicePrice = directorySite?.servicePrice ?? 0;
-    if (!servicePrice) continue;
+  const siteName =
+    directorySite?.name ??
+    rows.get(siteId)?.siteName ??
+    "";
 
-    const siteRow = ensure(siteId, siteName);
-    siteRow.serviceCharge += servicePrice * daySet.size;
-  }
+  if (!siteName) continue;
+
+  /*
+   * Service Charge now belongs to CleaningSchedule
+   * instead of Site.
+   */
+  const schedule = schedules.find(
+  (item) =>
+    item.siteName.trim().toLowerCase() ===
+    siteName.trim().toLowerCase()
+);
+
+  const serviceCharge =
+    Number(schedule?.serviceCharge ?? 0);
+
+  if (!serviceCharge) continue;
+
+  const siteRow = ensure(siteId, siteName);
+
+  siteRow.serviceCharge +=
+    serviceCharge * daySet.size;
+}
 
   // Mileage
   for (const m of mileageLogs) {

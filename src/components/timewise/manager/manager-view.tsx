@@ -373,6 +373,7 @@ useEffect(() => {
               deleteEntry={props.deleteEntry}
               employees={props.employees}
               sites={props.sites}
+              schedules={props.schedules}
               mileageLogs={props.mileageLogs}
               otherExpenses={props.otherExpenses}
               allEntries={props.allEntries}
