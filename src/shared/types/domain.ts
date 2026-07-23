@@ -44,31 +44,30 @@ export type Site = {
   lng?: number;
   color?: string;
 
+  // Primary contact
   contactName?: string;
   contactPhone?: string;
   contactEmail?: string;
+
+  // Billing contact
+  billingContactName?: string;
+  billingContactPhone?: string;
+  billingContactEmail?: string;
+
+  // Emergency contact
+  emergencyContactName?: string;
+  emergencyContactPhone?: string;
+  emergencyContactEmail?: string;
 
   notes?: string;
   entranceMethod?: string;
   alarmCode?: string;
 
-   /*
-   * Estimated amount of active work time required to service this site.
-   *
-   * Store the value in minutes.
-   *
-   * Examples:
-   * 45 minutes = 45
-   * 1 hour = 60
-   * 1 hour 30 minutes = 90
-   * 2 hours 15 minutes = 135
-   *
-   * This field is intended for manager planning only.
-   */
   estimatedWorkMinutes?: number;
 
-  revenue?: number; // new site-level revenue
-  servicePrice?: number; // keep temporarily for old data compatibility
+  revenue?: number;
+  serviceCharge?: number; // temporary legacy compatibility
+  billingFrequency?: BillingFrequency;
 
   rsFeeType?: "none" | "percent" | "fixed";
   rsFeeValue?: number;
@@ -78,8 +77,6 @@ export type Site = {
   otherFeeType?: "none" | "percent" | "fixed";
   otherFeeValue?: number;
   otherFeeVendor?: string;
-
-  billingFrequency?: BillingFrequency;
 
   bonusType?: "hourly" | "flat";
   bonusAmount?: number;
@@ -112,8 +109,7 @@ export type CleaningSchedule = {
   daysOfWeek?: DayOfWeek[]; // Only for 'weekly', 'every-2-weeks', 'every-3-weeks'
 
   repeatUntil?: string; // yyyy-MM-dd, optional end date
-  servicePrice?: number;
-  billingFrequency?: BillingFrequency;
+  serviceCharge?: number;
   exceptionDates?: string[];
   assignedTeamId?: string; // references settings.teams[].id
 

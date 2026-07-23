@@ -456,17 +456,17 @@ if (minDate && maxDate) {
       monthly.set(key, row);
     }
 
-    const serviceByMonth = new Map<MonthKey, number>();
+    const contractRevenueByMonth = new Map<MonthKey, number>();
 
     if (settings?.sites?.length && allEntries.length) {
       const idByName = new Map<string, string>();
-      const priceBySiteId = new Map<string, number>();
+      const revenueBySiteId = new Map<string, number>();
 
       for (const s of settings.sites) {
         if (!s.name) continue;
         const id = s.id || s.name;
         idByName.set(s.name.trim().toLowerCase(), id);
-        priceBySiteId.set(id, s.servicePrice ?? 0);
+        revenueBySiteId.set(id, s.revenue ?? 0);
       }
 
       const sessions = groupSessions(allEntries);
@@ -481,8 +481,8 @@ if (minDate && maxDate) {
         const siteId = idByName.get(siteName.trim().toLowerCase());
         if (!siteId) continue;
 
-        const price = priceBySiteId.get(siteId) ?? 0;
-        if (!price) continue;
+        const revenue = revenueBySiteId.get(siteId) ?? 0;
+        if (!revenue) continue;
 
         const sessionStart = sess.in.ts;
         const sessionEnd = sess.out.ts;
@@ -510,63 +510,137 @@ if (minDate && maxDate) {
       }
 
       for (const [mk, perMonth] of daysByMonth.entries()) {
-        let total = 0;
-        for (const [siteId, daySet] of perMonth.entries()) {
-          const price = priceBySiteId.get(siteId) ?? 0;
-          if (!price) continue;
-          total += price * daySet.size;
-        }
-        serviceByMonth.set(mk, total);
-      }
+  let totalContractRevenue = 0;
+
+  /*
+   * Each site is counted only once for the month.
+   *
+   * Site revenue is monthly contract revenue,
+   * so it must not be multiplied by the number
+   * of serviced days.
+   */
+  for (const siteId of perMonth.keys()) {
+    const siteRevenue =
+      revenueBySiteId.get(siteId) ?? 0;
+
+    if (siteRevenue <= 0) continue;
+
+    totalContractRevenue += siteRevenue;
+  }
+
+  contractRevenueByMonth.set(
+    mk,
+    totalContractRevenue
+  );
+}
     }
 
     const allMonthKeys = new Set<MonthKey>();
-    for (const k of monthly.keys()) allMonthKeys.add(k);
-    for (const k of serviceByMonth.keys()) allMonthKeys.add(k);
 
-    const sorted = Array.from(allMonthKeys).sort((a, b) => {
-      const [Ay, Am] = a.split("-");
-      const [By, Bm] = b.split("-");
-      const A = new Date(Number(Ay), new Date(`${Am} 1, 2000`).getMonth(), 1);
-      const B = new Date(Number(By), new Date(`${Bm} 1, 2000`).getMonth(), 1);
-      return A.getTime() - B.getTime();
-    });
+for (const key of monthly.keys()) {
+  allMonthKeys.add(key);
+}
 
-    const rows = sorted.map((k) => {
-      const v =
-        monthly.get(k) ?? { revenue: 0, other: 0, payroll: 0, mileage: 0 };
-      const serviceCharge = serviceByMonth.get(k) ?? 0;
-      const expenses = v.other + v.payroll + v.mileage;
-      const net = v.revenue - expenses;
-const revMinusService = v.revenue - serviceCharge;
+for (const key of contractRevenueByMonth.keys()) {
+  allMonthKeys.add(key);
+}
 
-const revenueMargin =
-  v.revenue > 0
-    ? (net / v.revenue) * 100
-    : 0;
+const sorted = Array.from(allMonthKeys).sort((a, b) => {
+  const [aYear, aMonth] = a.split("-");
+  const [bYear, bMonth] = b.split("-");
 
-return {
-  month: k,
-  serviceCharge,
-  revenue: v.revenue,
-  payroll: v.payroll,
-  other: v.other,
-  mileage: v.mileage,
-  expenses,
-  net,
-  revMinusService,
-  revenueMargin,
-};
-    });
+  const aDate = new Date(
+    Number(aYear),
+    new Date(`${aMonth} 1, 2000`).getMonth(),
+    1
+  );
 
-    const totalRevenue = rows.reduce((s, r) => s + r.revenue, 0);
-    const totalServiceCharge = rows.reduce((s, r) => s + r.serviceCharge, 0);
-    const totalPayroll = rows.reduce((s, r) => s + r.payroll, 0);
-    const totalOther = rows.reduce((s, r) => s + r.other, 0);
-    const totalMileage = rows.reduce((s, r) => s + r.mileage, 0);
-    const totalExpenses = totalPayroll + totalOther + totalMileage;
-    const netIncome = totalRevenue - totalExpenses;
-    const revenueVsServiceDiff = totalRevenue - totalServiceCharge;
+  const bDate = new Date(
+    Number(bYear),
+    new Date(`${bMonth} 1, 2000`).getMonth(),
+    1
+  );
+
+  return aDate.getTime() - bDate.getTime();
+});
+
+const rows = sorted.map((key) => {
+  const values =
+    monthly.get(key) ?? {
+      revenue: 0,
+      other: 0,
+      payroll: 0,
+      mileage: 0,
+    };
+
+  const contractRevenue =
+    contractRevenueByMonth.get(key) ?? 0;
+
+  const expenses =
+    values.other +
+    values.payroll +
+    values.mileage;
+
+  const net =
+    values.revenue - expenses;
+
+  const revenueVariance =
+    values.revenue - contractRevenue;
+
+  const revenueMargin =
+    values.revenue > 0
+      ? (net / values.revenue) * 100
+      : 0;
+
+  return {
+    month: key,
+    contractRevenue,
+    revenue: values.revenue,
+    revenueVariance,
+    payroll: values.payroll,
+    other: values.other,
+    mileage: values.mileage,
+    expenses,
+    net,
+    revenueMargin,
+  };
+});
+
+const totalRevenue = rows.reduce(
+  (sum, row) => sum + row.revenue,
+  0
+);
+
+const totalContractRevenue = rows.reduce(
+  (sum, row) => sum + row.contractRevenue,
+  0
+);
+
+const totalPayroll = rows.reduce(
+  (sum, row) => sum + row.payroll,
+  0
+);
+
+const totalOther = rows.reduce(
+  (sum, row) => sum + row.other,
+  0
+);
+
+const totalMileage = rows.reduce(
+  (sum, row) => sum + row.mileage,
+  0
+);
+
+const totalExpenses =
+  totalPayroll +
+  totalOther +
+  totalMileage;
+
+const netIncome =
+  totalRevenue - totalExpenses;
+
+const revenueVariance =
+  totalRevenue - totalContractRevenue;
 
     const series = rows.map((r) => ({
       month: r.month,
@@ -583,15 +657,15 @@ return {
 
     return {
       kpis: {
-        totalRevenue,
-        totalServiceCharge,
-        revenueVsServiceDiff,
-        totalExpenses,
-        netIncome,
-        totalPayroll,
-        totalOther,
-        totalMileage,
-      },
+  totalRevenue,
+  totalContractRevenue,
+  revenueVariance,
+  totalExpenses,
+  netIncome,
+  totalPayroll,
+  totalOther,
+  totalMileage,
+},
       monthlyRows: rows,
       chartSeries: series,
       expenseBreakdown: breakdown,
@@ -628,11 +702,7 @@ const cashData = useMemo(
     mileageRate,
   ]
 );
-{accountingView === "both" && (
-  <p className="text-sm text-muted-foreground mb-2">
-    Chart and monthly breakdown are showing Operational P&amp;L data.
-  </p>
-)}
+
 
 const activeData =
   accountingView === "cash"
@@ -815,6 +885,12 @@ const {
   </div>
 )}
 
+{accountingView === "both" && (
+  <p className="text-sm text-muted-foreground">
+    The chart and monthly breakdown below display Operational P&amp;L data.
+  </p>
+)}
+
         {accountingView !== "both" && (
   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6 gap-4">
           <Card className="shadow-sm">
@@ -839,13 +915,13 @@ const {
   <Card className="shadow-sm">
     <CardHeader>
       <CardTitle className="flex items-center">
-        Standard service charge
-        <InfoTip text="Sum of each site's standard service rate multiplied by the number of days it was serviced." />
-      </CardTitle>
+  Contract revenue
+  <InfoTip text="Sum of the monthly revenue stored in each serviced site's profile. Each site is counted once per month." />
+</CardTitle>
     </CardHeader>
 
     <CardContent className="text-2xl font-semibold">
-      ${kpis.totalServiceCharge.toFixed(2)}
+      ${kpis.totalContractRevenue.toFixed(2)}
     </CardContent>
   </Card>
 )}
@@ -854,19 +930,19 @@ const {
   <Card className="shadow-sm">
     <CardHeader>
       <CardTitle className="flex items-center">
-        Revenue vs service charge
-        <InfoTip text="Total revenue minus standard service charge. Positive values indicate performance above standard; negative values indicate below-standard billing." />
-      </CardTitle>
+  Revenue variance
+  <InfoTip text="Invoice revenue minus monthly contract revenue." />
+</CardTitle>
     </CardHeader>
 
     <CardContent
       className={`text-2xl font-semibold ${
-        kpis.revenueVsServiceDiff >= 0
+        kpis.revenueVariance>= 0
           ? "text-emerald-600"
           : "text-red-600"
       }`}
     >
-      ${kpis.revenueVsServiceDiff.toFixed(2)}
+      ${kpis.revenueVariance.toFixed(2)}
     </CardContent>
   </Card>
 )}
@@ -1015,9 +1091,9 @@ const {
                   <TableHead className="text-right">
             
                     <span className="inline-flex items-center justify-end w-full">
-                      Service charge
-                      <InfoTip text="Standard site rates × serviced days for this month." />
-                    </span>
+  Contract revenue
+  <InfoTip text="Monthly revenue stored in the Site profile. Each serviced site is counted once for the month." />
+</span>
                   </TableHead>)}
                   <TableHead className="text-right">
                     <span className="inline-flex items-center justify-end w-full">
@@ -1034,9 +1110,9 @@ const {
                   {accountingView === "operational" && (
                   <TableHead className="text-right">
                     <span className="inline-flex items-center justify-end w-full">
-                      Revenue vs service
-                      <InfoTip text="Revenue minus standard service charge for the month." />
-                    </span>
+  Revenue variance
+  <InfoTip text="Invoice revenue minus monthly contract revenue." />
+</span>
                   </TableHead>)}
                   <TableHead className="text-right">
                     <span className="inline-flex items-center justify-end w-full">
@@ -1091,7 +1167,7 @@ const {
 
                       {accountingView === "operational" && (
   <TableCell className="text-right">
-    ${r.serviceCharge.toFixed(2)}
+    ${r.contractRevenue.toFixed(2)}
   </TableCell>
 )}
                       <TableCell className="text-right">
@@ -1100,12 +1176,12 @@ const {
                       {accountingView === "operational" && (
   <TableCell
     className={`text-right ${
-      r.revMinusService >= 0
+      r.revenueVariance >= 0
         ? "text-emerald-600"
         : "text-red-600"
     }`}
   >
-    ${r.revMinusService.toFixed(2)}
+    ${r.revenueVariance.toFixed(2)}
   </TableCell>
 )}
                       <TableCell className="text-right">

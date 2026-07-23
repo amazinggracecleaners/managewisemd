@@ -72,7 +72,7 @@ const getCityFromAddress = (address?: string): string => {
 };
 
 const getSiteRevenue = (site: Partial<Site>) =>
-  Number(site.revenue ?? site.servicePrice ?? 0) || 0;
+  Number(site.revenue ?? 0);
 
 const calculateFee = (
   baseRevenue: number,
@@ -163,7 +163,9 @@ const allSitesCount = sites.length;
   const sitesNeedingGPS = useMemo(
   () =>
     settings.requireGeofence
-      ? activeSites.filter((s) => !s.lat || !s.lng).length
+      ? activeSites.filter(
+  (s) => s.lat === undefined || s.lng === undefined
+).length
       : 0,
   [settings.requireGeofence, activeSites]
 );
@@ -187,11 +189,19 @@ const filteredSites = useMemo(() => {
   const query = searchQuery.toLowerCase();
 
   return baseSites.filter(
-    (site) =>
-      site.name.toLowerCase().includes(query) ||
-      site.address?.toLowerCase().includes(query) ||
-      site.contactName?.toLowerCase().includes(query)
-  );
+  (site) =>
+    site.name.toLowerCase().includes(query) ||
+    site.address?.toLowerCase().includes(query) ||
+    site.contactName?.toLowerCase().includes(query) ||
+    site.contactPhone?.toLowerCase().includes(query) ||
+    site.contactEmail?.toLowerCase().includes(query) ||
+    site.billingContactName?.toLowerCase().includes(query) ||
+    site.billingContactPhone?.toLowerCase().includes(query) ||
+    site.billingContactEmail?.toLowerCase().includes(query) ||
+    site.emergencyContactName?.toLowerCase().includes(query) ||
+    site.emergencyContactPhone?.toLowerCase().includes(query) ||
+    site.emergencyContactEmail?.toLowerCase().includes(query)
+);
 }, [sites, activeSites, siteFilter, searchQuery]);
 const groupedSites = useMemo(() => {
   if (groupBy === "none") {
@@ -238,20 +248,29 @@ const groupedSites = useMemo(() => {
 ]);
 
   const handleOpenDialog = (site: Site | null) => {
-    setEditingSite(site);
-    setSiteData(
-  site
-    ? { status: "active", rsFeeType: "none", otherFeeType: "none", ...site }
-    : {
-        name: "",
-        color: "#333333",
-        status: "active",
-        rsFeeType: "none",
-        otherFeeType: "none",
-      }
-);
-    setIsDialogOpen(true);
-  };
+  setEditingSite(site);
+
+  setSiteData(
+    site
+      ? {
+          status: "active",
+          billingFrequency: "Monthly",
+          rsFeeType: "none",
+          otherFeeType: "none",
+          ...site,
+        }
+      : {
+          name: "",
+          color: "#333333",
+          status: "active",
+          billingFrequency: "Monthly",
+          rsFeeType: "none",
+          otherFeeType: "none",
+        }
+  );
+
+  setIsDialogOpen(true);
+};
 
   const handleDataChange = (field: keyof Site, value: any) => {
     setSiteData((prev) => ({ ...prev, [field]: value }));
@@ -378,7 +397,7 @@ const groupedSites = useMemo(() => {
 
             <div className="flex items-center gap-2">
               <Input
-                placeholder="Search by name, address, or contact…"
+                placeholder="Search sites or contacts…"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="w-full sm:w-56"
@@ -429,448 +448,765 @@ const groupedSites = useMemo(() => {
                       {editingSite ? "Edit site" : "New site"}
                     </DialogTitle>
                   </DialogHeader>
-                  <ScrollArea className="max-h-[70vh] p-1">
-                    <div className="space-y-4 px-4 py-2">
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                          <Label htmlFor="siteName">Site name</Label>
-                          <Input
-                            id="siteName"
-                            value={siteData.name || ""}
-                            onChange={(e) =>
-                              handleDataChange("name", e.target.value)
-                            }
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <Label htmlFor="siteColor">Color tag</Label>
-                          <Input
-                            id="siteColor"
-                            type="color"
-                            value={siteData.color || "#333333"}
-                            onChange={(e) =>
-                              handleDataChange("color", e.target.value)
-                            }
-                            className="h-10 p-1"
-                          />
-                        </div>
-                      </div>
+                 <ScrollArea className="max-h-[70vh] p-1">
+  <div className="space-y-8 px-4 py-2">
+    {/* =========================================================
+        GENERAL
+    ========================================================== */}
+    <section className="space-y-4">
+      <div className="border-b pb-2">
+        <h3 className="text-lg font-semibold">General</h3>
+        <p className="text-sm text-muted-foreground">
+          Basic site information, address, status, and GPS location.
+        </p>
+      </div>
 
-                      <div className="space-y-2">
-                        <Label htmlFor="siteAddress">Address</Label>
-                        <div className="flex items-center gap-2">
-                          <Input
-                            id="siteAddress"
-                            value={siteData.address || ""}
-                            onChange={(e) =>
-                              handleDataChange("address", e.target.value)
-                            }
-                          />
-                          <Button
-                            asChild
-                            variant="outline"
-                            size="icon"
-                            disabled={!siteData.address}
-                          >
-                            <a
-                              href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
-                                siteData.address || ""
-                              )}`}
-                              target="_blank"
-                              rel="noreferrer"
-                              title="Open in Google Maps"
-                            >
-                              <ExternalLink className="h-4 w-4" />
-                            </a>
-                          </Button>
-                        </div>
-                      </div>
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <div className="space-y-2 sm:col-span-2">
+          <Label htmlFor="siteName">Site name</Label>
+          <Input
+            id="siteName"
+            value={siteData.name || ""}
+            onChange={(e) =>
+              handleDataChange("name", e.target.value)
+            }
+            placeholder="Enter the client site name"
+          />
+        </div>
 
-                      <div className="space-y-2">
-                        <Label>Geofence location (latitude / longitude)</Label>
-                        <div className="flex gap-2 items-center">
-                          <Input
-                            value={
-                              siteData.lat !== undefined
-                                ? siteData.lat.toFixed(6)
-                                : ""
-                            }
-                            placeholder="Latitude"
-                            onChange={(e) =>
-                              handleDataChange(
-                                "lat",
-                                e.target.value
-                                  ? parseFloat(e.target.value)
-                                  : undefined
-                              )
-                            }
-                          />
-                          <Input
-                            value={
-                              siteData.lng !== undefined
-                                ? siteData.lng.toFixed(6)
-                                : ""
-                            }
-                            placeholder="Longitude"
-                            onChange={(e) =>
-                              handleDataChange(
-                                "lng",
-                                e.target.value
-                                  ? parseFloat(e.target.value)
-                                  : undefined
-                              )
-                            }
-                          />
-                          <Button
-                            type="button"
-                            variant="outline"
-                            onClick={addLocationToSite}
-                          >
-                            <MapPin className="mr-1 h-4 w-4" />
-                            Use current location
-                          </Button>
-                        </div>
-                      </div>
+        <div className="space-y-2">
+          <Label htmlFor="status">Site status</Label>
 
-                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                        <div className="space-y-2">
-                          <Label htmlFor="contactName">Primary contact</Label>
-                          <Input
-                            id="contactName"
-                            value={siteData.contactName || ""}
-                            onChange={(e) =>
-                              handleDataChange("contactName", e.target.value)
-                            }
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <Label htmlFor="contactPhone">Contact phone</Label>
-                          <Input
-                            id="contactPhone"
-                            value={siteData.contactPhone || ""}
-                            onChange={(e) =>
-                              handleDataChange("contactPhone", e.target.value)
-                            }
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <Label htmlFor="contactEmail">Contact email</Label>
-                          <Input
-                            id="contactEmail"
-                            type="email"
-                            value={siteData.contactEmail || ""}
-                            onChange={(e) =>
-                              handleDataChange("contactEmail", e.target.value)
-                            }
-                          />
-                        </div>
-                      </div>
+          <Select
+            value={siteData.status || "active"}
+            onValueChange={(value) =>
+              handleDataChange("status", value)
+            }
+          >
+            <SelectTrigger id="status">
+              <SelectValue />
+            </SelectTrigger>
 
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                          <Label htmlFor="entranceMethod">Access notes</Label>
-                          <Input
-                            id="entranceMethod"
-                            value={siteData.entranceMethod || ""}
-                            onChange={(e) =>
-                              handleDataChange(
-                                "entranceMethod",
-                                e.target.value
-                              )
-                            }
-                            placeholder="Gate code, door type, lockbox, etc."
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <Label htmlFor="alarmCode">Alarm details</Label>
-                          <Input
-                            id="alarmCode"
-                            value={siteData.alarmCode || ""}
-                            onChange={(e) =>
-                              handleDataChange("alarmCode", e.target.value)
-                            }
-                            placeholder="Alarm code or instructions"
-                          />
-                        </div>
-                      </div>
+            <SelectContent>
+              <SelectItem value="active">Active</SelectItem>
+              <SelectItem value="inactive">Inactive</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
 
-                     <div className="pt-4 border-t space-y-4">
-  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-    <div className="space-y-2">
-      <Label htmlFor="status">Site status</Label>
-      <Select
-        value={siteData.status || "active"}
-        onValueChange={(v) => handleDataChange("status", v)}
-      >
-        <SelectTrigger>
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="active">Active</SelectItem>
-          <SelectItem value="inactive">Inactive</SelectItem>
-        </SelectContent>
-      </Select>
-    </div>
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-[140px_1fr]">
+        <div className="space-y-2">
+          <Label htmlFor="siteColor">Color tag</Label>
 
-    <div className="space-y-2">
-      <Label htmlFor="revenue">Revenue ($)</Label>
-      <Input
-        id="revenue"
-        type="number"
-        value={siteData.revenue ?? ""}
-        onChange={(e) =>
-          handleDataChange(
-            "revenue",
-            e.target.value ? parseFloat(e.target.value) : undefined
-          )
-        }
-        placeholder="Example: 750"
-      />
-    </div>
+          <Input
+            id="siteColor"
+            type="color"
+            value={siteData.color || "#333333"}
+            onChange={(e) =>
+              handleDataChange("color", e.target.value)
+            }
+            className="h-10 p-1"
+          />
+        </div>
 
-    </div>
+        <div className="space-y-2">
+          <Label htmlFor="siteAddress">Address</Label>
 
-  <div className="space-y-2">
-    <Label>Estimated work time</Label>
+          <div className="flex items-center gap-2">
+            <Input
+              id="siteAddress"
+              value={siteData.address || ""}
+              onChange={(e) =>
+                handleDataChange("address", e.target.value)
+              }
+              placeholder="Enter the complete site address"
+            />
 
-    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-      <div className="space-y-2">
-        <Label
-          htmlFor="estimatedWorkHours"
-          className="text-xs text-muted-foreground"
-        >
-          Hours
-        </Label>
-
-        <Input
-          id="estimatedWorkHours"
-          type="number"
-          min="0"
-          step="1"
-          value={Math.floor((siteData.estimatedWorkMinutes ?? 0) / 60)}
-          onChange={(e) => {
-            const hours = Math.max(
-              0,
-              Math.floor(Number(e.target.value) || 0)
-            );
-
-            const currentMinutes =
-              (siteData.estimatedWorkMinutes ?? 0) % 60;
-
-            handleDataChange(
-              "estimatedWorkMinutes",
-              hours * 60 + currentMinutes
-            );
-          }}
-          placeholder="0"
-        />
+            <Button
+              asChild
+              variant="outline"
+              size="icon"
+              disabled={!siteData.address}
+            >
+              <a
+                href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
+                  siteData.address || ""
+                )}`}
+                target="_blank"
+                rel="noreferrer"
+                title="Open in Google Maps"
+              >
+                <ExternalLink className="h-4 w-4" />
+              </a>
+            </Button>
+          </div>
+        </div>
       </div>
 
       <div className="space-y-2">
-        <Label
-          htmlFor="estimatedWorkMinutes"
-          className="text-xs text-muted-foreground"
-        >
-          Minutes
-        </Label>
+        <Label>GPS location</Label>
 
-        <Input
-          id="estimatedWorkMinutes"
-          type="number"
-          min="0"
-          max="59"
-          step="5"
-          value={(siteData.estimatedWorkMinutes ?? 0) % 60}
-          onChange={(e) => {
-            const minutes = Math.min(
-              59,
-              Math.max(
-                0,
-                Math.floor(Number(e.target.value) || 0)
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-[1fr_1fr_auto]">
+          <Input
+            value={
+              siteData.lat !== undefined
+                ? siteData.lat.toFixed(6)
+                : ""
+            }
+            placeholder="Latitude"
+            onChange={(e) =>
+              handleDataChange(
+                "lat",
+                e.target.value
+                  ? parseFloat(e.target.value)
+                  : undefined
               )
-            );
+            }
+          />
 
-            const currentHours = Math.floor(
-              (siteData.estimatedWorkMinutes ?? 0) / 60
-            );
+          <Input
+            value={
+              siteData.lng !== undefined
+                ? siteData.lng.toFixed(6)
+                : ""
+            }
+            placeholder="Longitude"
+            onChange={(e) =>
+              handleDataChange(
+                "lng",
+                e.target.value
+                  ? parseFloat(e.target.value)
+                  : undefined
+              )
+            }
+          />
 
-            handleDataChange(
-              "estimatedWorkMinutes",
-              currentHours * 60 + minutes
-            );
-          }}
-          placeholder="0"
-        />
+          <Button
+            type="button"
+            variant="outline"
+            onClick={addLocationToSite}
+          >
+            <MapPin className="mr-2 h-4 w-4" />
+            Use current location
+          </Button>
+        </div>
       </div>
-    </div>
+    </section>
 
-    <p className="text-xs text-muted-foreground">
-      Average time required to complete service at this site.
-      This information is for manager planning.
-    </p>
+    {/* =========================================================
+        CONTACTS
+    ========================================================== */}
+    <section className="space-y-5 border-t pt-6">
+      <div className="border-b pb-2">
+        <h3 className="text-lg font-semibold">Contacts</h3>
+        <p className="text-sm text-muted-foreground">
+          Primary, billing, and emergency contacts for this site.
+        </p>
+      </div>
+
+      {/* Primary contact */}
+      <div className="space-y-3">
+        <h4 className="font-medium">Primary contact</h4>
+
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+          <div className="space-y-2">
+            <Label htmlFor="contactName">Name</Label>
+
+            <Input
+              id="contactName"
+              value={siteData.contactName || ""}
+              onChange={(e) =>
+                handleDataChange("contactName", e.target.value)
+              }
+              placeholder="Primary contact name"
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="contactPhone">Phone</Label>
+
+            <Input
+              id="contactPhone"
+              type="tel"
+              value={siteData.contactPhone || ""}
+              onChange={(e) =>
+                handleDataChange("contactPhone", e.target.value)
+              }
+              placeholder="Primary contact phone"
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="contactEmail">Email</Label>
+
+            <Input
+              id="contactEmail"
+              type="email"
+              value={siteData.contactEmail || ""}
+              onChange={(e) =>
+                handleDataChange("contactEmail", e.target.value)
+              }
+              placeholder="Primary contact email"
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* Billing contact */}
+      <div className="space-y-3 rounded-md border p-4">
+        <div>
+          <h4 className="font-medium">Billing contact</h4>
+          <p className="text-xs text-muted-foreground">
+            Person or department responsible for invoices and payments.
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+          <div className="space-y-2">
+            <Label htmlFor="billingContactName">Name</Label>
+
+            <Input
+              id="billingContactName"
+              value={siteData.billingContactName || ""}
+              onChange={(e) =>
+                handleDataChange(
+                  "billingContactName",
+                  e.target.value
+                )
+              }
+              placeholder="Billing contact name"
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="billingContactPhone">Phone</Label>
+
+            <Input
+              id="billingContactPhone"
+              type="tel"
+              value={siteData.billingContactPhone || ""}
+              onChange={(e) =>
+                handleDataChange(
+                  "billingContactPhone",
+                  e.target.value
+                )
+              }
+              placeholder="Billing contact phone"
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="billingContactEmail">Email</Label>
+
+            <Input
+              id="billingContactEmail"
+              type="email"
+              value={siteData.billingContactEmail || ""}
+              onChange={(e) =>
+                handleDataChange(
+                  "billingContactEmail",
+                  e.target.value
+                )
+              }
+              placeholder="Billing contact email"
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* Emergency contact */}
+      <div className="space-y-3 rounded-md border p-4">
+        <div>
+          <h4 className="font-medium">Emergency contact</h4>
+          <p className="text-xs text-muted-foreground">
+            Person to contact for urgent after-hours site issues.
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+          <div className="space-y-2">
+            <Label htmlFor="emergencyContactName">Name</Label>
+
+            <Input
+              id="emergencyContactName"
+              value={siteData.emergencyContactName || ""}
+              onChange={(e) =>
+                handleDataChange(
+                  "emergencyContactName",
+                  e.target.value
+                )
+              }
+              placeholder="Emergency contact name"
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="emergencyContactPhone">Phone</Label>
+
+            <Input
+              id="emergencyContactPhone"
+              type="tel"
+              value={siteData.emergencyContactPhone || ""}
+              onChange={(e) =>
+                handleDataChange(
+                  "emergencyContactPhone",
+                  e.target.value
+                )
+              }
+              placeholder="Emergency contact phone"
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="emergencyContactEmail">Email</Label>
+
+            <Input
+              id="emergencyContactEmail"
+              type="email"
+              value={siteData.emergencyContactEmail || ""}
+              onChange={(e) =>
+                handleDataChange(
+                  "emergencyContactEmail",
+                  e.target.value
+                )
+              }
+              placeholder="Emergency contact email"
+            />
+          </div>
+        </div>
+      </div>
+    </section>
+
+    {/* =========================================================
+        FINANCIAL
+    ========================================================== */}
+    <section className="space-y-5 border-t pt-6">
+      <div className="border-b pb-2">
+        <h3 className="text-lg font-semibold">Financial</h3>
+        <p className="text-sm text-muted-foreground">
+          Revenue, billing frequency, fees, and bonuses.
+        </p>
+      </div>
+
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <div className="space-y-2">
+          <Label htmlFor="revenue">Revenue ($)</Label>
+
+          <Input
+            id="revenue"
+            type="number"
+            min="0"
+            step="0.01"
+            value={siteData.revenue ?? ""}
+            onChange={(e) =>
+              handleDataChange(
+                "revenue",
+                e.target.value
+                  ? parseFloat(e.target.value)
+                  : undefined
+              )
+            }
+            placeholder="Example: 750"
+          />
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="billingFrequency">
+            Billing frequency
+          </Label>
+
+          <Select
+            value={siteData.billingFrequency || "Monthly"}
+            onValueChange={(value) =>
+              handleDataChange("billingFrequency", value)
+            }
+          >
+            <SelectTrigger id="billingFrequency">
+              <SelectValue placeholder="Select billing frequency" />
+            </SelectTrigger>
+
+            <SelectContent>
+              <SelectItem value="One-Time">One-Time</SelectItem>
+              <SelectItem value="Daily">Daily</SelectItem>
+              <SelectItem value="Weekly">Weekly</SelectItem>
+              <SelectItem value="Bi-Weekly">Bi-Weekly</SelectItem>
+              <SelectItem value="Monthly">Monthly</SelectItem>
+              <SelectItem value="Quarterly">Quarterly</SelectItem>
+              <SelectItem value="Yearly">Yearly</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+
+      {/* R/S fee */}
+      <div className="space-y-3 rounded-md border p-4">
+        <div>
+          <h4 className="font-medium">R/S fee</h4>
+          <p className="text-xs text-muted-foreground">
+            Royalty and Support fee associated with this site.
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+          <div className="space-y-2">
+            <Label htmlFor="rsFeeType">Fee type</Label>
+
+            <Select
+              value={siteData.rsFeeType || "none"}
+              onValueChange={(value) =>
+                handleDataChange("rsFeeType", value)
+              }
+            >
+              <SelectTrigger id="rsFeeType">
+                <SelectValue />
+              </SelectTrigger>
+
+              <SelectContent>
+                <SelectItem value="none">None</SelectItem>
+                <SelectItem value="percent">
+                  % of Revenue
+                </SelectItem>
+                <SelectItem value="fixed">
+                  Fixed Amount
+                </SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="rsFeeValue">Fee value</Label>
+
+            <Input
+              id="rsFeeValue"
+              type="number"
+              min="0"
+              step="0.01"
+              value={siteData.rsFeeValue ?? ""}
+              onChange={(e) =>
+                handleDataChange(
+                  "rsFeeValue",
+                  e.target.value
+                    ? parseFloat(e.target.value)
+                    : undefined
+                )
+              }
+              disabled={
+                !siteData.rsFeeType ||
+                siteData.rsFeeType === "none"
+              }
+              placeholder={
+                siteData.rsFeeType === "percent"
+                  ? "Example: 15"
+                  : "Example: 113.10"
+              }
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="rsFeeVendor">Vendor</Label>
+
+            <Input
+              id="rsFeeVendor"
+              value={siteData.rsFeeVendor || ""}
+              onChange={(e) =>
+                handleDataChange("rsFeeVendor", e.target.value)
+              }
+              placeholder="Example: Coverall"
+              disabled={
+                !siteData.rsFeeType ||
+                siteData.rsFeeType === "none"
+              }
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* Other fee */}
+      <div className="space-y-3 rounded-md border p-4">
+        <h4 className="font-medium">Other fee</h4>
+
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div className="space-y-2">
+            <Label htmlFor="otherFeeLabel">Fee name</Label>
+
+            <Input
+              id="otherFeeLabel"
+              value={siteData.otherFeeLabel || ""}
+              onChange={(e) =>
+                handleDataChange(
+                  "otherFeeLabel",
+                  e.target.value
+                )
+              }
+              placeholder="Example: Franchise fee"
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="otherFeeType">Fee type</Label>
+
+            <Select
+              value={siteData.otherFeeType || "none"}
+              onValueChange={(value) =>
+                handleDataChange("otherFeeType", value)
+              }
+            >
+              <SelectTrigger id="otherFeeType">
+                <SelectValue />
+              </SelectTrigger>
+
+              <SelectContent>
+                <SelectItem value="none">None</SelectItem>
+                <SelectItem value="percent">
+                  % of Revenue
+                </SelectItem>
+                <SelectItem value="fixed">
+                  Fixed Amount
+                </SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="otherFeeValue">Fee value</Label>
+
+            <Input
+              id="otherFeeValue"
+              type="number"
+              min="0"
+              step="0.01"
+              value={siteData.otherFeeValue ?? ""}
+              onChange={(e) =>
+                handleDataChange(
+                  "otherFeeValue",
+                  e.target.value
+                    ? parseFloat(e.target.value)
+                    : undefined
+                )
+              }
+              disabled={
+                !siteData.otherFeeType ||
+                siteData.otherFeeType === "none"
+              }
+              placeholder={
+                siteData.otherFeeType === "percent"
+                  ? "Example: 5"
+                  : "Example: 25"
+              }
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="otherFeeVendor">Vendor</Label>
+
+            <Input
+              id="otherFeeVendor"
+              value={siteData.otherFeeVendor || ""}
+              onChange={(e) =>
+                handleDataChange(
+                  "otherFeeVendor",
+                  e.target.value
+                )
+              }
+              placeholder="Enter vendor name"
+              disabled={
+                !siteData.otherFeeType ||
+                siteData.otherFeeType === "none"
+              }
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* Bonus */}
+      <div className="space-y-3 rounded-md border p-4">
+        <h4 className="font-medium">Bonus</h4>
+
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div className="space-y-2">
+            <Label htmlFor="bonusType">Bonus structure</Label>
+
+            <Select
+              value={siteData.bonusType || "none"}
+              onValueChange={(value) =>
+                handleDataChange(
+                  "bonusType",
+                  value === "none" ? undefined : value
+                )
+              }
+            >
+              <SelectTrigger id="bonusType">
+                <SelectValue placeholder="No bonus" />
+              </SelectTrigger>
+
+              <SelectContent>
+                <SelectItem value="none">No bonus</SelectItem>
+                <SelectItem value="hourly">
+                  Hourly bonus
+                </SelectItem>
+                <SelectItem value="flat">
+                  Flat amount bonus
+                </SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="bonusAmount">
+              Bonus amount ($)
+            </Label>
+
+            <Input
+              id="bonusAmount"
+              type="number"
+              min="0"
+              step="0.01"
+              value={siteData.bonusAmount ?? ""}
+              onChange={(e) =>
+                handleDataChange(
+                  "bonusAmount",
+                  e.target.value
+                    ? parseFloat(e.target.value)
+                    : undefined
+                )
+              }
+              disabled={!siteData.bonusType}
+              placeholder="Enter bonus amount"
+            />
+          </div>
+        </div>
+      </div>
+    </section>
+
+    {/* =========================================================
+        OPERATIONS
+    ========================================================== */}
+    <section className="space-y-5 border-t pt-6">
+      <div className="border-b pb-2">
+        <h3 className="text-lg font-semibold">Operations</h3>
+        <p className="text-sm text-muted-foreground">
+          Work-time estimates and site access instructions.
+        </p>
+      </div>
+
+      <div className="space-y-2">
+        <Label>Estimated work time</Label>
+
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div className="space-y-2">
+            <Label
+              htmlFor="estimatedWorkHours"
+              className="text-xs text-muted-foreground"
+            >
+              Hours
+            </Label>
+
+            <Input
+              id="estimatedWorkHours"
+              type="number"
+              min="0"
+              step="1"
+              value={Math.floor(
+                (siteData.estimatedWorkMinutes ?? 0) / 60
+              )}
+              onChange={(e) => {
+                const hours = Math.max(
+                  0,
+                  Math.floor(Number(e.target.value) || 0)
+                );
+
+                const currentMinutes =
+                  (siteData.estimatedWorkMinutes ?? 0) % 60;
+
+                handleDataChange(
+                  "estimatedWorkMinutes",
+                  hours * 60 + currentMinutes
+                );
+              }}
+              placeholder="0"
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label
+              htmlFor="estimatedWorkMinutes"
+              className="text-xs text-muted-foreground"
+            >
+              Minutes
+            </Label>
+
+            <Input
+              id="estimatedWorkMinutes"
+              type="number"
+              min="0"
+              max="59"
+              step="5"
+              value={
+                (siteData.estimatedWorkMinutes ?? 0) % 60
+              }
+              onChange={(e) => {
+                const minutes = Math.min(
+                  59,
+                  Math.max(
+                    0,
+                    Math.floor(Number(e.target.value) || 0)
+                  )
+                );
+
+                const currentHours = Math.floor(
+                  (siteData.estimatedWorkMinutes ?? 0) / 60
+                );
+
+                handleDataChange(
+                  "estimatedWorkMinutes",
+                  currentHours * 60 + minutes
+                );
+              }}
+              placeholder="0"
+            />
+          </div>
+        </div>
+
+        <p className="text-xs text-muted-foreground">
+          Average active work time required to complete service at
+          this site.
+        </p>
+      </div>
+
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <div className="space-y-2">
+          <Label htmlFor="entranceMethod">Access notes</Label>
+
+          <Input
+            id="entranceMethod"
+            value={siteData.entranceMethod || ""}
+            onChange={(e) =>
+              handleDataChange(
+                "entranceMethod",
+                e.target.value
+              )
+            }
+            placeholder="Gate code, lockbox, door, keys, etc."
+          />
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="alarmCode">Alarm information</Label>
+
+          <Input
+            id="alarmCode"
+            value={siteData.alarmCode || ""}
+            onChange={(e) =>
+              handleDataChange("alarmCode", e.target.value)
+            }
+            placeholder="Alarm code or alarm instructions"
+          />
+        </div>
+      </div>
+    </section>
   </div>
-
- <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-    <div className="space-y-2">
-      <Label>R/S Fee Type</Label>
-      <Select
-        value={siteData.rsFeeType || "none"}
-        onValueChange={(v) => handleDataChange("rsFeeType", v)}
-      >
-        <SelectTrigger>
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="none">None</SelectItem>
-          <SelectItem value="percent">% of Revenue</SelectItem>
-          <SelectItem value="fixed">Fixed Amount</SelectItem>
-        </SelectContent>
-      </Select>
-    </div>
-
-    <div className="space-y-2">
-      <Label>R/S Value</Label>
-      <Input
-        type="number"
-        value={siteData.rsFeeValue ?? ""}
-        onChange={(e) =>
-          handleDataChange(
-            "rsFeeValue",
-            e.target.value ? parseFloat(e.target.value) : undefined
-          )
-        }
-        disabled={!siteData.rsFeeType || siteData.rsFeeType === "none"}
-        placeholder={siteData.rsFeeType === "percent" ? "Example: 15" : "Example: 113.10"}
-      />
-    </div>
-  </div>
-
-  <div className="space-y-2">
-  <Label htmlFor="rsFeeVendor">
-    R/S Vendor
-  </Label>
-
-  <Input
-    id="rsFeeVendor"
-    value={siteData.rsFeeVendor || ""}
-    onChange={(e) =>
-      handleDataChange(
-        "rsFeeVendor",
-        e.target.value
-      )
-    }
-    placeholder="Example: Coverall"
-    disabled={
-      !siteData.rsFeeType ||
-      siteData.rsFeeType === "none"
-    }
-  />
-</div>
-
-  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-    <div className="space-y-2">
-      <Label>Other Fee Name</Label>
-      <Input
-        value={siteData.otherFeeLabel || ""}
-        onChange={(e) => handleDataChange("otherFeeLabel", e.target.value)}
-        placeholder="Example: Franchise fee"
-      />
-    </div>
-
-    <div className="space-y-2">
-      <Label>Other Fee Type</Label>
-      <Select
-        value={siteData.otherFeeType || "none"}
-        onValueChange={(v) => handleDataChange("otherFeeType", v)}
-      >
-        <SelectTrigger>
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="none">None</SelectItem>
-          <SelectItem value="percent">% of Revenue</SelectItem>
-          <SelectItem value="fixed">Fixed Amount</SelectItem>
-        </SelectContent>
-      </Select>
-    </div>
-
-    <div className="space-y-2">
-      <Label>Other Fee Value</Label>
-      <Input
-        type="number"
-        value={siteData.otherFeeValue ?? ""}
-        onChange={(e) =>
-          handleDataChange(
-            "otherFeeValue",
-            e.target.value ? parseFloat(e.target.value) : undefined
-          )
-        }
-        disabled={!siteData.otherFeeType || siteData.otherFeeType === "none"}
-      />
-    </div>
-  </div>
-
-  <div className="space-y-2">
-  <Label htmlFor="otherFeeVendor">
-    Other Fee Vendor
-  </Label>
-
-  <Input
-    id="otherFeeVendor"
-    value={siteData.otherFeeVendor || ""}
-    onChange={(e) =>
-      handleDataChange(
-        "otherFeeVendor",
-        e.target.value
-      )
-    }
-    placeholder="Enter vendor name"
-    disabled={
-      !siteData.otherFeeType ||
-      siteData.otherFeeType === "none"
-    }
-  />
-</div>
-
-  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-    <div className="space-y-2">
-      <Label htmlFor="bonusType">Bonus structure</Label>
-      <Select
-        value={siteData.bonusType || "none"}
-        onValueChange={(v) =>
-          handleDataChange("bonusType", v === "none" ? undefined : v)
-        }
-      >
-        <SelectTrigger>
-          <SelectValue placeholder="No bonus" />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="none">No bonus</SelectItem>
-          <SelectItem value="hourly">Hourly bonus</SelectItem>
-          <SelectItem value="flat">Flat amount bonus</SelectItem>
-        </SelectContent>
-      </Select>
-    </div>
-
-    <div className="space-y-2">
-      <Label htmlFor="bonusAmount">Bonus amount ($)</Label>
-      <Input
-        id="bonusAmount"
-        type="number"
-        value={siteData.bonusAmount ?? ""}
-        onChange={(e) =>
-          handleDataChange(
-            "bonusAmount",
-            e.target.value ? parseFloat(e.target.value) : undefined
-          )
-        }
-        disabled={!siteData.bonusType}
-      />
-    </div>
-  </div>
-</div>
-                    </div>
-                  </ScrollArea>
+</ScrollArea>
                   <DialogFooter>
                     <DialogClose asChild>
                       <Button variant="outline">Cancel</Button>
@@ -979,6 +1315,43 @@ const groupedSites = useMemo(() => {
                                         <strong>Email:</strong>{" "}
                                         {site.contactEmail || "Not provided"}
                                       </p>
+                                      <div className="mt-3 border-t pt-3">
+  <p className="font-medium">Billing contact</p>
+
+  <p>
+    <strong>Name:</strong>{" "}
+    {site.billingContactName || "Not provided"}
+  </p>
+
+  <p>
+    <strong>Phone:</strong>{" "}
+    {site.billingContactPhone || "Not provided"}
+  </p>
+
+  <p>
+    <strong>Email:</strong>{" "}
+    {site.billingContactEmail || "Not provided"}
+  </p>
+</div>
+
+<div className="mt-3 border-t pt-3">
+  <p className="font-medium">Emergency contact</p>
+
+  <p>
+    <strong>Name:</strong>{" "}
+    {site.emergencyContactName || "Not provided"}
+  </p>
+
+  <p>
+    <strong>Phone:</strong>{" "}
+    {site.emergencyContactPhone || "Not provided"}
+  </p>
+
+  <p>
+    <strong>Email:</strong>{" "}
+    {site.emergencyContactEmail || "Not provided"}
+  </p>
+</div>
                                     </div>
 
                                     <div className="space-y-1">
@@ -1029,6 +1402,10 @@ const groupedSites = useMemo(() => {
         <strong>Revenue:</strong>{" "}
         {revenue ? `$${revenue.toFixed(2)}` : "Not set"}
       </p>
+      <p>
+  <strong>Billing frequency:</strong>{" "}
+  {site.billingFrequency || "Not set"}
+</p>
 <p>
         <strong>Estimated work time:</strong>{" "}
         {formatDuration(site.estimatedWorkMinutes)}
@@ -1101,13 +1478,12 @@ const groupedSites = useMemo(() => {
                                       )}
 
                                       {settings.requireGeofence &&
-                                        (!site.lat || !site.lng) && (
-                                          <Badge variant="destructive">
-                                            GPS coordinates are required for
-                                            this site while geofencing is
-                                            enabled.
-                                          </Badge>
-                                        )}
+  (site.lat === undefined || site.lng === undefined) && (
+    <Badge variant="destructive">
+      GPS coordinates are required for this site while geofencing is
+      enabled.
+    </Badge>
+  )}
                                     </div>
 
                                     <div className="flex flex-col gap-2 sm:items-end">
@@ -1124,7 +1500,7 @@ const groupedSites = useMemo(() => {
                                         size="sm"
                                         variant="secondary"
                                         onClick={() => testGeofence(site)}
-                                        disabled={!site.lat || !site.lng}
+                                        disabled={site.lat === undefined || site.lng === undefined}
                                       >
                                         Test geofence
                                       </Button>

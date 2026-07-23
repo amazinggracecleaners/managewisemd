@@ -7,7 +7,6 @@ import type {
   CleaningSchedule,
   DayOfWeek,
   Employee,
-  BillingFrequency,
   RepeatFrequency,
   SiteStatus,
   Entry,
@@ -152,17 +151,6 @@ interface ScheduleViewProps {
 updateEntry: (id: string, updates: Partial<Entry>) => Promise<void>;
 }
 
-
-
-const billingFrequencies: BillingFrequency[] = [
-  "One-Time",
-  "Daily",
-  "Weekly",
-  "Bi-Weekly",
-  "Monthly",
-  "Quarterly",
-  "Yearly",
-];
 
 const repeatFrequencies: RepeatFrequency[] = [
   "does-not-repeat",
@@ -336,9 +324,7 @@ const [deleteTarget, setDeleteTarget] = useState<{
   const [daysOfWeek, setDaysOfWeek] = useState<DayOfWeek[]>([]);
   const [repeatUntil, setRepeatUntil] = useState<Date | undefined>();
 
-  const [servicePrice, setServicePrice] = useState<number | undefined>();
-  const [billingFrequency, setBillingFrequency] =
-    useState<BillingFrequency | undefined>();
+  const [serviceCharge, setServiceCharge] = useState<number | undefined>();
 
   const [currentDate, setCurrentDate] = useState(startOfDay(new Date()));
 const [activeTab, setActiveTab] = useState("list");
@@ -504,8 +490,7 @@ const openFixShiftModal = (data: {
       setDaysOfWeek(schedule.daysOfWeek || []);
       setRepeatUntil(schedule.repeatUntil ? parseISO(schedule.repeatUntil) : undefined);
 
-      setServicePrice(schedule.servicePrice);
-      setBillingFrequency(schedule.billingFrequency);
+      setServiceCharge(schedule.serviceCharge);
 
       setEditingOccurrenceDate(occurrenceDate);
       setApplyScope("single");
@@ -523,8 +508,7 @@ const openFixShiftModal = (data: {
       setDaysOfWeek([]);
       setRepeatUntil(undefined);
 
-      setServicePrice(undefined);
-      setBillingFrequency(undefined);
+      setServiceCharge(undefined);
 
       setEditingOccurrenceDate(undefined);
       setApplyScope("series");
@@ -583,8 +567,7 @@ const openFixShiftModal = (data: {
       ? format(repeatUntil, "yyyy-MM-dd")
       : undefined,
 
-    servicePrice,
-    billingFrequency,
+    serviceCharge,
   };
 
   const cleanedData = cleanForFirestore(
@@ -1382,13 +1365,15 @@ const getScheduleHours = useCallback(
                   {/* Price/Frequency */}
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
-                      <Label htmlFor="servicePrice">Service Price ($)</Label>
+                      <Label htmlFor="serviceCharge">
+  Service Charge ($)
+</Label>
                       <Input
-                        id="servicePrice"
+                        id="serviceCharge"
                         type="number"
-                        value={servicePrice ?? ""}
+                        value={serviceCharge ?? ""}
                         onChange={(e) =>
-                          setServicePrice(
+                          setServiceCharge(
                             parseFloat(e.target.value) || undefined
                           )
                         }
@@ -1396,24 +1381,6 @@ const getScheduleHours = useCallback(
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="billingFrequency">Billing Frequency</Label>
-                      <Select
-                        value={billingFrequency}
-                        onValueChange={(v: BillingFrequency) =>
-                          setBillingFrequency(v)
-                        }
-                      >
-                        <SelectTrigger id="billingFrequency">
-                          <SelectValue placeholder="Select frequency" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {billingFrequencies.map((f) => (
-                            <SelectItem key={f} value={f}>
-                              {f}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
                     </div>
                   </div>
 
@@ -1732,8 +1699,7 @@ const getScheduleHours = useCallback(
                       <TableHead>Assigned</TableHead>
                       <TableHead>Tasks</TableHead>
                       <TableHead>Note</TableHead>
-                      <TableHead>Price</TableHead>
-                      <TableHead>Frequency</TableHead>
+                      <TableHead>Service Charge</TableHead>
                       <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -1782,12 +1748,9 @@ const getScheduleHours = useCallback(
               {schedule.note || "-"}
             </TableCell>
             <TableCell>
-              {schedule.servicePrice
-                ? `$${schedule.servicePrice.toFixed(2)}`
+              {schedule.serviceCharge
+                ? `$${schedule.serviceCharge.toFixed(2)}`
                 : "-"}
-            </TableCell>
-            <TableCell>
-              {schedule.billingFrequency || "-"}
             </TableCell>
             <TableCell className="text-right">
               <Button
