@@ -178,7 +178,7 @@ const [feedbackNotes, setFeedbackNotes] = React.useState("");
               <th className="px-3 py-3 text-right font-semibold text-violet-200">
   Mileage
 </th>
-              <th className="px-3 py-3 text-right font-semibold text-rose-200">
+              <th className="px-3 py-3 text-right font-semibold text-cyan-200">
   Other
 </th>
               <th className="px-3 py-3 font-semibold">
@@ -227,7 +227,7 @@ const [feedbackNotes, setFeedbackNotes] = React.useState("");
                 <td className="px-3 py-3 text-right font-semibold tabular-nums text-violet-700 dark:text-violet-300">
   ${r.mileage.toFixed(2)}
 </td>
-                <td className="px-3 py-3 text-right font-semibold tabular-nums text-rose-700 dark:text-rose-300">
+                <td className="px-3 py-3 text-right font-semibold tabular-nums text-cyan-700 dark:text-cyan-300">
   ${r.other.toFixed(2)}
 </td>
 
@@ -283,7 +283,7 @@ const [feedbackNotes, setFeedbackNotes] = React.useState("");
   ${totals.mileage.toFixed(2)}
 </td>
 
-    <td className="px-3 py-3 text-right tabular-nums text-rose-200">
+    <td className="px-3 py-3 text-right tabular-nums text-cyan-200">
   ${totals.other.toFixed(2)}
 </td>
 
@@ -394,16 +394,15 @@ const [feedbackNotes, setFeedbackNotes] = React.useState("");
       </div>
     </div>
 
-    <div className="rounded-xl border border-rose-200 bg-rose-50 p-4 dark:border-rose-900 dark:bg-rose-950/30">
-      <div className="text-xs font-semibold uppercase tracking-wide text-rose-700 dark:text-rose-300">
-        Other Expenses
-      </div>
+    <div className="rounded-xl border border-cyan-200 bg-cyan-50 p-4 dark:border-cyan-900 dark:bg-cyan-950/30">
+  <div className="text-xs font-semibold uppercase tracking-wide text-cyan-700 dark:text-cyan-300">
+    Other Expenses
+  </div>
 
-      <div className="mt-1 text-xl font-bold tabular-nums text-rose-950 dark:text-rose-100">
-        ${other.toFixed(2)}
-      </div>
-    </div>
-
+  <div className="mt-1 text-xl font-bold tabular-nums text-cyan-950 dark:text-cyan-100">
+    ${other.toFixed(2)}
+  </div>
+</div>
     <div
       className={`rounded-xl border p-4 ${
         revenueProfit >= 0
