@@ -166,6 +166,26 @@ const getStatusIndicator = (status: SiteStatus | undefined, hours?: string) => {
   );
 };
 
+const getScheduleDisplayName = (
+  schedule: CleaningSchedule
+): string => {
+  if (
+    schedule.siteGroupLabelMode === "custom" &&
+    schedule.siteGroupName?.trim()
+  ) {
+    return schedule.siteGroupName.trim();
+  }
+
+  if (
+    schedule.siteNames &&
+    schedule.siteNames.length > 1
+  ) {
+    return schedule.siteNames.join(" + ");
+  }
+
+  return schedule.siteName;
+};
+
 const formatDateHeader = (date: Date): string => {
   const today = startOfToday();
   const diff = differenceInCalendarDays(date, today);
@@ -547,10 +567,16 @@ const filteredDailySchedules = useMemo(() => {
 
   return dailySchedules.filter((s) => {
     const matchesSearch =
-      !q ||
-      s.siteName.toLowerCase().includes(q) ||
-      s.tasks.toLowerCase().includes(q) ||
-      (s.note ?? "").toLowerCase().includes(q);
+  !q ||
+  getScheduleDisplayName(s)
+    .toLowerCase()
+    .includes(q) ||
+  s.siteName.toLowerCase().includes(q) ||
+  (s.siteNames ?? []).some((name) =>
+    name.toLowerCase().includes(q)
+  ) ||
+  s.tasks.toLowerCase().includes(q) ||
+  (s.note ?? "").toLowerCase().includes(q);
 
     const status = currentSiteStatuses.get(s.siteName);
     const matchesStatus =
@@ -1503,12 +1529,22 @@ const hoursSpent =
       </Badge>
     )}
 
+  <div>
   <p
     className="font-semibold"
     style={{ color: scheduleSite?.color }}
   >
-    {schedule.siteName}
+    {getScheduleDisplayName(schedule)}
   </p>
+
+  {schedule.siteNames &&
+    schedule.siteNames.length > 1 &&
+    schedule.siteGroupLabelMode === "custom" && (
+      <p className="text-xs text-muted-foreground">
+        {schedule.siteNames.join(" • ")}
+      </p>
+    )}
+</div>
 </div>
   
 
@@ -1628,9 +1664,22 @@ const hoursSpent =
                                           borderLeftWidth: "2px",
                                         }}
                                       >
-                                        <p className="font-semibold" style={{ color: scheduleSite?.color }}>
-            {schedule.siteName}
-          </p>
+                                        <div>
+  <p
+    className="font-semibold"
+    style={{ color: scheduleSite?.color }}
+  >
+    {getScheduleDisplayName(schedule)}
+  </p>
+
+  {schedule.siteNames &&
+    schedule.siteNames.length > 1 &&
+    schedule.siteGroupLabelMode === "custom" && (
+      <p className="text-[11px] text-muted-foreground">
+        {schedule.siteNames.join(" • ")}
+      </p>
+    )}
+</div>
                                         <p className="text-muted-foreground">{schedule.tasks}</p>
                                         {asNoteText(schedule.note) && (
                                           <p className="text-xs italic text-amber-700 truncate">

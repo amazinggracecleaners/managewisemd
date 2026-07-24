@@ -300,24 +300,53 @@ if (!sessionSchedule || !scheduleId) {
       siteName.trim().toLowerCase();
 
     const legacySchedule =
-      [...schedules]
-        .reverse()
-        .find((schedule) => {
-          const scheduleName =
-            schedule.siteName
-              ?.trim()
-              .toLowerCase();
+  [...schedules]
+    .reverse()
+    .find((schedule) => {
+      const primaryName =
+        schedule.siteName
+          ?.trim()
+          .toLowerCase();
 
-          return (
-            scheduleName ===
-            normalizedSiteName
-          );
-        });
+      const groupedNames =
+        (schedule.siteNames ?? []).map(
+          (name) =>
+            name.trim().toLowerCase()
+        );
 
-    const legacyCharge =
-      Number(
-        legacySchedule?.serviceCharge ?? 0
+      return (
+        primaryName === normalizedSiteName ||
+        groupedNames.includes(
+          normalizedSiteName
+        )
       );
+    });
+
+let legacyCharge = 0;
+
+if (legacySchedule) {
+  const isGrouped =
+    (legacySchedule.siteNames?.length ?? 0) > 1;
+
+  if (isGrouped) {
+    const chargeEntry =
+      Object.entries(
+        legacySchedule.siteServiceCharges ?? {}
+      ).find(
+        ([name]) =>
+          name.trim().toLowerCase() ===
+          normalizedSiteName
+      );
+
+    legacyCharge =
+      Number(chargeEntry?.[1] ?? 0);
+  } else {
+    legacyCharge =
+      Number(
+        legacySchedule.serviceCharge ?? 0
+      );
+  }
+}
 
     const siteRow = ensure(
       siteId,

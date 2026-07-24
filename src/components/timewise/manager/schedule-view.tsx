@@ -225,6 +225,34 @@ const getScheduleDisplayName = (
   return schedule.siteName;
 };
 
+const getScheduleEstimatedMinutes = (
+  schedule: CleaningSchedule,
+  sites: Site[]
+): number => {
+  const scheduleSiteNames =
+    schedule.siteNames?.length
+      ? schedule.siteNames
+      : [schedule.siteName];
+
+  return scheduleSiteNames.reduce(
+    (total, siteName) => {
+      const matchedSite = sites.find(
+        (site) =>
+          site.name.trim().toLowerCase() ===
+          siteName.trim().toLowerCase()
+      );
+
+      return (
+        total +
+        Number(
+          matchedSite?.estimatedWorkMinutes ?? 0
+        )
+      );
+    },
+    0
+  );
+};
+
 // minutes -> "HH:MM" (rounded up)
 const formatHHMM = (totalMinutes: number) => {
   if (!totalMinutes || totalMinutes <= 0) return "00:00";
@@ -2825,7 +2853,32 @@ style={{
     return sum + h * 60 + m;
   }, 0);
 
-  const estimatedMinutes = site?.estimatedWorkMinutes ?? 0;
+  const estimatedMinutes = (() => {
+  const scheduleSiteNames =
+    s.siteNames?.length
+      ? s.siteNames
+      : [s.siteName];
+
+  return scheduleSiteNames.reduce(
+    (total, name) => {
+      const matchedSite = sites.find(
+        (siteItem) =>
+          siteItem.name
+            .trim()
+            .toLowerCase() ===
+          name.trim().toLowerCase()
+      );
+
+      return (
+        total +
+        Number(
+          matchedSite?.estimatedWorkMinutes ?? 0
+        )
+      );
+    },
+    0
+  );
+})(); 
 
 return totalScheduleMinutes > 0 || estimatedMinutes > 0 ? (
   <span className="text-xs text-muted-foreground whitespace-nowrap">
