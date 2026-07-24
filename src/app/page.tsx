@@ -978,6 +978,63 @@ async function getCloudSiteActiveStatus(
   );
 }
 
+const getExpenseSitesForSchedule = useCallback(
+  (
+    primarySite: Site,
+    scheduleId?: string
+  ): Site[] => {
+    if (!scheduleId) {
+      return [primarySite];
+    }
+
+    const schedule = schedules.find(
+      (item) => item.id === scheduleId
+    );
+
+    if (!schedule) {
+      return [primarySite];
+    }
+
+    const groupedSiteNames =
+      schedule.siteNames?.filter(Boolean) ?? [];
+
+    /*
+     * Normal single-site schedule.
+     */
+    if (groupedSiteNames.length <= 1) {
+      return [primarySite];
+    }
+
+    /*
+     * Grouped schedule:
+     * resolve every scheduled site back to the Site directory.
+     */
+    const resolvedSites = groupedSiteNames
+      .map((name) =>
+        (settings.sites ?? []).find(
+          (candidate) =>
+            candidate.name
+              .trim()
+              .toLowerCase() ===
+            name.trim().toLowerCase()
+        )
+      )
+      .filter(
+        (candidate): candidate is Site =>
+          !!candidate
+      );
+
+    /*
+     * Safety fallback:
+     * never return an empty array.
+     */
+    return resolvedSites.length > 0
+      ? resolvedSites
+      : [primarySite];
+  },
+  [schedules, settings.sites]
+);
+
 const recordEntry = useCallback(
   async (
     action: "in" | "out",
@@ -1106,11 +1163,19 @@ if (!employeesStillActive) {
     format(forDate, "yyyy-MM-dd");
 
   try {
+  const expenseSites =
+    getExpenseSitesForSchedule(
+      site,
+      scheduleId
+    );
+
+  for (const expenseSite of expenseSites) {
     await ensureMonthlySiteExpenses({
       companyId: cId,
-      site,
+      site: expenseSite,
       serviceDate: completedServiceDate,
     });
+  }
   } catch (expenseError) {
     console.error(
       "[MONTHLY SITE EXPENSES] manual completion failed",
@@ -1383,21 +1448,36 @@ if (!isManagerOverride) {
     }
 
     if (!employeesStillActive) {
-      await ensureMonthlySiteExpenses({
-        companyId: cId,
-        site,
-        serviceDate: completedServiceDate,
-      });
+  const expenseSites =
+    getExpenseSitesForSchedule(
+      site,
+      scheduleId
+    );
 
-      console.log(
-        "[MONTHLY SITE EXPENSES] ensured after final clock-out",
-        {
-          companyId: cId,
-          siteId: site.id,
-          siteName: site.name,
-          serviceDate: completedServiceDate,
-        }
-      );
+  for (const expenseSite of expenseSites) {
+    await ensureMonthlySiteExpenses({
+      companyId: cId,
+      site: expenseSite,
+      serviceDate: completedServiceDate,
+    });
+  }
+
+  console.log(
+  "[MONTHLY SITE EXPENSES] ensured after final clock-out",
+  {
+    companyId: cId,
+    scheduleId,
+    primarySiteId: site.id,
+    primarySiteName: site.name,
+    expenseSites: expenseSites.map(
+      (item) => ({
+        id: item.id,
+        name: item.name,
+      })
+    ),
+    serviceDate: completedServiceDate,
+  }
+);
     }
   } catch (expenseError) {
     console.error(
@@ -1466,6 +1546,7 @@ await addDoc(
     toast,
     isClockedIn,
     requestLocation,
+    getExpenseSitesForSchedule,
   ]
 );
 

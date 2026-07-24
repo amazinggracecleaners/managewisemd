@@ -93,8 +93,22 @@ export type RepeatFrequency = 'does-not-repeat' | 'weekly' | 'every-2-weeks' | '
 export type CleaningSchedule = {
   id: string;
   siteName: string;
+  // Optional multi-site schedule group.
+  // Existing single-site schedules continue using siteName only.
+  siteNames?: string[];
+
+  // Optional custom label for a grouped visit.
+  // Example: "ABC Complex"
+  siteGroupName?: string;
+
+  // Controls what employees/managers see as the group title.
+  // "site-names" = "Business A + Business B"
+  // "custom" = siteGroupName
+  siteGroupLabelMode?: "site-names" | "custom";
+
   tasks: string;
 
+  
   // Legacy display names; keep during migration/backward compatibility
   assignedTo: string[];
 
@@ -110,6 +124,15 @@ export type CleaningSchedule = {
 
   repeatUntil?: string; // yyyy-MM-dd, optional end date
   serviceCharge?: number;
+    // Per-site service charge for grouped schedules.
+  // Key = exact Site name.
+  // Example:
+  // {
+  //   "Business A": 43.50,
+  //   "Business B": 28.77,
+  //   "Business C": 75.00
+  // }
+  siteServiceCharges?: Record<string, number>;
   exceptionDates?: string[];
   assignedTeamId?: string; // references settings.teams[].id
 

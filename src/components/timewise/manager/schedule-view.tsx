@@ -205,6 +205,26 @@ const formatDateHeader = (date: Date): string => {
   return fullDate;
 };
 
+const getScheduleDisplayName = (
+  schedule: CleaningSchedule
+): string => {
+  if (
+    schedule.siteGroupLabelMode === "custom" &&
+    schedule.siteGroupName?.trim()
+  ) {
+    return schedule.siteGroupName.trim();
+  }
+
+  if (
+    schedule.siteNames &&
+    schedule.siteNames.length > 1
+  ) {
+    return schedule.siteNames.join(" + ");
+  }
+
+  return schedule.siteName;
+};
+
 // minutes -> "HH:MM" (rounded up)
 const formatHHMM = (totalMinutes: number) => {
   if (!totalMinutes || totalMinutes <= 0) return "00:00";
@@ -309,8 +329,18 @@ const [deleteTarget, setDeleteTarget] = useState<{
 }>({ open: false });
   // form fields
   const [siteName, setSiteName] = useState("");
-  const [tasks, setTasks] = useState("");
-  const [note, setNote] = useState("");
+
+// Schedule may contain one site or multiple sites.
+const [selectedSiteNames, setSelectedSiteNames] = useState<string[]>([]);
+
+// Group label behavior.
+const [siteGroupLabelMode, setSiteGroupLabelMode] =
+  useState<"site-names" | "custom">("site-names");
+
+const [siteGroupName, setSiteGroupName] = useState("");
+
+const [tasks, setTasks] = useState("");
+const [note, setNote] = useState("");
 
   // ✅ assignment
   const [assignMode, setAssignMode] = useState<AssignMode>("employees");
@@ -325,6 +355,8 @@ const [deleteTarget, setDeleteTarget] = useState<{
   const [repeatUntil, setRepeatUntil] = useState<Date | undefined>();
 
   const [serviceCharge, setServiceCharge] = useState<number | undefined>();
+  const [siteServiceCharges, setSiteServiceCharges] =
+  useState<Record<string, number>>({});
 
   const [currentDate, setCurrentDate] = useState(startOfDay(new Date()));
 const [activeTab, setActiveTab] = useState("list");
@@ -402,10 +434,20 @@ const resolveAssignedEmployeeIds = (names: string[]): string[] => {
 
   // include any “deleted” site names that exist in schedules
   const sitesForDropdown = useMemo(() => {
-    const siteNames = new Set(sites.map((s) => s.name));
-    schedules.forEach((s) => siteNames.add(s.siteName));
-    return Array.from(siteNames).sort();
-  }, [sites, schedules]);
+  const siteNames = new Set(
+    sites.map((s) => s.name)
+  );
+
+  schedules.forEach((schedule) => {
+    siteNames.add(schedule.siteName);
+
+    schedule.siteNames?.forEach((name) => {
+      siteNames.add(name);
+    });
+  });
+
+  return Array.from(siteNames).sort();
+}, [sites, schedules]);
 
   const allDaysSelected = daysOfWeek.length === 7;
 
@@ -418,6 +460,19 @@ const resolveAssignedEmployeeIds = (names: string[]): string[] => {
   const handleSelectAllDays = (checked: boolean) => {
     setDaysOfWeek(checked ? weekDays : []);
   };
+
+  const handleSiteToggle = (
+  selectedName: string,
+  checked: boolean
+) => {
+  setSelectedSiteNames((prev) => {
+    if (checked) {
+      return Array.from(new Set([...prev, selectedName]));
+    }
+
+    return prev.filter((name) => name !== selectedName);
+  });
+};
 
   const handleEmployeeToggle = (employeeName: string, checked: boolean) => {
     setAssignedTo((prev) =>
@@ -471,8 +526,32 @@ const openFixShiftModal = (data: {
     setEditingSchedule(schedule);
 
     if (schedule) {
-      setSiteName(schedule.siteName);
-      setTasks(schedule.tasks);
+  const scheduleSiteNames =
+    schedule.siteNames?.length
+      ? schedule.siteNames
+      : [schedule.siteName];
+
+  setSelectedSiteNames(scheduleSiteNames);
+  setSiteServiceCharges(
+  schedule.siteServiceCharges || {}
+);
+
+  // Keep the legacy primary site populated.
+  setSiteName(
+    schedule.siteName ||
+      scheduleSiteNames[0] ||
+      ""
+  );
+
+  setSiteGroupLabelMode(
+    schedule.siteGroupLabelMode || "site-names"
+  );
+
+  setSiteGroupName(
+    schedule.siteGroupName || ""
+  );
+
+  setTasks(schedule.tasks);
       setNote(schedule.note || "");
 
       const mode: AssignMode = schedule.assignedTeamId ? "team" : "employees";
@@ -496,8 +575,12 @@ const openFixShiftModal = (data: {
       setApplyScope("single");
     } else {
       setSiteName("");
-      setTasks("");
-      setNote("");
+setSelectedSiteNames([]);
+setSiteGroupLabelMode("site-names");
+setSiteGroupName("");
+
+setTasks("");
+setNote("");
 
       setAssignMode("employees");
       setAssignedTo([]);
@@ -509,7 +592,7 @@ const openFixShiftModal = (data: {
       setRepeatUntil(undefined);
 
       setServiceCharge(undefined);
-
+setSiteServiceCharges({});
       setEditingOccurrenceDate(undefined);
       setApplyScope("series");
     }
@@ -519,33 +602,93 @@ const openFixShiftModal = (data: {
 
  
  const handleSubmit = async () => {
-  if (!siteName || !tasks || !startDate || !validateAssignment()) {
-    alert(
-      "Please fill out required fields: Site, Start Date, Tasks, and Assignment."
-    );
-    return;
-  }
-
   if (
-    (repeatFrequency === "weekly" ||
-      repeatFrequency === "every-2-weeks" ||
-      repeatFrequency === "every-3-weeks") &&
-    daysOfWeek.length === 0
-  ) {
+  selectedSiteNames.length === 0 ||
+  !tasks ||
+  !startDate ||
+  !validateAssignment()
+) {
+  alert(
+    "Please fill out required fields: Site, Start Date, Tasks, and Assignment."
+  );
+  return;
+}
+
+if (
+  selectedSiteNames.length > 1 &&
+  siteGroupLabelMode === "custom" &&
+  !siteGroupName.trim()
+) {
+  alert(
+    "Please enter a Site Group name or choose Use site names."
+  );
+  return;
+}
+
+if (
+  (repeatFrequency === "weekly" ||
+    repeatFrequency === "every-2-weeks" ||
+    repeatFrequency === "every-3-weeks") &&
+  daysOfWeek.length === 0
+) {
+  alert(
+    "Please select at least one day of the week for weekly repeating schedules."
+  );
+  return;
+}
+
+if (selectedSiteNames.length > 1) {
+  const missingChargeSite =
+    selectedSiteNames.find(
+      (name) =>
+        siteServiceCharges[name] === undefined ||
+        siteServiceCharges[name] < 0
+    );
+
+  if (missingChargeSite) {
     alert(
-      "Please select at least one day of the week for weekly repeating schedules."
+      `Please enter a service charge for ${missingChargeSite}.`
     );
     return;
   }
+}
 
   const assignedEmployeeIds =
     assignMode === "team"
       ? []
       : resolveAssignedEmployeeIds(assignedTo);
 
+      const primarySiteName =
+  selectedSiteNames[0];
+
+const isSiteGroup =
+  selectedSiteNames.length > 1;
+
+const resolvedSiteGroupName =
+  isSiteGroup &&
+  siteGroupLabelMode === "custom"
+    ? siteGroupName.trim()
+    : undefined;
+
   const baseData: Omit<CleaningSchedule, "id"> = {
-    siteName,
-    tasks,
+  // Keep the first site as the legacy primary site.
+  siteName: primarySiteName,
+
+  // Store every selected site for grouped schedules.
+  siteNames:
+    isSiteGroup
+      ? selectedSiteNames
+      : undefined,
+
+  siteGroupLabelMode:
+    isSiteGroup
+      ? siteGroupLabelMode
+      : undefined,
+
+  siteGroupName:
+    resolvedSiteGroupName,
+
+  tasks,
     note,
 
     assignedTeamId:
@@ -567,7 +710,25 @@ const openFixShiftModal = (data: {
       ? format(repeatUntil, "yyyy-MM-dd")
       : undefined,
 
-    serviceCharge,
+    serviceCharge:
+  !isSiteGroup
+    ? serviceCharge
+    : undefined,
+
+siteServiceCharges:
+  isSiteGroup
+    ? Object.fromEntries(
+        selectedSiteNames
+          .filter(
+            (name) =>
+              siteServiceCharges[name] !== undefined
+          )
+          .map((name) => [
+            name,
+            siteServiceCharges[name],
+          ])
+      )
+    : undefined,
   };
 
   const cleanedData = cleanForFirestore(
@@ -963,9 +1124,15 @@ const filteredDailySchedules = useMemo(() => {
       : "";
 
     const matchesSearch =
-      !q ||
-      s.siteName.toLowerCase().includes(q) ||
-      s.tasks.toLowerCase().includes(q) ||
+  !q ||
+  getScheduleDisplayName(s)
+    .toLowerCase()
+    .includes(q) ||
+  s.siteName.toLowerCase().includes(q) ||
+  (s.siteNames ?? []).some((name) =>
+    name.toLowerCase().includes(q)
+  ) ||
+  s.tasks.toLowerCase().includes(q) ||
       (s.note ?? "").toLowerCase().includes(q) ||
       assignedEmployeeNames.some((name) => name.toLowerCase().includes(q)) ||
       teamName.toLowerCase().includes(q);
@@ -1333,56 +1500,211 @@ const getScheduleHours = useCallback(
 
               <ScrollArea className="max-h-[70vh]">
                 <div className="grid gap-4 py-4 px-1">
-                  {/* Site */}
-                  <div className="space-y-2">
-                    <Label htmlFor="siteName">Site</Label>
-                    <Select value={siteName} onValueChange={setSiteName}>
-                      <SelectTrigger id="siteName">
-                        <SelectValue placeholder="Select a site" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {sitesForDropdown.map((sName) => (
-                          <SelectItem key={sName} value={sName}>
-                            <span className="flex items-center gap-2">
-                              {!sites.find((s) => s.name === sName) && (
-                                <Tooltip>
-                                  <TooltipTrigger>
-                                    <AlertCircle className="h-4 w-4 text-destructive" />
-                                  </TooltipTrigger>
-                                  <TooltipContent>
-                                    <p>This site is not in your site directory.</p>
-                                  </TooltipContent>
-                                </Tooltip>
-                              )}
-                              {sName}
-                            </span>
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
+                 {/* Sites / Site Group */}
+<div className="space-y-3">
+  <div>
+    <Label>Sites</Label>
+    <p className="text-xs text-muted-foreground">
+      Select one site for a normal schedule or multiple sites
+      when they should be treated as one visit.
+    </p>
+  </div>
 
-                  {/* Price/Frequency */}
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="serviceCharge">
-  Service Charge ($)
-</Label>
-                      <Input
-                        id="serviceCharge"
-                        type="number"
-                        value={serviceCharge ?? ""}
-                        onChange={(e) =>
-                          setServiceCharge(
-                            parseFloat(e.target.value) || undefined
-                          )
-                        }
-                        placeholder="e.g., 150"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                    </div>
-                  </div>
+  <ScrollArea className="h-40 rounded-md border p-3">
+    <div className="space-y-2">
+      {sitesForDropdown.map((sName) => {
+        const checked =
+          selectedSiteNames.includes(sName);
+
+        return (
+          <div
+            key={sName}
+            className="flex items-center space-x-2"
+          >
+            <Checkbox
+              id={`schedule-site-${sName}`}
+              checked={checked}
+              onCheckedChange={(value) =>
+                handleSiteToggle(
+                  sName,
+                  !!value
+                )
+              }
+            />
+
+            <Label
+              htmlFor={`schedule-site-${sName}`}
+              className="flex cursor-pointer items-center gap-2 text-sm font-normal"
+            >
+              {!sites.find(
+                (site) => site.name === sName
+              ) && (
+                <AlertCircle className="h-4 w-4 text-destructive" />
+              )}
+
+              {sName}
+            </Label>
+          </div>
+        );
+      })}
+    </div>
+  </ScrollArea>
+
+  {selectedSiteNames.length > 0 && (
+    <div className="flex flex-wrap gap-2">
+      {selectedSiteNames.map((name) => (
+        <Badge
+          key={name}
+          variant="secondary"
+        >
+          {name}
+        </Badge>
+      ))}
+    </div>
+  )}
+</div>
+
+{selectedSiteNames.length > 1 && (
+  <div className="space-y-3 rounded-md border p-4">
+    <div>
+      <Label>Site Group Name</Label>
+      <p className="text-xs text-muted-foreground">
+        Choose how this combined visit should appear
+        in the schedule.
+      </p>
+    </div>
+
+    <RadioGroup
+      value={siteGroupLabelMode}
+      onValueChange={(value) =>
+        setSiteGroupLabelMode(
+          value as "site-names" | "custom"
+        )
+      }
+      className="space-y-2"
+    >
+      <div className="flex items-center space-x-2">
+        <RadioGroupItem
+          id="group-label-sites"
+          value="site-names"
+        />
+
+        <Label htmlFor="group-label-sites">
+          Use site names
+        </Label>
+      </div>
+
+      <div className="flex items-center space-x-2">
+        <RadioGroupItem
+          id="group-label-custom"
+          value="custom"
+        />
+
+        <Label htmlFor="group-label-custom">
+          Use custom group name
+        </Label>
+      </div>
+    </RadioGroup>
+
+    {siteGroupLabelMode === "site-names" ? (
+      <div className="rounded-md bg-muted p-3 text-sm">
+        <span className="font-medium">
+          Schedule will display:
+        </span>{" "}
+        {selectedSiteNames.join(" + ")}
+      </div>
+    ) : (
+      <div className="space-y-2">
+        <Label htmlFor="siteGroupName">
+          Group name
+        </Label>
+
+        <Input
+          id="siteGroupName"
+          value={siteGroupName}
+          onChange={(e) =>
+            setSiteGroupName(e.target.value)
+          }
+          placeholder="Example: ABC Complex"
+        />
+
+        <p className="text-xs text-muted-foreground">
+          Sites: {selectedSiteNames.join(", ")}
+        </p>
+      </div>
+    )}
+  </div>
+)}
+
+                  {/* Service Charge */}
+<div className="space-y-3">
+  <Label>Service Charge</Label>
+
+  {selectedSiteNames.length <= 1 ? (
+    <div className="space-y-2">
+      <Input
+        id="serviceCharge"
+        type="number"
+        min="0"
+        step="0.01"
+        value={serviceCharge ?? ""}
+        onChange={(e) =>
+          setServiceCharge(
+            e.target.value === ""
+              ? undefined
+              : Number(e.target.value)
+          )
+        }
+        placeholder="e.g., 150.00"
+      />
+    </div>
+  ) : (
+    <div className="space-y-3 rounded-md border p-3">
+      <p className="text-xs text-muted-foreground">
+        Enter the service charge for each site in this grouped visit.
+      </p>
+
+      {selectedSiteNames.map((name) => (
+        <div
+          key={name}
+          className="grid grid-cols-[1fr_140px] items-center gap-3"
+        >
+          <Label className="font-normal">
+            {name}
+          </Label>
+
+          <Input
+            type="number"
+            min="0"
+            step="0.01"
+            value={
+              siteServiceCharges[name] ?? ""
+            }
+            onChange={(e) => {
+              const value =
+                e.target.value === ""
+                  ? undefined
+                  : Number(e.target.value);
+
+              setSiteServiceCharges((prev) => {
+                const next = { ...prev };
+
+                if (value === undefined) {
+                  delete next[name];
+                } else {
+                  next[name] = value;
+                }
+
+                return next;
+              });
+            }}
+            placeholder="$0.00"
+          />
+        </div>
+      ))}
+    </div>
+  )}
+</div>
 
                   {/* Start date / Repeat */}
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -1708,7 +2030,11 @@ const getScheduleHours = useCallback(
   {listSchedules.length > 0 ? (
     listSchedules
       .slice()
-      .sort((a, b) => a.siteName.localeCompare(b.siteName))
+      .sort((a, b) =>
+  getScheduleDisplayName(a).localeCompare(
+    getScheduleDisplayName(b)
+  )
+)
       .map((schedule) => {
         const repeatFreq =
           schedule.repeatFrequency || "does-not-repeat";
@@ -1722,7 +2048,21 @@ const getScheduleHours = useCallback(
     dark:hover:bg-sky-950/20
   "
 >
-            <TableCell>{schedule.siteName}</TableCell>
+            <TableCell>
+  <div className="space-y-1">
+    <span className="font-medium">
+      {getScheduleDisplayName(schedule)}
+    </span>
+
+    {schedule.siteNames &&
+      schedule.siteNames.length > 1 &&
+      schedule.siteGroupLabelMode === "custom" && (
+        <div className="text-xs text-muted-foreground">
+          {schedule.siteNames.join(" • ")}
+        </div>
+      )}
+  </div>
+</TableCell>
             <TableCell className="capitalize">
               {repeatFreq.replace(/-/g, " ")}
               {repeatFreq.includes("week")
@@ -1747,11 +2087,35 @@ const getScheduleHours = useCallback(
             >
               {schedule.note || "-"}
             </TableCell>
-            <TableCell>
-              {schedule.serviceCharge
-                ? `$${schedule.serviceCharge.toFixed(2)}`
-                : "-"}
-            </TableCell>
+           <TableCell>
+  {schedule.siteNames &&
+  schedule.siteNames.length > 1 &&
+  schedule.siteServiceCharges ? (
+    <div className="space-y-1 text-xs">
+      {schedule.siteNames.map((name) => (
+        <div
+          key={name}
+          className="flex items-center justify-between gap-3"
+        >
+          <span className="truncate">
+            {name}
+          </span>
+
+          <span className="font-medium tabular-nums">
+            $
+            {Number(
+              schedule.siteServiceCharges?.[name] ?? 0
+            ).toFixed(2)}
+          </span>
+        </div>
+      ))}
+    </div>
+  ) : schedule.serviceCharge !== undefined ? (
+    `$${Number(schedule.serviceCharge).toFixed(2)}`
+  ) : (
+    "-"
+  )}
+</TableCell>
             <TableCell className="text-right">
               <Button
                 variant="ghost"
@@ -2214,10 +2578,10 @@ style={{
 />
                   <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                     <div>
-                      <p className="text-base font-bold tracking-tight">
-                        {index + 1}.{" "}
-                        {stop.schedule.siteName}
-                      </p>
+                     <p className="text-base font-bold tracking-tight">
+  {index + 1}.{" "}
+  {getScheduleDisplayName(stop.schedule)}
+</p>
 
                       <p className="text-xs text-muted-foreground">
                         Cleaning:{" "}
@@ -2415,13 +2779,21 @@ style={{
                                       backgroundColor: site?.color || "#ccc",
                                     }}
                                   />
-                                  {s.siteName}
+                                  {getScheduleDisplayName(s)}
                                   {siteBonus && (
                                     <span className="text-xs font-normal text-green-600">
                                       {siteBonus}
                                     </span>
                                   )}
                                 </CardTitle>
+
+                                {s.siteNames &&
+  s.siteNames.length > 1 &&
+  s.siteGroupLabelMode === "custom" && (
+    <p className="text-xs text-muted-foreground">
+      {s.siteNames.join(" • ")}
+    </p>
+  )}
 
                                 <CardDescription className="text-xs">
                                   {s.tasks}
@@ -2776,6 +3148,13 @@ const siteScheduleCompleted = entries.some((e) => {
   </Button>
 </div>
 
+<p
+  className="mt-1 font-semibold truncate"
+  style={{ color: siteColor }}
+>
+  {getScheduleDisplayName(s)}
+</p>
+
                                   <p className="my-1 text-muted-foreground truncate">{s.tasks}</p>
 
                                   {s.note && (
@@ -2899,14 +3278,14 @@ const siteScheduleCompleted = entries.some((e) => {
                                 style={{
                                   backgroundColor: site ? `${siteColor}33` : "var(--muted)",
                                 }}
-                                title={`${s.siteName}: ${s.tasks}\nAssigned: ${assignedLabel}`}
+                                title={`${getScheduleDisplayName(s)}: ${s.tasks}\nAssigned: ${assignedLabel}`}
                               >
                                 {status && getStatusIndicator(status, "monthly")}
                                 <span
                                   className="font-semibold truncate flex-grow"
                                   style={{ color: siteColor }}
                                 >
-                                  {s.siteName}
+                                  {getScheduleDisplayName(s)}
                                 </span>
                                 <div className="absolute right-0 top-0.5 flex opacity-0 group-hover:opacity-100">
   <Button
@@ -3012,9 +3391,14 @@ const siteScheduleCompleted = entries.some((e) => {
 
     <div className="space-y-3 text-sm">
       <p>
-        What do you want to delete for{" "}
-        <strong>{deleteTarget.schedule?.siteName}</strong>?
-      </p>
+  What do you want to delete for{" "}
+  <strong>
+    {deleteTarget.schedule
+      ? getScheduleDisplayName(deleteTarget.schedule)
+      : ""}
+  </strong>
+  ?
+</p>
 
       <Button
         variant="outline"

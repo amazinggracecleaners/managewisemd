@@ -131,9 +131,11 @@ export function aggregateMonthlySiteProfit(params: {
     if (e.name) hourlyRatesByEmployee.set(e.name, rate);
   }
 
-  // Track which days in the month each site was serviced
-  // key: siteId -> Set<"YYYY-MM-DD">
-  const visitDaysBySite = new Map<string, Set<string>>();
+  // Prevent Service Charge from being counted more than once
+// when multiple employees work the same scheduled visit.
+const chargedOccurrences = new Set<string>();
+
+
 
   // Labor (timeclock entries)
   const allSessions = groupSessions(entries);
@@ -162,91 +164,278 @@ export function aggregateMonthlySiteProfit(params: {
     if (overlapEnd <= overlapStart) continue;
 
     const minutesInMonth = (overlapEnd - overlapStart) / 60000;
-    // ✅ Track serviced day(s) so serviceCharge can be computed
-const dayKey = new Date(overlapStart).toISOString().slice(0, 10);
-let set = visitDaysBySite.get(siteId);
-if (!set) {
-  set = new Set<string>();
-  visitDaysBySite.set(siteId, set);
+    const dayKey =
+  new Date(overlapStart).toISOString().slice(0, 10);
+
+const rate =
+  hourlyRatesByEmployee.get(session.employee) ??
+  settings?.defaultHourlyWage ??
+  0;
+
+const cost =
+  (minutesInMonth / 60) * rate;
+
+/*
+ * Try to identify the exact schedule that produced
+ * this clock session.
+ *
+ * Newer clock entries already carry scheduleId.
+ * Older entries may not, so they will safely fall
+ * back to the original single-site behavior below.
+ */
+const scheduleId =
+  session.in?.scheduleId ??
+  session.out?.scheduleId;
+
+const sessionSchedule = scheduleId
+  ? schedules.find(
+      (schedule) => schedule.id === scheduleId
+    )
+  : undefined;
+
+  /*
+ * Service Charge for this completed scheduled visit.
+ *
+ * Multiple employees may work the same schedule occurrence,
+ * but the service charge must be counted only once.
+ */
+if (sessionSchedule && scheduleId) {
+  const occurrenceDate =
+  session.in?.scheduleDate ??
+  session.out?.scheduleDate ??
+  dayKey;
+
+const occurrenceKey =
+  `${scheduleId}__${occurrenceDate}`;
+
+  if (!chargedOccurrences.has(occurrenceKey)) {
+    chargedOccurrences.add(occurrenceKey);
+
+    const groupedNames =
+      sessionSchedule.siteNames?.filter(Boolean) ?? [];
+
+    /*
+     * GROUPED SCHEDULE
+     *
+     * Example:
+     * ABC Complex
+     * A = $43.50
+     * B = $28.77
+     * C = $75.00
+     */
+    if (groupedNames.length > 1) {
+      for (const groupSiteName of groupedNames) {
+        const resolved =
+          resolveToDirectorySiteId(
+            undefined,
+            groupSiteName,
+            idx
+          );
+
+        if (
+          !resolved.siteId ||
+          !resolved.siteName
+        ) {
+          continue;
+        }
+
+        const chargeEntry =
+          Object.entries(
+            sessionSchedule.siteServiceCharges ?? {}
+          ).find(
+            ([name]) =>
+              name.trim().toLowerCase() ===
+              groupSiteName.trim().toLowerCase()
+          );
+
+        const siteCharge =
+          Number(chargeEntry?.[1] ?? 0);
+
+        const siteRow = ensure(
+          resolved.siteId,
+          resolved.siteName
+        );
+
+        siteRow.serviceCharge += siteCharge;
+      }
+    } else {
+      /*
+       * NORMAL SINGLE-SITE SCHEDULE
+       */
+      const normalCharge =
+        Number(
+          sessionSchedule.serviceCharge ?? 0
+        );
+
+      const siteRow = ensure(
+        siteId,
+        siteName
+      );
+
+      siteRow.serviceCharge += normalCharge;
+    }
+  }
 }
-set.add(dayKey);
 
-    const rate =
-      hourlyRatesByEmployee.get(session.employee) ??
-      settings?.defaultHourlyWage ??
-      0;
-    const cost = (minutesInMonth / 60) * rate;
+/*
+ * Legacy fallback:
+ * Older clock entries may not contain scheduleId.
+ *
+ * These entries use the original primary-site behavior.
+ */
+if (!sessionSchedule || !scheduleId) {
+  const legacyOccurrenceKey =
+    `legacy__${siteId}__${dayKey}`;
 
-    const siteRow = ensure(siteId, siteName);
-    siteRow.labor += cost;
+  if (
+    !chargedOccurrences.has(
+      legacyOccurrenceKey
+    )
+  ) {
+    chargedOccurrences.add(
+      legacyOccurrenceKey
+    );
+
+    const normalizedSiteName =
+      siteName.trim().toLowerCase();
+
+    const legacySchedule =
+      [...schedules]
+        .reverse()
+        .find((schedule) => {
+          const scheduleName =
+            schedule.siteName
+              ?.trim()
+              .toLowerCase();
+
+          return (
+            scheduleName ===
+            normalizedSiteName
+          );
+        });
+
+    const legacyCharge =
+      Number(
+        legacySchedule?.serviceCharge ?? 0
+      );
+
+    const siteRow = ensure(
+      siteId,
+      siteName
+    );
+
+    siteRow.serviceCharge +=
+      legacyCharge;
+  }
+}
+
+/*
+ * A grouped schedule contains siteNames with more
+ * than one site.
+ */
+const groupedSiteNames =
+  sessionSchedule?.siteNames?.filter(Boolean) ?? [];
+
+if (groupedSiteNames.length > 1) {
+  /*
+   * Resolve every group member back to the Site directory.
+   */
+  const groupSites = groupedSiteNames
+    .map((groupSiteName) => {
+      const resolved =
+        resolveToDirectorySiteId(
+          undefined,
+          groupSiteName,
+          idx
+        );
+
+      if (!resolved.siteId || !resolved.siteName) {
+        return null;
+      }
+
+      const directorySite =
+        idx.byId.get(resolved.siteId) ??
+        idx.byName.get(
+          resolved.siteName
+            .trim()
+            .toLowerCase()
+        );
+
+      return {
+        siteId: resolved.siteId,
+        siteName: resolved.siteName,
+        estimatedMinutes: Number(
+          directorySite?.estimatedWorkMinutes ?? 0
+        ),
+      };
+    })
+    .filter(
+      (
+        item
+      ): item is {
+        siteId: string;
+        siteName: string;
+        estimatedMinutes: number;
+      } => item !== null
+    );
+
+  /*
+   * Use estimated work time only when every site
+   * has a positive estimate.
+   *
+   * Otherwise use equal allocation so no site's
+   * labor accidentally becomes zero.
+   */
+  const canUseEstimatedTime =
+    groupSites.length > 0 &&
+    groupSites.every(
+      (groupSite) =>
+        groupSite.estimatedMinutes > 0
+    );
+
+  const totalEstimatedMinutes =
+    canUseEstimatedTime
+      ? groupSites.reduce(
+          (sum, groupSite) =>
+            sum +
+            groupSite.estimatedMinutes,
+          0
+        )
+      : 0;
+
+  for (const groupSite of groupSites) {
+    const allocation =
+      canUseEstimatedTime &&
+      totalEstimatedMinutes > 0
+        ? groupSite.estimatedMinutes /
+          totalEstimatedMinutes
+        : 1 / groupSites.length;
+
+    const siteRow = ensure(
+      groupSite.siteId,
+      groupSite.siteName
+    );
+
+    siteRow.labor += cost * allocation;
+
+  }
+} else {
+  /*
+   * Normal single-site schedule.
+   *
+   * This preserves your existing behavior exactly.
+   */
+  const siteRow = ensure(
+    siteId,
+    siteName
+  );
+
+  siteRow.labor += cost;
+
+}
   }
 
-  /*
- * Service Charge
- *
- * Same calculation as the former Site servicePrice:
- * schedule.serviceCharge × number of completed site visits.
- */
-for (const [siteId, daySet] of visitDaysBySite.entries()) {
-  const directorySite = idx.byId.get(siteId);
-const existingRow = rows.get(siteId);
-
-const siteName =
-  directorySite?.name ??
-  existingRow?.siteName ??
-  "";
-
-  if (!siteName) continue;
-
-  const normalizedSiteName =
-    siteName.trim().toLowerCase();
-
-  /*
-   * A site may have multiple schedule documents.
-   * Match by siteId first, then fall back to siteName.
-   */
-  const matchingSchedules = schedules.filter((schedule) => {
-    const scheduleSiteId =
-      String((schedule as any).siteId ?? "").trim();
-
-    const scheduleSiteName =
-      String(
-        (schedule as any).siteName ??
-        (schedule as any).site ??
-        ""
-      )
-        .trim()
-        .toLowerCase();
-
-    return (
-      (scheduleSiteId && scheduleSiteId === siteId) ||
-      scheduleSiteName === normalizedSiteName
-    );
-  });
-
-  /*
-   * Use the most recently listed schedule that has
-   * a valid service charge.
-   *
-   * This avoids an older schedule with serviceCharge 0
-   * being selected before the edited schedule.
-   */
-  const scheduleWithCharge = [...matchingSchedules]
-    .reverse()
-    .find(
-      (schedule) =>
-        Number(schedule.serviceCharge ?? 0) > 0
-    );
-
-  const serviceCharge =
-    Number(scheduleWithCharge?.serviceCharge ?? 0);
-
-  const siteRow = ensure(siteId, siteName);
-
-  siteRow.serviceCharge =
-    round2(serviceCharge * daySet.size);
-}
-
+ 
   // Mileage
   for (const m of mileageLogs) {
     const ts = safeDate(m.date);
