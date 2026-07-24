@@ -191,7 +191,6 @@ onAddServiceFeedbackAction,
              sites={sites}
             mileageLogs={mileageLogs}
             otherExpenses={otherExpenses}
-            invoices={invoices}
             schedules={schedules}
             settings={settings}
             serviceFeedbacks={serviceFeedbacks}

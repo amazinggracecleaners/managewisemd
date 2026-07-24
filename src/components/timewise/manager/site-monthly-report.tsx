@@ -8,7 +8,6 @@ import type {
     Employee,
     MileageLog,
     OtherExpense,
-    Invoice,
      CleaningSchedule,
     Settings,
     ServiceFeedback,
@@ -24,7 +23,6 @@ type Props = {
   sites: Site[];
   mileageLogs: any[];
   otherExpenses: any[];
-  invoices: Invoice[];
   schedules: CleaningSchedule[];
   settings: Settings;
   serviceFeedbacks: ServiceFeedback[];
@@ -34,12 +32,14 @@ onAddServiceFeedbackAction: (feedback: Omit<ServiceFeedback, "id">) => void;
 
 const chip = (v: number) => (
   <span
-    className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
-      v >= 0 ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"
+    className={`inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-semibold shadow-sm ${
+      v >= 0
+        ? "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-300"
+        : "border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-900 dark:bg-rose-950/40 dark:text-rose-300"
     }`}
     title={v.toFixed(2)}
   >
-    {v >= 0 ? "Profit" : "Loss"} {Math.abs(v).toFixed(2)}
+    {v >= 0 ? "Profit" : "Loss"} ${Math.abs(v).toFixed(2)}
   </span>
 );
 
@@ -62,7 +62,7 @@ const getRevenueMargin = (r: any) => {
 const revenueMarginChip = (margin: number) => {
   if (margin >= 20) {
     return (
-      <span className="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium bg-green-100 text-green-800">
+      <span className="inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700 shadow-sm dark:border-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-300">
         Healthy {margin.toFixed(2)}%
       </span>
     );
@@ -70,14 +70,14 @@ const revenueMarginChip = (margin: number) => {
 
   if (margin >= 10) {
     return (
-      <span className="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium bg-yellow-100 text-yellow-800">
+      <span className="inline-flex items-center rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-700 shadow-sm dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-300">
         Watch {margin.toFixed(2)}%
       </span>
     );
   }
 
   return (
-    <span className="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium bg-red-100 text-red-800">
+    <span className="inline-flex items-center rounded-full border border-rose-200 bg-rose-50 px-2.5 py-1 text-xs font-semibold text-rose-700 shadow-sm dark:border-rose-900 dark:bg-rose-950/40 dark:text-rose-300">
       Action Needed {margin.toFixed(2)}%
     </span>
   );
@@ -90,7 +90,6 @@ export function SiteMonthlyReport({
    sites,
   mileageLogs,
   otherExpenses,
-  invoices,
    schedules,
   settings,
   deleteSiteAction,
@@ -137,60 +136,120 @@ const [feedbackNotes, setFeedbackNotes] = React.useState("");
   }
 
   return (
-    <div className="mt-6 border rounded-xl p-4">
-       <div className="flex justify-between items-center mb-3">
-          <h3 className="text-base font-semibold">Site Profitability (Monthly)</h3>
-          <button
-            onClick={() => exportSiteMonthCSV({ rows: rows as any, totals, monthISO })}
-            className="inline-flex items-center rounded-lg px-3 py-1.5 text-sm border hover:bg-muted"
-          >
-            Export CSV
-          </button>
-      </div>
-      <div className="overflow-x-auto">
-        <table className="w-full text-sm">
-          <thead className="text-left">
-            <tr className="border-b">
-              <th className="py-2 pr-3">Site</th>
-              <th className="py-2 pr-3 text-right">Service Charge</th>
-              <th className="py-2 pr-3 text-right">Labor</th>
-              <th className="py-2 pr-3 text-right">Mileage</th>
-              <th className="py-2 pr-3 text-right">Other</th>
-              <th className="py-2 pr-3">Status</th>
-<th className="py-2 pr-3 text-right">Revenue Profit</th>
-<th className="py-2 pr-3 text-right">Revenue Margin</th>
+  <div className="mt-6 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_12px_35px_rgba(15,23,42,0.08)] dark:border-slate-800 dark:bg-slate-950">
+       <div className="flex flex-col gap-3 border-b border-slate-200 bg-gradient-to-r from-sky-50 via-white to-violet-50 px-5 py-4 dark:border-slate-800 dark:from-sky-950/30 dark:via-slate-950 dark:to-violet-950/20 sm:flex-row sm:items-center sm:justify-between">
+  <div>
+    <h3 className="text-lg font-bold tracking-tight text-slate-900 dark:text-slate-100">
+      Site Profitability
+    </h3>
 
-              <th className="py-2 pl-3 text-right">Actions</th>
+    <p className="text-xs text-muted-foreground">
+      Monthly performance by site
+    </p>
+  </div>
+
+  <button
+    onClick={() =>
+      exportSiteMonthCSV({
+        rows: rows as any,
+        totals,
+        monthISO,
+      })
+    }
+    className="inline-flex items-center justify-center rounded-xl border border-sky-200 bg-white px-3.5 py-2 text-sm font-semibold text-sky-700 shadow-sm transition hover:bg-sky-50 dark:border-sky-900 dark:bg-slate-950 dark:text-sky-300 dark:hover:bg-sky-950/30"
+  >
+    Export CSV
+  </button>
+</div>
+      <div className="overflow-x-auto p-4">
+        <table className="w-full text-sm">
+          <thead className="bg-slate-900 text-left text-slate-100 dark:bg-slate-800">
+ 
+            <tr className="border-b">
+              <th className="px-4 py-3 font-semibold">
+  Site
+</th>
+              <th className="px-3 py-3 text-right font-semibold text-sky-200">
+  Service Charge
+</th>
+              <th className="px-3 py-3 text-right font-semibold text-amber-200">
+  Labor
+</th>
+              <th className="px-3 py-3 text-right font-semibold text-violet-200">
+  Mileage
+</th>
+              <th className="px-3 py-3 text-right font-semibold text-rose-200">
+  Other
+</th>
+              <th className="px-3 py-3 font-semibold">
+  Status
+</th>
+<th className="px-3 py-3 text-right font-semibold text-emerald-200">
+  Revenue Profit
+</th>
+<th className="px-3 py-3 text-right font-semibold">
+  Revenue Margin
+</th>
+
+              <th className="px-4 py-3 text-right font-semibold">
+  Actions
+</th>
             </tr>
           </thead>
           <tbody>
             {rows.map((r) => (
               <tr
   key={r.siteId}
-  className="border-b last:border-0 cursor-pointer hover:bg-muted/50"
+  className="
+  cursor-pointer
+  border-b border-slate-100
+  transition-colors
+  last:border-0
+  odd:bg-white
+  even:bg-slate-50/60
+  hover:bg-sky-50/80
+  dark:border-slate-800
+  dark:odd:bg-slate-950
+  dark:even:bg-slate-900/40
+  dark:hover:bg-sky-950/20
+"
   onClick={() => setSelectedRow(r)}
 >
-                <td className="py-2 pr-3">{r.siteName}</td>
-                <td className="py-2 pr-3 text-right">{r.serviceCharge.toFixed(2)}</td>
-                <td className="py-2 pr-3 text-right">{r.labor.toFixed(2)}</td>
-                <td className="py-2 pr-3 text-right">{r.mileage.toFixed(2)}</td>
-                <td className="py-2 pr-3 text-right">
-  {r.other.toFixed(2)}
+                <td className="px-4 py-3 font-semibold text-slate-900 dark:text-slate-100">
+  {r.siteName}
+</td>
+                <td className="px-3 py-3 text-right font-semibold tabular-nums text-sky-700 dark:text-sky-300">
+  ${r.serviceCharge.toFixed(2)}
+</td>
+                <td className="px-3 py-3 text-right font-semibold tabular-nums text-amber-700 dark:text-amber-300">
+  ${r.labor.toFixed(2)}
+</td>
+                <td className="px-3 py-3 text-right font-semibold tabular-nums text-violet-700 dark:text-violet-300">
+  ${r.mileage.toFixed(2)}
+</td>
+                <td className="px-3 py-3 text-right font-semibold tabular-nums text-rose-700 dark:text-rose-300">
+  ${r.other.toFixed(2)}
 </td>
 
-<td className="py-2 pr-3">
+<td className="px-3 py-3">
   {chip(r.net)}
 </td>
 
-<td className="py-2 pr-3 text-right font-medium">
-  {getRevenueProfit(r).toFixed(2)}
+<td
+  className={`px-3 py-3 text-right font-bold tabular-nums ${
+    getRevenueProfit(r) >= 0
+      ? "text-emerald-700 dark:text-emerald-300"
+      : "text-rose-700 dark:text-rose-300"
+  }`}
+>
+  ${getRevenueProfit(r).toFixed(2)}
 </td>
 
-<td className="py-2 pr-3 text-right">
+<td className="px-3 py-3 text-right">
   {revenueMarginChip(getRevenueMargin(r))}
 </td>
 
-                <td className="py-2 pl-3 text-right">
+                <td className="px-4 py-3 text-right">
                     <Button
                         variant="ghost"
                         size="icon"
@@ -207,24 +266,26 @@ const [feedbackNotes, setFeedbackNotes] = React.useState("");
             ))}
           </tbody>
          <tfoot>
-  <tr className="border-t font-semibold">
-    <td className="py-2 pr-3">Total</td>
+ <tr className="border-t border-slate-300 bg-slate-900 font-semibold text-white dark:border-slate-700 dark:bg-slate-800">
+    <td className="px-4 py-3">
+  Total
+</td>
 
-    <td className="py-2 pr-3 text-right">
-      {totals.serviceCharge.toFixed(2)}
-    </td>
+    <td className="px-3 py-3 text-right tabular-nums text-sky-200">
+  ${totals.serviceCharge.toFixed(2)}
+</td>
 
-    <td className="py-2 pr-3 text-right">
-      {totals.labor.toFixed(2)}
-    </td>
+    <td className="px-3 py-3 text-right tabular-nums text-amber-200">
+  ${totals.labor.toFixed(2)}
+</td>
 
-    <td className="py-2 pr-3 text-right">
-      {totals.mileage.toFixed(2)}
-    </td>
+    <td className="px-3 py-3 text-right tabular-nums text-violet-200">
+  ${totals.mileage.toFixed(2)}
+</td>
 
-    <td className="py-2 pr-3 text-right">
-      {totals.other.toFixed(2)}
-    </td>
+    <td className="px-3 py-3 text-right tabular-nums text-rose-200">
+  ${totals.other.toFixed(2)}
+</td>
 
     {/* Status */}
     <td className="py-2 pr-3"></td>
@@ -242,7 +303,7 @@ const [feedbackNotes, setFeedbackNotes] = React.useState("");
         </table>
 
         {selectedRow && (
-  <div className="mt-4 rounded-xl border p-4 bg-muted/20">
+  <div className="m-4 mt-5 rounded-2xl border border-slate-200 bg-gradient-to-br from-white via-slate-50 to-sky-50/50 p-5 shadow-sm dark:border-slate-800 dark:from-slate-950 dark:via-slate-950 dark:to-sky-950/20">
     <div className="flex justify-between items-start mb-3">
       <h4 className="font-semibold text-base">
         {selectedRow.siteName} — Detail
@@ -270,34 +331,112 @@ const [feedbackNotes, setFeedbackNotes] = React.useState("");
         revenue > 0 ? (revenueProfit / revenue) * 100 : 0;
 
       return (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
-          <div>Service Charge: ${serviceCharge.toFixed(2)}</div>
-          <div>Revenue: ${revenue.toFixed(2)}</div>
+  <div className="grid grid-cols-1 gap-3 text-sm md:grid-cols-2 lg:grid-cols-4">
+    <div className="rounded-xl border border-sky-200 bg-sky-50 p-4 dark:border-sky-900 dark:bg-sky-950/30">
+      <div className="text-xs font-semibold uppercase tracking-wide text-sky-700 dark:text-sky-300">
+        Service Charge
+      </div>
 
-          <div
-            className={
-              revenueVsServiceCharge >= 0
-                ? "text-emerald-600"
-                : "text-red-600"
-            }
-          >
-            Revenue vs Service Charge: $
-            {revenueVsServiceCharge.toFixed(2)}
-          </div>
+      <div className="mt-1 text-xl font-bold tabular-nums text-sky-950 dark:text-sky-100">
+        ${serviceCharge.toFixed(2)}
+      </div>
+    </div>
 
-          <div>Labor: ${labor.toFixed(2)}</div>
-          <div>Mileage: ${mileage.toFixed(2)}</div>
-          <div>Other Expenses: ${other.toFixed(2)}</div>
+    <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 dark:border-emerald-900 dark:bg-emerald-950/30">
+      <div className="text-xs font-semibold uppercase tracking-wide text-emerald-700 dark:text-emerald-300">
+        Revenue
+      </div>
 
-          <div className="font-semibold">
-            Revenue-Based Profit: ${revenueProfit.toFixed(2)}
-          </div>
+      <div className="mt-1 text-xl font-bold tabular-nums text-emerald-950 dark:text-emerald-100">
+        ${revenue.toFixed(2)}
+      </div>
+    </div>
 
-          <div className="font-semibold">
-            Revenue-Based Margin: {revenueMargin.toFixed(2)}%
-          </div>
-        </div>
-      );
+    <div
+      className={`rounded-xl border p-4 ${
+        revenueVsServiceCharge >= 0
+          ? "border-emerald-200 bg-emerald-50 dark:border-emerald-900 dark:bg-emerald-950/30"
+          : "border-rose-200 bg-rose-50 dark:border-rose-900 dark:bg-rose-950/30"
+      }`}
+    >
+      <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+        Revenue vs Service Charge
+      </div>
+
+      <div
+        className={`mt-1 text-xl font-bold tabular-nums ${
+          revenueVsServiceCharge >= 0
+            ? "text-emerald-700 dark:text-emerald-300"
+            : "text-rose-700 dark:text-rose-300"
+        }`}
+      >
+        ${revenueVsServiceCharge.toFixed(2)}
+      </div>
+    </div>
+
+    <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 dark:border-amber-900 dark:bg-amber-950/30">
+      <div className="text-xs font-semibold uppercase tracking-wide text-amber-700 dark:text-amber-300">
+        Labor
+      </div>
+
+      <div className="mt-1 text-xl font-bold tabular-nums text-amber-950 dark:text-amber-100">
+        ${labor.toFixed(2)}
+      </div>
+    </div>
+
+    <div className="rounded-xl border border-violet-200 bg-violet-50 p-4 dark:border-violet-900 dark:bg-violet-950/30">
+      <div className="text-xs font-semibold uppercase tracking-wide text-violet-700 dark:text-violet-300">
+        Mileage
+      </div>
+
+      <div className="mt-1 text-xl font-bold tabular-nums text-violet-950 dark:text-violet-100">
+        ${mileage.toFixed(2)}
+      </div>
+    </div>
+
+    <div className="rounded-xl border border-rose-200 bg-rose-50 p-4 dark:border-rose-900 dark:bg-rose-950/30">
+      <div className="text-xs font-semibold uppercase tracking-wide text-rose-700 dark:text-rose-300">
+        Other Expenses
+      </div>
+
+      <div className="mt-1 text-xl font-bold tabular-nums text-rose-950 dark:text-rose-100">
+        ${other.toFixed(2)}
+      </div>
+    </div>
+
+    <div
+      className={`rounded-xl border p-4 ${
+        revenueProfit >= 0
+          ? "border-emerald-200 bg-emerald-50 dark:border-emerald-900 dark:bg-emerald-950/30"
+          : "border-rose-200 bg-rose-50 dark:border-rose-900 dark:bg-rose-950/30"
+      }`}
+    >
+      <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+        Revenue-Based Profit
+      </div>
+
+      <div
+        className={`mt-1 text-xl font-bold tabular-nums ${
+          revenueProfit >= 0
+            ? "text-emerald-700 dark:text-emerald-300"
+            : "text-rose-700 dark:text-rose-300"
+        }`}
+      >
+        ${revenueProfit.toFixed(2)}
+      </div>
+    </div>
+
+    <div className="rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-950">
+      <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+        Revenue-Based Margin
+      </div>
+
+      <div className="mt-2">
+        {revenueMarginChip(revenueMargin)}
+      </div>
+    </div>
+  </div>
+);
     })()}
 
     <div className="mt-4 border-t pt-4 space-y-3">
