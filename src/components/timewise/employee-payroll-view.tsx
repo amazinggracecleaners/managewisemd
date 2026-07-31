@@ -23,6 +23,15 @@ import {
   Clock,
   Download,
   ExternalLink,
+  WalletCards,
+  CalendarRange,
+  BadgeDollarSign,
+  ReceiptText,
+  ShieldCheck,
+  Sparkles,
+  FileCheck2,
+  CircleDollarSign,
+  Hourglass,
 } from "lucide-react";
 import { PaystubCard } from "@/components/timewise/payroll/PaystubCard";
 import {
@@ -187,50 +196,47 @@ function PayrollStatusBadge({
 }: {
   status: "draft" | "waiting_for_confirmation" | "ready_to_pay" | "paid";
 }) {
-  const className =
-    status === "paid"
-      ? "bg-green-600 text-white"
-      : status === "ready_to_pay"
-      ? "bg-blue-600 text-white"
-      : status === "waiting_for_confirmation"
-      ? "bg-yellow-500 text-white"
-      : "bg-gray-500 text-white";
+  const config = {
+    paid: {
+      label: "Paid",
+      className:
+        "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-300",
+      icon: CheckCircle,
+    },
+    ready_to_pay: {
+      label: "Ready to Pay",
+      className:
+        "border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-900 dark:bg-blue-950/40 dark:text-blue-300",
+      icon: FileCheck2,
+    },
+    waiting_for_confirmation: {
+      label: "Awaiting Confirmation",
+      className:
+        "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-300",
+      icon: Hourglass,
+    },
+    draft: {
+      label: "Draft",
+      className:
+        "border-slate-200 bg-slate-50 text-slate-700 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300",
+      icon: Clock,
+    },
+  } as const;
 
-  const label =
-    status === "paid"
-      ? "Paid"
-      : status === "ready_to_pay"
-      ? "Ready to Pay"
-      : status === "waiting_for_confirmation"
-      ? "Waiting for Confirmation"
-      : "Draft";
+  const item = config[status];
+  const Icon = item.icon;
 
-  return <Badge className={className}>{label}</Badge>;
+  return (
+    <Badge
+      variant="outline"
+      className={`rounded-full px-3 py-1 font-semibold ${item.className}`}
+    >
+      <Icon className="mr-1.5 h-3.5 w-3.5" />
+      {item.label}
+    </Badge>
+  );
 }
-async function loadImageAsDataUrl(src: string): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const img = new Image();
-    img.crossOrigin = "anonymous";
 
-    img.onload = () => {
-      const canvas = document.createElement("canvas");
-      canvas.width = img.naturalWidth;
-      canvas.height = img.naturalHeight;
-
-      const ctx = canvas.getContext("2d");
-      if (!ctx) {
-        reject(new Error("Could not create canvas context."));
-        return;
-      }
-
-      ctx.drawImage(img, 0, 0);
-      resolve(canvas.toDataURL("image/jpeg"));
-    };
-
-    img.onerror = () => reject(new Error(`Failed to load image: ${src}`));
-    img.src = src;
-  });
-}
 export function EmployeePayrollView({
   employee,
   payrollPeriods,
@@ -321,270 +327,492 @@ const y = 5;
   }
 };
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Payroll Confirmation</CardTitle>
-        <CardDescription>
-          Review your payroll periods, confirm when requested, and track payment status.
-        </CardDescription>
-      </CardHeader>
+    <div className="space-y-6">
+      <section className="relative overflow-hidden rounded-3xl border border-blue-200/60 bg-gradient-to-br from-slate-950 via-blue-950 to-indigo-950 p-6 text-white shadow-2xl dark:border-blue-900/60">
+        <div className="absolute -right-20 -top-24 h-72 w-72 rounded-full bg-cyan-400/15 blur-3xl" />
+        <div className="absolute -bottom-20 left-1/3 h-56 w-56 rounded-full bg-violet-500/15 blur-3xl" />
 
-      <CardContent>
-        {relevantPeriods.length > 0 ? (
-          <Accordion type="single" collapsible className="w-full">
-            {relevantPeriods.map((period) => {
-              const employeeData = period.lineItems.find(
-                (item: PayrollLineItem) => item.employeeId === employee.id
-              );
-              if (!employeeData) return null;
+        <div className="relative flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
+          <div>
+            <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-3 py-1.5 text-xs font-semibold text-blue-100 backdrop-blur">
+              <Sparkles className="h-3.5 w-3.5" />
+              Employee Payroll Center
+            </div>
 
-              const summary = getPayrollConfirmationSummary(period, payrollConfirmations);
-              const revision = summary.revision;
-              const status = deriveEmployeePayrollStatus(
-  period,
-  employee.id,
-  payrollConfirmations
-);
-const employeeLine = period.lineItems.find(
-  (item: PayrollLineItem) => item.employeeId === employee.id
-);
+            <div className="flex items-start gap-4">
+              <div className="rounded-2xl bg-gradient-to-br from-cyan-400 to-blue-500 p-3.5 shadow-lg shadow-cyan-500/20">
+                <WalletCards className="h-7 w-7 text-white" />
+              </div>
 
-const needsReconfirmation =
-  (employeeLine as any)?.needsReconfirmation === true;
+              <div>
+                <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">
+                  Payroll & Pay Stubs
+                </h1>
+                <p className="mt-2 max-w-2xl text-sm leading-6 text-blue-100/85">
+                  Review earnings, download official pay stubs, confirm payroll,
+                  and track payment status for every pay period.
+                </p>
+              </div>
+            </div>
+          </div>
 
-const wasCorrected =
-  (employeeLine as any)?.wasCorrected === true;
+          <div className="rounded-2xl border border-white/15 bg-white/10 px-4 py-3 backdrop-blur">
+            <p className="text-xs font-medium uppercase tracking-[0.16em] text-blue-200">
+              Employee
+            </p>
+            <p className="mt-1 font-semibold">{employee.name}</p>
+          </div>
+        </div>
+      </section>
 
-const isReconfirmed =
-  status === "ready_to_pay" && wasCorrected;
+      <div className="grid gap-4 md:grid-cols-3">
+        <Card className="overflow-hidden border-blue-200 bg-gradient-to-br from-white to-blue-50 shadow-sm dark:border-blue-900 dark:from-slate-950 dark:to-blue-950/20">
+          <CardContent className="flex items-center justify-between p-5">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-blue-700 dark:text-blue-300">
+                Pay Periods
+              </p>
+              <p className="mt-2 text-3xl font-bold text-slate-900 dark:text-white">
+                {relevantPeriods.length}
+              </p>
+            </div>
+            <div className="rounded-2xl bg-blue-500 p-3 text-white shadow-lg shadow-blue-500/20">
+              <CalendarRange className="h-6 w-6" />
+            </div>
+          </CardContent>
+        </Card>
 
-const hasConfirmedThisRev =
-  summary.confirmedEmployeeIds.has(employee.id) && !needsReconfirmation;
-              const isPaid = status === "paid";
-              const employeeCanConfirm = canEmployeeConfirm(
-                period,
-                employee.id,
-                payrollConfirmations
-              );
+        <Card className="overflow-hidden border-emerald-200 bg-gradient-to-br from-white to-emerald-50 shadow-sm dark:border-emerald-900 dark:from-slate-950 dark:to-emerald-950/20">
+          <CardContent className="flex items-center justify-between p-5">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-emerald-700 dark:text-emerald-300">
+                Paid Periods
+              </p>
+              <p className="mt-2 text-3xl font-bold text-slate-900 dark:text-white">
+                {
+                  relevantPeriods.filter(
+                    (period) =>
+                      deriveEmployeePayrollStatus(
+                        period,
+                        employee.id,
+                        payrollConfirmations
+                      ) === "paid"
+                  ).length
+                }
+              </p>
+            </div>
+            <div className="rounded-2xl bg-emerald-500 p-3 text-white shadow-lg shadow-emerald-500/20">
+              <CircleDollarSign className="h-6 w-6" />
+            </div>
+          </CardContent>
+        </Card>
 
-              const net = Number(employeeData.net ?? 0);
-              const netClass = net < 0 ? "text-red-600" : "";
+        <Card className="overflow-hidden border-amber-200 bg-gradient-to-br from-white to-amber-50 shadow-sm dark:border-amber-900 dark:from-slate-950 dark:to-amber-950/20">
+          <CardContent className="flex items-center justify-between p-5">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-amber-700 dark:text-amber-300">
+                Needs Attention
+              </p>
+              <p className="mt-2 text-3xl font-bold text-slate-900 dark:text-white">
+                {
+                  relevantPeriods.filter(
+                    (period) =>
+                      deriveEmployeePayrollStatus(
+                        period,
+                        employee.id,
+                        payrollConfirmations
+                      ) === "waiting_for_confirmation"
+                  ).length
+                }
+              </p>
+            </div>
+            <div className="rounded-2xl bg-amber-500 p-3 text-white shadow-lg shadow-amber-500/20">
+              <Hourglass className="h-6 w-6" />
+            </div>
+          </CardContent>
+        </Card>
+      </div>
 
-              const onConfirm = async () => {
-  if (!employeeCanConfirm || submittingFor) return;
+      <Card className="overflow-hidden rounded-3xl border-slate-200 shadow-xl dark:border-slate-800">
+        <CardHeader className="border-b bg-gradient-to-r from-white via-slate-50 to-blue-50/60 p-5 dark:from-slate-950 dark:via-slate-950 dark:to-blue-950/20">
+          <CardTitle className="flex items-center gap-2 text-xl">
+            <ReceiptText className="h-5 w-5 text-blue-600" />
+            Payroll History
+          </CardTitle>
+          <CardDescription>
+            Open a pay period to review the pay stub, download the PDF, view
+            timesheet details, or confirm payroll.
+          </CardDescription>
+        </CardHeader>
 
-  setSubmittingFor(period.id);
-  try {
-    await confirmPayroll(period.id, employee.id, revision);
+        <CardContent className="p-0">
+          {relevantPeriods.length > 0 ? (
+            <Accordion type="single" collapsible className="w-full">
+              {relevantPeriods.map((period) => {
+                const employeeData = period.lineItems.find(
+                  (item: PayrollLineItem) => item.employeeId === employee.id
+                );
+                if (!employeeData) return null;
 
-    // Clear the correction flag locally after employee reconfirms
-    period.lineItems = period.lineItems?.map((item) =>
-      item.employeeId === employee.id
-        ? {
-            ...item,
-            needsReconfirmation: false,
-            wasCorrected: false,
-          }
-        : item
-    );
-  } finally {
-    setSubmittingFor(null);
-  }
-};
+                const summary = getPayrollConfirmationSummary(
+                  period,
+                  payrollConfirmations
+                );
+                const revision = summary.revision;
+                const status = deriveEmployeePayrollStatus(
+                  period,
+                  employee.id,
+                  payrollConfirmations
+                );
 
-              const safePeriodId = period.id || `${period.startDate}-${period.endDate}`;
+                const employeeLine = period.lineItems.find(
+                  (item: PayrollLineItem) => item.employeeId === employee.id
+                );
 
-              return (
-                <AccordionItem value={safePeriodId} key={safePeriodId}>
-                  <AccordionTrigger>
-                    <div className="flex justify-between items-center w-full pr-4 gap-4">
-                      <div className="text-left">
-                        <span>
-                          Payroll for {fmt(period.startDate, "MMM d")} -{" "}
-                          {fmt(period.endDate, "MMM d, yyyy")}
-                        </span>
-                        <span className="ml-2 text-xs text-muted-foreground align-middle">
-                          rev {revision}
-                        </span>
-                      </div>
+                const needsReconfirmation =
+                  (employeeLine as any)?.needsReconfirmation === true;
+                const wasCorrected = (employeeLine as any)?.wasCorrected === true;
+                const isReconfirmed = status === "ready_to_pay" && wasCorrected;
+                const hasConfirmedThisRev =
+                  summary.confirmedEmployeeIds.has(employee.id) &&
+                  !needsReconfirmation;
+                const isPaid = status === "paid";
+                const employeeCanConfirm = canEmployeeConfirm(
+                  period,
+                  employee.id,
+                  payrollConfirmations
+                );
 
-                      <div className="flex items-center gap-3">
-                        
-                        <PayrollStatusBadge status={status} />
-                       {status === "paid" ? (
-  <span className="flex items-center gap-2 text-green-700 font-semibold">
-    <CheckCircle className="h-4 w-4" /> Paid
-  </span>
-) : status === "ready_to_pay" ? (
-  <span className="flex items-center gap-2 text-green-600">
-    <CheckCircle className="h-4 w-4" />
-{isReconfirmed ? "Reconfirmed" : "Confirmed"}
-  </span>
-) : status === "waiting_for_confirmation" ? (
-  <span className="flex items-center gap-2 text-yellow-600">
-    <Clock className="h-4 w-4" /> Awaiting Your Confirmation
-  </span>
-) : (
-  <span className="flex items-center gap-2 text-muted-foreground">
-    Draft
-  </span>
-)}
-                      </div>
-                    </div>
-                  </AccordionTrigger>
+                const regularHours =
+                  Number((employeeData as any).regularMinutes ?? 0) / 60;
+                const bonusHours =
+                  Number((employeeData as any).bonusMinutes ?? 0) / 60;
+                const flatBonus = Number(employeeData.flatBonus ?? 0);
+                const gross = Number(employeeData.gross ?? 0);
+                const totalDeductions = Number(employeeData.deductions ?? 0);
+                const net = Number(employeeData.net ?? 0);
 
-                  <AccordionContent>
-                    <div className="p-4 bg-muted/50 rounded-lg space-y-4">
+                const federalTax = Number(
+                  (employeeData as any).federalWithholding ??
+                    (employeeData as any).federalTax ??
+                    0
+                );
+                const stateTax = Number(
+                  (employeeData as any).stateWithholding ??
+                    (employeeData as any).stateTax ??
+                    0
+                );
+                const localTax = Number(
+                  (employeeData as any).localWithholding ??
+                    (employeeData as any).localTax ??
+                    0
+                );
+                const socialSecurity = Number(
+                  (employeeData as any).socialSecurity ??
+                    (employeeData as any).socialSecurityTax ??
+                    0
+                );
+                const medicare = Number(
+                  (employeeData as any).medicare ??
+                    (employeeData as any).medicareTax ??
+                    0
+                );
+                const otherDeductions = Math.max(
+                  0,
+                  totalDeductions -
+                    federalTax -
+                    stateTax -
+                    localTax -
+                    socialSecurity -
+                    medicare
+                );
 
-  {/* 🔥 Branded Paystub Preview */}
-  <div ref={paystubRef}>
-  <PaystubCard
- companyName="Amazing Grace Cleaners LLC"
-  logoUrl="/Mathieu_logo_AGC.jpg"
-  employeeName={employee.name}
-  employeeId={employee.id}
-  employeeAddress={(employee as any).address || ""}
-  payDate={fmt(period.endDate)}
-  payPeriodStart={fmt(period.startDate)}
-  payPeriodEnd={fmt(period.endDate)}
-  payRate={Number((employee as any).payRate ?? 0)}
-  regularHours={Number((employeeData as any).regularMinutes ?? 0) / 60}
-  bonusHours={Number((employeeData as any).bonusMinutes ?? 0) / 60}
-  flatBonus={Number(employeeData.flatBonus ?? 0)}
-  grossPay={Number(employeeData.gross ?? 0)}
-  deductions={[
-    {
-      label: "Deductions",
-      amount: Number(employeeData.deductions ?? 0),
-    },
-  ]}
-  netPay={Number(employeeData.net ?? 0)}
-  companyContact="Amazing Grace Cleaners LLC Email: amazinggracecleaners1@gmail.com • Phone: (859) 740-0101"
-/>
-</div>
-                      <div className="grid grid-cols-2 gap-4">
-                        <div>
-                          <p className="text-sm font-medium">Regular Hours</p>
-                          <p className="text-lg font-bold">
-                            {toHours((employeeData as any).regularMinutes)}
-                          </p>
+                const deductions = [
+                  federalTax > 0
+                    ? { label: "Federal Withholding", amount: federalTax }
+                    : null,
+                  stateTax > 0
+                    ? { label: "State Withholding", amount: stateTax }
+                    : null,
+                  localTax > 0
+                    ? { label: "Local Withholding", amount: localTax }
+                    : null,
+                  socialSecurity > 0
+                    ? { label: "Social Security", amount: socialSecurity }
+                    : null,
+                  medicare > 0
+                    ? { label: "Medicare", amount: medicare }
+                    : null,
+                  otherDeductions > 0
+                    ? { label: "Other Deductions", amount: otherDeductions }
+                    : null,
+                ].filter(Boolean) as { label: string; amount: number }[];
+
+                if (deductions.length === 0 && totalDeductions !== 0) {
+                  deductions.push({
+                    label: "Deductions",
+                    amount: totalDeductions,
+                  });
+                }
+
+                const onConfirm = async () => {
+                  if (!employeeCanConfirm || submittingFor) return;
+
+                  setSubmittingFor(period.id);
+                  try {
+                    await confirmPayroll(period.id, employee.id, revision);
+
+                    period.lineItems = period.lineItems?.map((item) =>
+                      item.employeeId === employee.id
+                        ? {
+                            ...item,
+                            needsReconfirmation: false,
+                            wasCorrected: false,
+                          }
+                        : item
+                    );
+                  } finally {
+                    setSubmittingFor(null);
+                  }
+                };
+
+                const safePeriodId =
+                  period.id || `${period.startDate}-${period.endDate}`;
+
+                return (
+                  <AccordionItem
+                    value={safePeriodId}
+                    key={safePeriodId}
+                    className="border-slate-200 px-5 dark:border-slate-800"
+                  >
+                    <AccordionTrigger className="py-5 hover:no-underline">
+                      <div className="flex w-full flex-col gap-3 pr-4 text-left sm:flex-row sm:items-center sm:justify-between">
+                        <div className="flex items-center gap-3">
+                          <div className="rounded-2xl bg-gradient-to-br from-blue-100 to-indigo-100 p-3 text-blue-700 dark:from-blue-950/50 dark:to-indigo-950/50 dark:text-blue-300">
+                            <CalendarRange className="h-5 w-5" />
+                          </div>
+
+                          <div>
+                            <p className="font-semibold text-slate-900 dark:text-white">
+                              {fmt(period.startDate, "MMM d")} –{" "}
+                              {fmt(period.endDate, "MMM d, yyyy")}
+                            </p>
+                            <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                              Payroll revision {revision}
+                            </p>
+                          </div>
                         </div>
 
-                        <div>
-                          <p className="text-sm font-medium">Bonus Hours</p>
-                          <p className="text-lg font-bold">
-                            {toHours((employeeData as any).bonusMinutes)}
-                          </p>
-                        </div>
-
-                        <div>
-                          <p className="text-sm font-medium">Flat Bonus</p>
-                          <p className="text-lg font-bold text-blue-600">
-                            +{money.format(Number(employeeData.flatBonus ?? 0))}
-                          </p>
-                        </div>
-
-                        <div>
-                          <p className="text-sm font-medium">Deductions</p>
-                          <p className="text-lg font-bold text-red-600">
-                            -{money.format(Number(employeeData.deductions ?? 0))}
-                          </p>
-                        </div>
-
-                        <div className="col-span-2 text-right">
-                          <p className="text-sm font-medium">Net Pay</p>
-                          <p className={`text-2xl font-bold ${netClass}`}>
+                        <div className="flex flex-wrap items-center gap-3">
+                          <div className="rounded-xl border border-emerald-100 bg-emerald-50 px-3 py-2 text-sm font-bold text-emerald-700 dark:border-emerald-900 dark:bg-emerald-950/30 dark:text-emerald-300">
                             {money.format(net)}
-                          </p>
+                          </div>
+                          <PayrollStatusBadge status={status} />
                         </div>
                       </div>
+                    </AccordionTrigger>
 
-                      <div className="mt-4 flex flex-col sm:flex-row gap-2">
-                        <Button
-                          type="button"
-                          variant="secondary"
-                          className="w-full sm:w-auto"
-                          onClick={() => downloadPaystub({ period, employeeData })}
-                          disabled={Boolean(pdfFor)}
-                          aria-busy={pdfFor === period.id}
-                        >
-                          <Download className="mr-2 h-4 w-4" />
-                          {pdfFor === period.id ? "Preparing PDF…" : "Download paystub (PDF)"}
-                        </Button>
-
-                        <Button
-                          type="button"
-                          variant="outline"
-                          className="w-full sm:w-auto"
-                          onClick={() => handleViewTimesheet(period.id, employee.id)}
-                        >
-                          <ExternalLink className="mr-2 h-4 w-4" /> View timesheet details
-                        </Button>
-                      </div>
-
-                      {employeeCanConfirm && (
-                        <Button
-                          className="w-full mt-4"
-                          onClick={onConfirm}
-                          disabled={Boolean(submittingFor)}
-                          aria-busy={submittingFor === period.id}
-                        >
-                          <Check className="mr-2 h-4 w-4" />
-                          {submittingFor === period.id
-                            ? "Submitting confirmation…"
-                            : `I confirm these hours and pay are correct (rev ${revision})`}
-                        </Button>
-                      )}
-
-                      {hasConfirmedThisRev && !isPaid && (
-                        <div
-                          className="text-center mt-4 p-2 bg-blue-100 text-blue-800 rounded-md"
-                          aria-live="polite"
-                        >
-                          Your confirmation has been recorded.
+                    <AccordionContent>
+                      <div className="space-y-5 pb-6">
+                        <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3 shadow-inner dark:border-slate-800 dark:bg-slate-900/60">
+                          <div ref={paystubRef}>
+                            <PaystubCard
+                              companyName={
+                                companyName || "Amazing Grace Cleaners LLC"
+                              }
+                              logoUrl="/Mathieu_logo_AGC.jpg"
+                              employeeName={employee.name}
+                              employeeId={employee.id}
+                              employeeAddress={(employee as any).address || ""}
+                              payDate={fmt(period.endDate)}
+                              payPeriodStart={fmt(period.startDate)}
+                              payPeriodEnd={fmt(period.endDate)}
+                              payRate={Number((employee as any).payRate ?? 0)}
+                              regularHours={regularHours}
+                              bonusHours={bonusHours}
+                              flatBonus={flatBonus}
+                              grossPay={gross}
+                              deductions={deductions}
+                              netPay={net}
+                              companyContact={`${companyName || "Amazing Grace Cleaners LLC"} • amazinggracecleaners1@gmail.com • (859) 740-0101`}
+                            />
+                          </div>
                         </div>
-                      )}
 
-                      {!hasConfirmedThisRev && status === "draft" && (
-                        <div
-                          className="text-center mt-4 p-2 bg-gray-100 text-gray-700 rounded-md"
-                          aria-live="polite"
-                        >
-                          This payroll period is still in draft and is not ready for confirmation yet.
+                        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+                          <div className="rounded-2xl border border-blue-100 bg-blue-50/70 p-4 dark:border-blue-900 dark:bg-blue-950/25">
+                            <p className="text-xs font-semibold uppercase tracking-wide text-blue-700 dark:text-blue-300">
+                              Regular Hours
+                            </p>
+                            <p className="mt-2 text-xl font-bold text-slate-900 dark:text-white">
+                              {toHours((employeeData as any).regularMinutes)}
+                            </p>
+                          </div>
+
+                          <div className="rounded-2xl border border-violet-100 bg-violet-50/70 p-4 dark:border-violet-900 dark:bg-violet-950/25">
+                            <p className="text-xs font-semibold uppercase tracking-wide text-violet-700 dark:text-violet-300">
+                              Bonus Hours
+                            </p>
+                            <p className="mt-2 text-xl font-bold text-slate-900 dark:text-white">
+                              {toHours((employeeData as any).bonusMinutes)}
+                            </p>
+                          </div>
+
+                          <div className="rounded-2xl border border-cyan-100 bg-cyan-50/70 p-4 dark:border-cyan-900 dark:bg-cyan-950/25">
+                            <p className="text-xs font-semibold uppercase tracking-wide text-cyan-700 dark:text-cyan-300">
+                              Flat Bonus
+                            </p>
+                            <p className="mt-2 text-xl font-bold text-cyan-700 dark:text-cyan-300">
+                              {money.format(flatBonus)}
+                            </p>
+                          </div>
+
+                          <div className="rounded-2xl border border-rose-100 bg-rose-50/70 p-4 dark:border-rose-900 dark:bg-rose-950/25">
+                            <p className="text-xs font-semibold uppercase tracking-wide text-rose-700 dark:text-rose-300">
+                              Deductions
+                            </p>
+                            <p className="mt-2 text-xl font-bold text-rose-700 dark:text-rose-300">
+                              {money.format(totalDeductions)}
+                            </p>
+                          </div>
+
+                          <div className="rounded-2xl border border-emerald-200 bg-gradient-to-br from-emerald-50 to-teal-50 p-4 shadow-sm dark:border-emerald-900 dark:from-emerald-950/30 dark:to-teal-950/20">
+                            <p className="text-xs font-semibold uppercase tracking-wide text-emerald-700 dark:text-emerald-300">
+                              Net Pay
+                            </p>
+                            <p
+                              className={`mt-2 text-2xl font-bold ${
+                                net < 0
+                                  ? "text-rose-600"
+                                  : "text-emerald-700 dark:text-emerald-300"
+                              }`}
+                            >
+                              {money.format(net)}
+                            </p>
+                          </div>
                         </div>
-                      )}
 
-                      {!hasConfirmedThisRev &&
-                        status === "ready_to_pay" &&
-                        !employeeCanConfirm && (
-                          <div
-                            className="text-center mt-4 p-2 bg-blue-100 text-blue-800 rounded-md"
-                            aria-live="polite"
+                        <div className="flex flex-col gap-3 sm:flex-row">
+                          <Button
+                            type="button"
+                            className="h-11 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 px-5 font-semibold text-white shadow-lg shadow-blue-600/20 hover:from-blue-700 hover:to-indigo-700"
+                            onClick={() =>
+                              downloadPaystub({ period, employeeData })
+                            }
+                            disabled={Boolean(pdfFor)}
+                            aria-busy={pdfFor === period.id}
                           >
-                            This payroll period is pending payment.
+                            <Download className="mr-2 h-4 w-4" />
+                            {pdfFor === period.id
+                              ? "Preparing PDF…"
+                              : "Download Pay Stub"}
+                          </Button>
+
+                          <Button
+                            type="button"
+                            variant="outline"
+                            className="h-11 rounded-xl px-5"
+                            onClick={() =>
+                              handleViewTimesheet(period.id, employee.id)
+                            }
+                          >
+                            <ExternalLink className="mr-2 h-4 w-4" />
+                            View Timesheet
+                          </Button>
+                        </div>
+
+                        {employeeCanConfirm && (
+                          <div className="rounded-2xl border border-amber-200 bg-gradient-to-r from-amber-50 to-orange-50 p-4 dark:border-amber-900 dark:from-amber-950/30 dark:to-orange-950/20">
+                            <div className="mb-3 flex items-start gap-3">
+                              <ShieldCheck className="mt-0.5 h-5 w-5 text-amber-600" />
+                              <div>
+                                <p className="font-semibold text-amber-900 dark:text-amber-100">
+                                  Your confirmation is required
+                                </p>
+                                <p className="text-sm text-amber-700 dark:text-amber-300">
+                                  Review the hours and pay information above before confirming.
+                                </p>
+                              </div>
+                            </div>
+
+                            <Button
+                              className="h-11 w-full rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 font-semibold text-white shadow-lg shadow-amber-500/20 hover:from-amber-600 hover:to-orange-600"
+                              onClick={onConfirm}
+                              disabled={Boolean(submittingFor)}
+                              aria-busy={submittingFor === period.id}
+                            >
+                              <Check className="mr-2 h-4 w-4" />
+                              {submittingFor === period.id
+                                ? "Submitting confirmation…"
+                                : `I Confirm These Hours and Pay (Revision ${revision})`}
+                            </Button>
                           </div>
                         )}
 
-                      {isPaid && (
-                        <div
-                          className="text-center mt-4 p-2 bg-green-100 text-green-800 rounded-md"
-                          aria-live="polite"
-                        >
-                          This payroll period has been paid.
-                        </div>
-                      )}
-                    </div>
-                  </AccordionContent>
-                </AccordionItem>
-              );
-            })}
-          </Accordion>
-        ) : (
-          <div className="flex items-center justify-center h-24 text-muted-foreground">
-            No payroll periods available for your review.
-          </div>
-        )}
-      </CardContent>
-    </Card>
+                        {hasConfirmedThisRev && !isPaid && (
+                          <div
+                            className="flex items-center justify-center gap-2 rounded-2xl border border-blue-200 bg-blue-50 p-4 text-center font-medium text-blue-800 dark:border-blue-900 dark:bg-blue-950/30 dark:text-blue-300"
+                            aria-live="polite"
+                          >
+                            <CheckCircle className="h-5 w-5" />
+                            {isReconfirmed
+                              ? "Your corrected payroll has been reconfirmed."
+                              : "Your confirmation has been recorded."}
+                          </div>
+                        )}
+
+                        {!hasConfirmedThisRev && status === "draft" && (
+                          <div
+                            className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-center text-slate-700 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300"
+                            aria-live="polite"
+                          >
+                            This payroll period is still in draft and is not ready
+                            for confirmation.
+                          </div>
+                        )}
+
+                        {!hasConfirmedThisRev &&
+                          status === "ready_to_pay" &&
+                          !employeeCanConfirm && (
+                            <div
+                              className="rounded-2xl border border-blue-200 bg-blue-50 p-4 text-center text-blue-800 dark:border-blue-900 dark:bg-blue-950/30 dark:text-blue-300"
+                              aria-live="polite"
+                            >
+                              This payroll period is pending payment.
+                            </div>
+                          )}
+
+                        {isPaid && (
+                          <div
+                            className="flex items-center justify-center gap-2 rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-center font-semibold text-emerald-800 dark:border-emerald-900 dark:bg-emerald-950/30 dark:text-emerald-300"
+                            aria-live="polite"
+                          >
+                            <CheckCircle className="h-5 w-5" />
+                            This payroll period has been paid.
+                          </div>
+                        )}
+                      </div>
+                    </AccordionContent>
+                  </AccordionItem>
+                );
+              })}
+            </Accordion>
+          ) : (
+            <div className="flex min-h-72 flex-col items-center justify-center px-6 text-center">
+              <div className="mb-4 rounded-3xl bg-gradient-to-br from-blue-100 to-violet-100 p-5 text-blue-600 dark:from-blue-950/40 dark:to-violet-950/40 dark:text-blue-300">
+                <BadgeDollarSign className="h-8 w-8" />
+              </div>
+              <h3 className="font-semibold text-slate-900 dark:text-white">
+                No payroll periods available
+              </h3>
+              <p className="mt-1 max-w-sm text-sm text-slate-500 dark:text-slate-400">
+                Your payroll history and pay stubs will appear here once payroll
+                has been prepared.
+              </p>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </div>
   );
 }
