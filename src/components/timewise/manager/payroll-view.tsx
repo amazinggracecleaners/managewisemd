@@ -47,6 +47,11 @@ import {
   Send,
   DollarSign,
   FileText,
+  Users,
+  CheckCircle2,
+  Clock3,
+  WalletCards,
+  TrendingUp,
 } from "lucide-react";
 import { groupSessions } from "@/lib/time-utils";
 import {
@@ -172,12 +177,12 @@ function derivePayrollStatus(
 function PayrollStatusBadge({ status }: { status: PayrollStatus }) {
   const className =
     status === "paid"
-      ? "bg-green-600 text-white"
+      ? "border border-emerald-200 bg-gradient-to-r from-emerald-100 to-green-100 text-emerald-800 shadow-sm dark:border-emerald-800 dark:from-emerald-950/50 dark:to-green-950/40 dark:text-emerald-300"
       : status === "ready_to_pay"
-      ? "bg-blue-600 text-white"
+      ? "border border-blue-200 bg-gradient-to-r from-blue-100 to-sky-100 text-blue-800 shadow-sm dark:border-blue-800 dark:from-blue-950/50 dark:to-sky-950/40 dark:text-blue-300"
       : status === "waiting_for_confirmation"
-      ? "bg-yellow-500 text-white"
-      : "bg-gray-500 text-white";
+      ? "border border-amber-200 bg-gradient-to-r from-amber-100 to-orange-100 text-amber-800 shadow-sm dark:border-amber-800 dark:from-amber-950/50 dark:to-orange-950/40 dark:text-amber-300"
+      : "border border-slate-200 bg-gradient-to-r from-slate-100 to-gray-100 text-slate-700 shadow-sm dark:border-slate-700 dark:from-slate-900 dark:to-slate-800 dark:text-slate-300";
 
   const label =
     status === "paid"
@@ -188,7 +193,11 @@ function PayrollStatusBadge({ status }: { status: PayrollStatus }) {
       ? "Waiting for Confirmation"
       : "Draft";
 
-  return <Badge className={className}>{label}</Badge>;
+  return (
+    <Badge className={`${className} rounded-full px-3 py-1 font-semibold`}>
+      {label}
+    </Badge>
+  );
 }
 
 export function PayrollView({
@@ -929,38 +938,111 @@ console.log("Payroll Confirmations", payrollConfirmations);
 
   return (
     <TooltipProvider>
-      <Card>
-        <CardHeader>
+      <Card className="overflow-hidden border-0 bg-gradient-to-b from-slate-50 via-white to-blue-50/40 shadow-2xl dark:from-slate-950 dark:via-slate-950 dark:to-blue-950/20">
+        <CardHeader className="border-b border-blue-100 bg-gradient-to-r from-blue-700 via-indigo-700 to-violet-700 text-white dark:border-slate-800">
           <div className="flex flex-col md:flex-row md:justify-between md:items-start gap-4">
-            <div>
-              <CardTitle>Payroll</CardTitle>
-              <CardDescription>
-                Calculate payroll for specific periods, track confirmations, pay employees individually, and generate paystubs.
-              </CardDescription>
+            <div className="flex items-center gap-4">
+              <div className="flex h-14 w-14 items-center justify-center rounded-2xl border border-white/20 bg-white/15 shadow-lg backdrop-blur-sm">
+                <WalletCards className="h-7 w-7 text-white" />
+              </div>
+              <div>
+                <CardTitle className="text-3xl font-bold tracking-tight text-white">
+                  Payroll
+                </CardTitle>
+                <CardDescription className="mt-1 max-w-3xl text-blue-100">
+                  Calculate payroll for specific periods, track confirmations, pay employees individually, and generate paystubs.
+                </CardDescription>
+              </div>
             </div>
           </div>
         </CardHeader>
 
-        <CardContent>
+        <CardContent className="p-5">
           <Tabs defaultValue="period">
-            <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="period">Period Payroll</TabsTrigger>
-              <TabsTrigger value="yearly">Yearly Summary</TabsTrigger>
+            <TabsList className="grid w-full grid-cols-2 rounded-xl bg-slate-100 p-1 shadow-inner dark:bg-slate-900">
+              <TabsTrigger value="period" className="rounded-lg data-[state=active]:bg-gradient-to-r data-[state=active]:from-blue-600 data-[state=active]:to-indigo-600 data-[state=active]:text-white">
+                Period Payroll
+              </TabsTrigger>
+              <TabsTrigger value="yearly" className="rounded-lg data-[state=active]:bg-gradient-to-r data-[state=active]:from-blue-600 data-[state=active]:to-indigo-600 data-[state=active]:text-white">
+                Yearly Summary
+              </TabsTrigger>
             </TabsList>
 
             <TabsContent value="period" className="mt-4">
-              <div className="flex gap-2 flex-wrap justify-end mb-4">
+              <div className="mb-5 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                <div className="group rounded-2xl border border-emerald-200 bg-gradient-to-br from-emerald-50 to-green-100 p-5 shadow-md transition-all duration-200 hover:-translate-y-1 hover:shadow-xl dark:border-emerald-900 dark:from-emerald-950/40 dark:to-green-950/30">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium text-emerald-700 dark:text-emerald-300">Total Gross Pay</p>
+                      <p className="mt-2 text-3xl font-bold tracking-tight text-emerald-900 dark:text-emerald-100">
+                        ${totalGross.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </p>
+                    </div>
+                    <div className="rounded-2xl bg-emerald-600 p-3 text-white shadow-lg transition-transform group-hover:scale-110">
+                      <TrendingUp className="h-6 w-6" />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="group rounded-2xl border border-blue-200 bg-gradient-to-br from-blue-50 to-sky-100 p-5 shadow-md transition-all duration-200 hover:-translate-y-1 hover:shadow-xl dark:border-blue-900 dark:from-blue-950/40 dark:to-sky-950/30">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium text-blue-700 dark:text-blue-300">Total Net Pay</p>
+                      <p className="mt-2 text-3xl font-bold tracking-tight text-blue-900 dark:text-blue-100">
+                        ${grandTotalNet.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </p>
+                    </div>
+                    <div className="rounded-2xl bg-blue-600 p-3 text-white shadow-lg transition-transform group-hover:scale-110">
+                      <DollarSign className="h-6 w-6" />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="group rounded-2xl border border-amber-200 bg-gradient-to-br from-amber-50 to-orange-100 p-5 shadow-md transition-all duration-200 hover:-translate-y-1 hover:shadow-xl dark:border-amber-900 dark:from-amber-950/40 dark:to-orange-950/30">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium text-amber-700 dark:text-amber-300">Employees Paid</p>
+                      <p className="mt-2 text-3xl font-bold tracking-tight text-amber-900 dark:text-amber-100">
+                        {paidCount}/{payableLineItems.length || 0}
+                      </p>
+                    </div>
+                    <div className="rounded-2xl bg-amber-500 p-3 text-white shadow-lg transition-transform group-hover:scale-110">
+                      <Users className="h-6 w-6" />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="group rounded-2xl border border-violet-200 bg-gradient-to-br from-violet-50 to-purple-100 p-5 shadow-md transition-all duration-200 hover:-translate-y-1 hover:shadow-xl dark:border-violet-900 dark:from-violet-950/40 dark:to-purple-950/30">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium text-violet-700 dark:text-violet-300">Confirmed</p>
+                      <p className="mt-2 text-3xl font-bold tracking-tight text-violet-900 dark:text-violet-100">
+                        {confirmedCount}/{lineItems.length}
+                      </p>
+                    </div>
+                    <div className="rounded-2xl bg-violet-600 p-3 text-white shadow-lg transition-transform group-hover:scale-110">
+                      <CheckCircle2 className="h-6 w-6" />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="mb-4 flex flex-wrap justify-end gap-2">
                 <Button
                   onClick={downloadCSV}
                   variant="outline"
                   size="sm"
                   disabled={lineItems.length === 0}
+                  className="border-0 bg-gradient-to-r from-emerald-500 to-teal-600 text-white shadow-lg transition-all hover:-translate-y-0.5 hover:from-emerald-600 hover:to-teal-700 hover:shadow-xl"
                 >
                   <Download className="mr-2 h-4 w-4" /> CSV
                 </Button>
 
                 {currentStatus === "draft" && (
-                  <Button onClick={handleSendForConfirmation}>
+                  <Button
+                    onClick={handleSendForConfirmation}
+                    className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-lg transition-all hover:-translate-y-0.5 hover:from-blue-700 hover:to-indigo-700 hover:shadow-xl"
+                  >
                     <Send className="mr-2 h-4 w-4" />
                     Send for Confirmation
                   </Button>
@@ -972,6 +1054,7 @@ console.log("Payroll Confirmations", payrollConfirmations);
                     variant="secondary"
                     onClick={handleSaveWaitingOrReady}
                     disabled={isPaid}
+                    className="bg-gradient-to-r from-violet-600 to-indigo-600 text-white shadow-lg transition-all hover:-translate-y-0.5 hover:from-violet-700 hover:to-indigo-700 hover:shadow-xl"
                   >
                     Save & Re-send confirmation
                   </Button>
@@ -996,7 +1079,7 @@ console.log("Payroll Confirmations", payrollConfirmations);
                 )}
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-end mb-6">
+              <div className="mb-6 grid grid-cols-1 items-end gap-4 rounded-2xl border border-blue-200 bg-gradient-to-br from-blue-50 to-indigo-50 p-5 shadow-md md:grid-cols-2 dark:border-blue-900 dark:from-blue-950/30 dark:to-indigo-950/20">
                 <div className="space-y-2">
                   <Label>Pay Frequency</Label>
                   <Select
@@ -1066,7 +1149,7 @@ console.log("Payroll Confirmations", payrollConfirmations);
                 </div>
               </div>
 
-              <div className="mb-4 flex gap-2 items-center flex-wrap">
+              <div className="mb-4 flex flex-wrap items-center gap-2 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-950">
                 <PayrollStatusBadge status={currentStatus} />
 
                 <Badge variant={allConfirmed ? "default" : "secondary"}>
@@ -1083,39 +1166,40 @@ console.log("Payroll Confirmations", payrollConfirmations);
                   <Badge variant="outline">Rev. {currentPeriod.revision}</Badge>
                 )}
               </div>
-<div className="mb-4">
-  <div className="mb-1 flex items-center justify-between text-xs text-muted-foreground">
+<div className="mb-5 rounded-2xl border border-emerald-200 bg-gradient-to-r from-emerald-50 to-teal-50 p-4 shadow-sm dark:border-emerald-900 dark:from-emerald-950/30 dark:to-teal-950/20">
+  <div className="mb-2 flex items-center justify-between text-sm font-medium text-emerald-800 dark:text-emerald-300">
     <span>Payroll payment progress</span>
     <span>
   {payableLineItems.length === 0 ? "—" : `${paidProgressPct}%`}
 </span>
   </div>
 
-  <div className="h-2 w-full rounded-full bg-muted overflow-hidden">
+  <div className="h-3 w-full overflow-hidden rounded-full bg-emerald-100 shadow-inner dark:bg-emerald-950/50">
     <div
       className={`h-full transition-all ${
   paidProgressPct === 100
-    ? "bg-green-600"
+    ? "bg-gradient-to-r from-emerald-500 to-green-600"
     : paidProgressPct > 50
-    ? "bg-yellow-500"
-    : "bg-red-500"
+    ? "bg-gradient-to-r from-amber-400 to-orange-500"
+    : "bg-gradient-to-r from-rose-500 to-red-600"
 }`}
       style={{ width: `${paidProgressPct}%` }}
     />
   </div>
 </div>
+              <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-lg dark:border-slate-800 dark:bg-slate-950">
               <ScrollArea className="h-96">
                 <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Employee</TableHead>
-                      <TableHead>Regular Hours</TableHead>
-                      <TableHead>Bonus Hours</TableHead>
-                      <TableHead>Gross</TableHead>
-                      <TableHead>Flat Bonus</TableHead>
-                      <TableHead>Deductions</TableHead>
-                      <TableHead className="text-right">Net Pay</TableHead>
-                      <TableHead className="text-right">Actions</TableHead>
+                  <TableHeader className="bg-gradient-to-r from-slate-900 to-blue-950">
+                    <TableRow className="hover:bg-transparent">
+                      <TableHead className="text-white">Employee</TableHead>
+                      <TableHead className="text-white">Regular Hours</TableHead>
+                      <TableHead className="text-white">Bonus Hours</TableHead>
+                      <TableHead className="text-white">Gross</TableHead>
+                      <TableHead className="text-white">Flat Bonus</TableHead>
+                      <TableHead className="text-white">Deductions</TableHead>
+                      <TableHead className="text-right text-white">Net Pay</TableHead>
+                      <TableHead className="text-right text-white">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
 
@@ -1130,8 +1214,8 @@ console.log("Payroll Confirmations", payrollConfirmations);
                             key={item.employeeId}
                             className={
                               !hasConfirmed && !item.paid
-                                ? "bg-amber-50/70 dark:bg-amber-950/20"
-                                : ""
+                                ? "bg-amber-50/80 transition-colors hover:bg-amber-100/80 dark:bg-amber-950/20 dark:hover:bg-amber-950/30"
+                                : "odd:bg-white even:bg-slate-50/70 transition-colors hover:bg-blue-50/80 dark:odd:bg-slate-950 dark:even:bg-slate-900/60 dark:hover:bg-blue-950/20"
                             }
                           >
                             <TableCell className="font-medium">
@@ -1274,7 +1358,7 @@ console.log("Payroll Confirmations", payrollConfirmations);
                               />
                             </TableCell>
 
-                            <TableCell className="text-right font-mono">
+                            <TableCell className="text-right font-mono font-bold text-emerald-700 dark:text-emerald-300">
                               ${(item.net || 0).toFixed(2)}
                             </TableCell>
 
@@ -1307,6 +1391,7 @@ console.log("Payroll Confirmations", payrollConfirmations);
                                     onClick={() =>
                                       handleMarkEmployeePaid(item.employeeId)
                                     }
+                                    className="bg-gradient-to-r from-emerald-500 to-green-600 text-white shadow-md transition-all hover:-translate-y-0.5 hover:from-emerald-600 hover:to-green-700 hover:shadow-lg"
                                   >
                                     <DollarSign className="mr-2 h-4 w-4" />
                                     Mark Paid
@@ -1321,6 +1406,7 @@ console.log("Payroll Confirmations", payrollConfirmations);
                                   variant="outline"
                                   size="sm"
                                   onClick={() => generateEmployeePaystub(item)}
+                                  className="border-blue-200 bg-blue-50 text-blue-700 shadow-sm hover:bg-blue-100 dark:border-blue-900 dark:bg-blue-950/30 dark:text-blue-300"
                                 >
                                   <FileText className="mr-2 h-4 w-4" />
                                   Paystub
@@ -1333,6 +1419,7 @@ console.log("Payroll Confirmations", payrollConfirmations);
                                     handleDeleteLineItem(item.employeeId)
                                   }
                                   disabled={!isEditable}
+                                  className="rounded-full hover:bg-rose-100 dark:hover:bg-rose-950/50"
                                 >
                                   <Trash2 className="h-4 w-4 text-destructive" />
                                 </Button>
@@ -1351,22 +1438,26 @@ console.log("Payroll Confirmations", payrollConfirmations);
                   </TableBody>
                 </Table>
               </ScrollArea>
+              </div>
 
-              <div className="mt-4 pr-4 grid grid-cols-2 sm:grid-cols-3 gap-2 text-right">
-                <div className="font-medium">
-                  Total Gross: ${totalGross.toFixed(2)}
+              <div className="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-3">
+                <div className="rounded-2xl border border-emerald-200 bg-gradient-to-br from-emerald-50 to-green-100 p-4 shadow-sm dark:border-emerald-900 dark:from-emerald-950/30 dark:to-green-950/20">
+                  <p className="text-sm text-emerald-700 dark:text-emerald-300">Gross Payroll</p>
+                  <p className="mt-1 text-2xl font-bold text-emerald-900 dark:text-emerald-100">${totalGross.toFixed(2)}</p>
                 </div>
-                <div className="font-medium">
-                  Total Net: ${grandTotalNet.toFixed(2)}
+                <div className="rounded-2xl border border-blue-200 bg-gradient-to-br from-blue-50 to-sky-100 p-4 shadow-sm dark:border-blue-900 dark:from-blue-950/30 dark:to-sky-950/20">
+                  <p className="text-sm text-blue-700 dark:text-blue-300">Net Payroll</p>
+                  <p className="mt-1 text-2xl font-bold text-blue-900 dark:text-blue-100">${grandTotalNet.toFixed(2)}</p>
                 </div>
-                <div className="text-sm text-muted-foreground">
-                  Confirmed: {confirmedCount}/{lineItems.length}
+                <div className="rounded-2xl border border-violet-200 bg-gradient-to-br from-violet-50 to-purple-100 p-4 shadow-sm dark:border-violet-900 dark:from-violet-950/30 dark:to-purple-950/20">
+                  <p className="text-sm text-violet-700 dark:text-violet-300">Confirmations</p>
+                  <p className="mt-1 text-2xl font-bold text-violet-900 dark:text-violet-100">{confirmedCount}/{lineItems.length}</p>
                 </div>
               </div>
             </TabsContent>
 
             <TabsContent value="yearly" className="mt-4">
-              <div className="flex items-center gap-4 mb-6">
+              <div className="mb-6 flex items-center gap-4 rounded-2xl border border-blue-200 bg-gradient-to-r from-blue-50 to-indigo-50 p-4 shadow-sm dark:border-blue-900 dark:from-blue-950/30 dark:to-indigo-950/20">
                 <Label htmlFor="year-select">Select Year</Label>
                 <Select value={selectedYear} onValueChange={setSelectedYear}>
                   <SelectTrigger id="year-select" className="w-48">
@@ -1382,27 +1473,28 @@ console.log("Payroll Confirmations", payrollConfirmations);
                 </Select>
               </div>
 
+              <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-lg dark:border-slate-800 dark:bg-slate-950">
               <ScrollArea className="h-[500px]">
                 <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Employee</TableHead>
-                      <TableHead className="text-right">Total Gross Pay</TableHead>
-                      <TableHead className="text-right">Total Net Pay</TableHead>
+                  <TableHeader className="bg-gradient-to-r from-slate-900 to-blue-950">
+                    <TableRow className="hover:bg-transparent">
+                      <TableHead className="text-white">Employee</TableHead>
+                      <TableHead className="text-right text-white">Total Gross Pay</TableHead>
+                      <TableHead className="text-right text-white">Total Net Pay</TableHead>
                     </TableRow>
                   </TableHeader>
 
                   <TableBody>
                     {yearlySummary.length > 0 ? (
                       yearlySummary.map((summary) => (
-                        <TableRow key={summary.employeeName}>
+                        <TableRow key={summary.employeeName} className="odd:bg-white even:bg-slate-50/70 transition-colors hover:bg-blue-50/80 dark:odd:bg-slate-950 dark:even:bg-slate-900/60 dark:hover:bg-blue-950/20">
                           <TableCell className="font-medium">
                             {summary.employeeName}
                           </TableCell>
                           <TableCell className="text-right font-mono">
                             ${summary.gross.toFixed(2)}
                           </TableCell>
-                          <TableCell className="text-right font-mono">
+                          <TableCell className="text-right font-mono font-bold text-emerald-700 dark:text-emerald-300">
                             ${summary.net.toFixed(2)}
                           </TableCell>
                         </TableRow>
@@ -1420,6 +1512,7 @@ console.log("Payroll Confirmations", payrollConfirmations);
                   </TableBody>
                 </Table>
               </ScrollArea>
+              </div>
             </TabsContent>
           </Tabs>
         </CardContent>
