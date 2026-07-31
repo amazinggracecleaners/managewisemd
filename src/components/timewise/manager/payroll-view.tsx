@@ -88,6 +88,84 @@ type PayFrequency =
 
 type PaymentMethod = "cash" | "zelle" | "bank";
 
+
+type PayrollTaxField =
+  | "federalWithholding"
+  | "stateWithholding"
+  | "localWithholding"
+  | "socialSecurityTax"
+  | "medicareTax"
+  | "preTaxDeductions"
+  | "postTaxDeductions"
+  | "garnishments";
+
+type EmployerTaxField =
+  | "employerSocialSecurityTax"
+  | "employerMedicareTax"
+  | "federalUnemploymentTax"
+  | "stateUnemploymentTax";
+
+type TaxReadyPayrollLineItem = PayrollLineItem & {
+  federalWithholding?: number;
+  stateWithholding?: number;
+  localWithholding?: number;
+  socialSecurityTax?: number;
+  medicareTax?: number;
+  preTaxDeductions?: number;
+  postTaxDeductions?: number;
+  garnishments?: number;
+  employerSocialSecurityTax?: number;
+  employerMedicareTax?: number;
+  federalUnemploymentTax?: number;
+  stateUnemploymentTax?: number;
+  taxableWages?: number;
+};
+
+const EMPLOYEE_TAX_FIELDS: PayrollTaxField[] = [
+  "federalWithholding",
+  "stateWithholding",
+  "localWithholding",
+  "socialSecurityTax",
+  "medicareTax",
+  "preTaxDeductions",
+  "postTaxDeductions",
+  "garnishments",
+];
+
+const EMPLOYER_TAX_FIELDS: EmployerTaxField[] = [
+  "employerSocialSecurityTax",
+  "employerMedicareTax",
+  "federalUnemploymentTax",
+  "stateUnemploymentTax",
+];
+
+function money(value: number | undefined): number {
+  return Number.isFinite(Number(value)) ? Number(value) : 0;
+}
+
+function getEmployeeTaxesAndDeductions(item: TaxReadyPayrollLineItem): number {
+  return EMPLOYEE_TAX_FIELDS.reduce((sum, field) => sum + money(item[field]), 0);
+}
+
+function getEmployerTaxes(item: TaxReadyPayrollLineItem): number {
+  return EMPLOYER_TAX_FIELDS.reduce((sum, field) => sum + money(item[field]), 0);
+}
+
+function calculateTaxReadyLine(item: TaxReadyPayrollLineItem): TaxReadyPayrollLineItem {
+  const gross = money(item.gross);
+  const preTax = money(item.preTaxDeductions);
+  const taxableWages = Math.max(0, gross - preTax);
+  const deductions = getEmployeeTaxesAndDeductions(item);
+  const net = Math.max(0, gross - deductions);
+
+  return {
+    ...item,
+    taxableWages,
+    deductions,
+    net,
+  };
+}
+
 interface PayrollViewProps {
   employees: Employee[];
   sites: Site[];
@@ -177,12 +255,12 @@ function derivePayrollStatus(
 function PayrollStatusBadge({ status }: { status: PayrollStatus }) {
   const className =
     status === "paid"
-      ? "border border-emerald-200 bg-gradient-to-r from-emerald-100 to-green-100 text-emerald-800 shadow-sm dark:border-emerald-800 dark:from-emerald-950/50 dark:to-green-950/40 dark:text-emerald-300"
+      ? "border border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:from-emerald-950/50 dark:to-green-950/40 dark:text-emerald-300"
       : status === "ready_to_pay"
-      ? "border border-blue-200 bg-gradient-to-r from-blue-100 to-sky-100 text-blue-800 shadow-sm dark:border-blue-800 dark:from-blue-950/50 dark:to-sky-950/40 dark:text-blue-300"
+      ? "border border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-800 dark:from-blue-950/50 dark:to-sky-950/40 dark:text-blue-300"
       : status === "waiting_for_confirmation"
-      ? "border border-amber-200 bg-gradient-to-r from-amber-100 to-orange-100 text-amber-800 shadow-sm dark:border-amber-800 dark:from-amber-950/50 dark:to-orange-950/40 dark:text-amber-300"
-      : "border border-slate-200 bg-gradient-to-r from-slate-100 to-gray-100 text-slate-700 shadow-sm dark:border-slate-700 dark:from-slate-900 dark:to-slate-800 dark:text-slate-300";
+      ? "border border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-800 dark:from-amber-950/50 dark:to-orange-950/40 dark:text-amber-300"
+      : "border border-slate-200 bg-slate-100 text-slate-700 dark:border-slate-700 dark:from-slate-900 dark:to-slate-800 dark:text-slate-300";
 
   const label =
     status === "paid"
@@ -224,7 +302,7 @@ export function PayrollView({
     String(new Date().getFullYear())
   );
 
-  const [lineItems, setLineItems] = useState<PayrollLineItem[]>([]);
+  const [lineItems, setLineItems] = useState<TaxReadyPayrollLineItem[]>([]);
   const [paymentMethodByEmployee, setPaymentMethodByEmployee] = useState<
     Record<string, PaymentMethod>
   >({});
@@ -366,7 +444,7 @@ const paidProgressPct = useMemo(() => {
 
   useEffect(() => {
     if (currentPeriod && currentStatus !== "draft") {
-      setLineItems(currentPeriod.lineItems ?? []);
+      setLineItems((currentPeriod.lineItems ?? []).map((item) => calculateTaxReadyLine(item as TaxReadyPayrollLineItem)));
 
       const restoredMethods: Record<string, PaymentMethod> = {};
       (currentPeriod.lineItems ?? []).forEach((item) => {
@@ -443,7 +521,7 @@ const paidProgressPct = useMemo(() => {
           paid: false,
           paidAt: undefined,
           paymentMethod: undefined,
-        } as PayrollLineItem;
+        } as TaxReadyPayrollLineItem;
       })
       .filter((item) => (item.minutes ?? 0) > 0 || (item.gross ?? 0) > 0)
       .sort((a, b) => a.employeeName.localeCompare(b.employeeName));
@@ -463,11 +541,11 @@ const paidProgressPct = useMemo(() => {
   const yearlySummary = useMemo(() => {
   const summary = new Map<
     string,
-    { employeeName: string; gross: number; net: number }
+    { employeeName: string; gross: number; taxes: number; deductions: number; employerTaxes: number; net: number }
   >();
 
   employees.forEach((emp) => {
-    summary.set(emp.id, { employeeName: emp.name, gross: 0, net: 0 });
+    summary.set(emp.id, { employeeName: emp.name, gross: 0, taxes: 0, deductions: 0, employerTaxes: 0, net: 0 });
   });
 
   payrollPeriods.forEach((period) => {
@@ -485,18 +563,33 @@ const paidProgressPct = useMemo(() => {
         summary.set(item.employeeId, {
           employeeName: item.employeeName,
           gross: 0,
+          taxes: 0,
+          deductions: 0,
+          employerTaxes: 0,
           net: 0,
         });
       }
 
       const current = summary.get(item.employeeId)!;
-      current.gross += Number(item.gross ?? 0);
-      current.net += Number(item.net ?? 0);
+      const taxItem = item as TaxReadyPayrollLineItem;
+      current.gross += money(taxItem.gross);
+      current.taxes +=
+        money(taxItem.federalWithholding) +
+        money(taxItem.stateWithholding) +
+        money(taxItem.localWithholding) +
+        money(taxItem.socialSecurityTax) +
+        money(taxItem.medicareTax);
+      current.deductions +=
+        money(taxItem.preTaxDeductions) +
+        money(taxItem.postTaxDeductions) +
+        money(taxItem.garnishments);
+      current.employerTaxes += getEmployerTaxes(taxItem);
+      current.net += money(taxItem.net);
     });
   });
 
   return Array.from(summary.values())
-    .filter((s) => s.gross > 0 || s.net > 0)
+    .filter((s) => s.gross > 0 || s.net > 0 || s.taxes > 0 || s.deductions > 0)
     .sort((a, b) => a.employeeName.localeCompare(b.employeeName));
 }, [payrollPeriods, employees, selectedYear]);
   const isPaid = currentStatus === "paid";
@@ -569,36 +662,42 @@ const isEditable = !isLocked;
 
   const handleLineItemChange = (
     employeeId: string,
-    field: "deductions" | "flatBonus",
+    field: "flatBonus" | PayrollTaxField | EmployerTaxField,
     value: number
   ) => {
     if (isPaid) return;
 
     setLineItems((prev) =>
       prev.map((item) => {
-        if (item.employeeId !== employeeId) return item;
-        if (item.paid) return item;
+        if (item.employeeId !== employeeId || item.paid) return item;
 
-       const prevCorrections = (item as any).corrections ?? {};
+        const previousValue = money(item[field]);
+        const previousCorrections =
+          (item as TaxReadyPayrollLineItem & {
+            corrections?: Record<string, unknown>;
+          }).corrections ?? {};
 
-const next = {
-  ...item,
-  [field]: value,
-  needsReconfirmation: true,
-  wasCorrected: true,
-  corrections: {
-    ...prevCorrections,
-    [field]: {
-      before: item[field] ?? 0,
-      after: value,
-      changedAt: new Date().toISOString(),
-    },
-  },
-};
-        const grossWithoutFlat = (item.gross || 0) - (item.flatBonus || 0);
-        next.gross = grossWithoutFlat + (next.flatBonus || 0);
-        next.net = (next.gross || 0) - (next.deductions || 0);
-        return next;
+        const next: TaxReadyPayrollLineItem = {
+          ...item,
+          [field]: value,
+          needsReconfirmation: true,
+          wasCorrected: true,
+          corrections: {
+            ...previousCorrections,
+            [field]: {
+              before: previousValue,
+              after: value,
+              changedAt: new Date().toISOString(),
+            },
+          },
+        } as TaxReadyPayrollLineItem;
+
+        if (field === "flatBonus") {
+          const grossWithoutFlat = money(item.gross) - money(item.flatBonus);
+          next.gross = grossWithoutFlat + money(next.flatBonus);
+        }
+
+        return calculateTaxReadyLine(next);
       })
     );
   };
@@ -794,9 +893,22 @@ const allPaid =
       "Regular Hours",
       "Bonus Hours",
       "Gross Pay",
-      "Flat Bonus",
-      "Deductions",
+      "Taxable Wages",
+      "Federal Withholding",
+      "State Withholding",
+      "Local Withholding",
+      "Social Security",
+      "Medicare",
+      "Pre-Tax Deductions",
+      "Post-Tax Deductions",
+      "Garnishments",
+      "Total Employee Deductions",
       "Net Pay",
+      "Employer Social Security",
+      "Employer Medicare",
+      "Federal Unemployment",
+      "State Unemployment",
+      "Employer Tax Cost",
       "Paid",
       "Payment Method",
     ];
@@ -805,10 +917,23 @@ const allPaid =
       item.employeeName,
       ((item.regularMinutes || 0) / 60).toFixed(2),
       ((item.bonusMinutes || 0) / 60).toFixed(2),
-      (item.gross || 0).toFixed(2),
-      (item.flatBonus || 0).toFixed(2),
-      (item.deductions || 0).toFixed(2),
-      (item.net || 0).toFixed(2),
+      money(item.gross).toFixed(2),
+      money(item.taxableWages).toFixed(2),
+      money(item.federalWithholding).toFixed(2),
+      money(item.stateWithholding).toFixed(2),
+      money(item.localWithholding).toFixed(2),
+      money(item.socialSecurityTax).toFixed(2),
+      money(item.medicareTax).toFixed(2),
+      money(item.preTaxDeductions).toFixed(2),
+      money(item.postTaxDeductions).toFixed(2),
+      money(item.garnishments).toFixed(2),
+      getEmployeeTaxesAndDeductions(item).toFixed(2),
+      money(item.net).toFixed(2),
+      money(item.employerSocialSecurityTax).toFixed(2),
+      money(item.employerMedicareTax).toFixed(2),
+      money(item.federalUnemploymentTax).toFixed(2),
+      money(item.stateUnemploymentTax).toFixed(2),
+      getEmployerTaxes(item).toFixed(2),
       item.paid ? "Yes" : "No",
       item.paymentMethod || "",
     ]);
@@ -840,6 +965,41 @@ const allPaid =
     () => lineItems.reduce((sum, item) => sum + (item.gross || 0), 0),
     [lineItems]
   );
+
+  const totalEmployeeTaxes = useMemo(
+    () =>
+      lineItems.reduce(
+        (sum, item) =>
+          sum +
+          money(item.federalWithholding) +
+          money(item.stateWithholding) +
+          money(item.localWithholding) +
+          money(item.socialSecurityTax) +
+          money(item.medicareTax),
+        0
+      ),
+    [lineItems]
+  );
+
+  const totalOtherDeductions = useMemo(
+    () =>
+      lineItems.reduce(
+        (sum, item) =>
+          sum +
+          money(item.preTaxDeductions) +
+          money(item.postTaxDeductions) +
+          money(item.garnishments),
+        0
+      ),
+    [lineItems]
+  );
+
+  const totalEmployerTaxes = useMemo(
+    () => lineItems.reduce((sum, item) => sum + getEmployerTaxes(item), 0),
+    [lineItems]
+  );
+
+  const totalEmployerCost = totalGross + totalEmployerTaxes;
 console.log("Payroll Confirmations", payrollConfirmations);
   const confirmedIds = useMemo(() => {
   if (!currentPeriod) return new Set<string>();
@@ -921,14 +1081,27 @@ console.log("Payroll Confirmations", payrollConfirmations);
       14,
       93
     );
-    doc.text(`Gross Pay: $${(item.gross || 0).toFixed(2)}`, 14, 101);
-    doc.text(`Flat Bonus: $${(item.flatBonus || 0).toFixed(2)}`, 14, 109);
-    doc.text(`Deductions: $${(item.deductions || 0).toFixed(2)}`, 14, 117);
-    doc.text(`Net Pay: $${(item.net || 0).toFixed(2)}`, 14, 125);
-    doc.text(`Payment Method: ${item.paymentMethod || "—"}`, 14, 133);
+    const taxItem = item as TaxReadyPayrollLineItem;
+    doc.text(`Gross Pay: $${money(taxItem.gross).toFixed(2)}`, 14, 101);
+    doc.text(`Taxable Wages: $${money(taxItem.taxableWages).toFixed(2)}`, 14, 109);
+    doc.text(`Federal Withholding: $${money(taxItem.federalWithholding).toFixed(2)}`, 14, 117);
+    doc.text(`State Withholding: $${money(taxItem.stateWithholding).toFixed(2)}`, 14, 125);
+    doc.text(`Local Withholding: $${money(taxItem.localWithholding).toFixed(2)}`, 14, 133);
+    doc.text(`Social Security: $${money(taxItem.socialSecurityTax).toFixed(2)}`, 14, 141);
+    doc.text(`Medicare: $${money(taxItem.medicareTax).toFixed(2)}`, 14, 149);
+    doc.text(`Other Deductions: $${(
+      money(taxItem.preTaxDeductions) +
+      money(taxItem.postTaxDeductions) +
+      money(taxItem.garnishments)
+    ).toFixed(2)}`, 14, 157);
+    doc.text(`Total Deductions: $${getEmployeeTaxesAndDeductions(taxItem).toFixed(2)}`, 14, 165);
+    doc.setFontSize(13);
+    doc.text(`Net Pay: $${money(taxItem.net).toFixed(2)}`, 14, 175);
+    doc.setFontSize(11);
+    doc.text(`Payment Method: ${taxItem.paymentMethod || "—"}`, 14, 184);
 
-    if (item.paidAt) {
-      doc.text(`Paid At: ${new Date(item.paidAt).toLocaleString()}`, 14, 141);
+    if (taxItem.paidAt) {
+      doc.text(`Paid At: ${new Date(taxItem.paidAt).toLocaleString()}`, 14, 192);
     }
 
     doc.save(
@@ -938,15 +1111,15 @@ console.log("Payroll Confirmations", payrollConfirmations);
 
   return (
     <TooltipProvider>
-      <Card className="overflow-hidden border-0 bg-gradient-to-b from-slate-50 via-white to-blue-50/40 shadow-2xl dark:from-slate-950 dark:via-slate-950 dark:to-blue-950/20">
-        <CardHeader className="border-b border-blue-100 bg-gradient-to-r from-blue-700 via-indigo-700 to-violet-700 text-white dark:border-slate-800">
+      <Card className="overflow-hidden border-0 bg-slate-50/70 shadow-xl dark:bg-slate-950">
+        <CardHeader className="border-b border-blue-100 bg-gradient-to-r from-slate-950 via-blue-950 to-indigo-950 text-white dark:border-slate-800">
           <div className="flex flex-col md:flex-row md:justify-between md:items-start gap-4">
             <div className="flex items-center gap-4">
-              <div className="flex h-14 w-14 items-center justify-center rounded-2xl border border-white/20 bg-white/15 shadow-lg backdrop-blur-sm">
+              <div className="flex h-14 w-14 items-center justify-center rounded-xl border border-white/15 bg-white/10 shadow-md backdrop-blur-sm">
                 <WalletCards className="h-7 w-7 text-white" />
               </div>
               <div>
-                <CardTitle className="text-3xl font-bold tracking-tight text-white">
+                <CardTitle className="text-2xl font-semibold tracking-tight text-white">
                   Payroll
                 </CardTitle>
                 <CardDescription className="mt-1 max-w-3xl text-blue-100">
@@ -957,70 +1130,73 @@ console.log("Payroll Confirmations", payrollConfirmations);
           </div>
         </CardHeader>
 
-        <CardContent className="p-5">
+        <CardContent className="p-6">
           <Tabs defaultValue="period">
-            <TabsList className="grid w-full grid-cols-2 rounded-xl bg-slate-100 p-1 shadow-inner dark:bg-slate-900">
-              <TabsTrigger value="period" className="rounded-lg data-[state=active]:bg-gradient-to-r data-[state=active]:from-blue-600 data-[state=active]:to-indigo-600 data-[state=active]:text-white">
+            <TabsList className="grid w-full grid-cols-3 rounded-lg border border-slate-200 bg-slate-100 p-1 dark:border-slate-800 dark:bg-slate-900">
+              <TabsTrigger value="period" className="rounded-lg data-[state=active]:bg-white data-[state=active]:text-blue-900 data-[state=active]:shadow-sm dark:data-[state=active]:bg-slate-800 dark:data-[state=active]:text-blue-200">
                 Period Payroll
               </TabsTrigger>
-              <TabsTrigger value="yearly" className="rounded-lg data-[state=active]:bg-gradient-to-r data-[state=active]:from-blue-600 data-[state=active]:to-indigo-600 data-[state=active]:text-white">
+              <TabsTrigger value="yearly" className="rounded-lg data-[state=active]:bg-white data-[state=active]:text-blue-900 data-[state=active]:shadow-sm dark:data-[state=active]:bg-slate-800 dark:data-[state=active]:text-blue-200">
                 Yearly Summary
+              </TabsTrigger>
+              <TabsTrigger value="taxes" className="rounded-lg data-[state=active]:bg-white data-[state=active]:text-blue-900 data-[state=active]:shadow-sm dark:data-[state=active]:bg-slate-800 dark:data-[state=active]:text-blue-200">
+                Taxes & Deductions
               </TabsTrigger>
             </TabsList>
 
             <TabsContent value="period" className="mt-4">
-              <div className="mb-5 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-                <div className="group rounded-2xl border border-emerald-200 bg-gradient-to-br from-emerald-50 to-green-100 p-5 shadow-md transition-all duration-200 hover:-translate-y-1 hover:shadow-xl dark:border-emerald-900 dark:from-emerald-950/40 dark:to-green-950/30">
+              <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                <div className="group rounded-xl border border-emerald-200 bg-white p-5 shadow-sm transition-all duration-200 hover:shadow-md dark:border-emerald-900 dark:bg-slate-950">
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="text-sm font-medium text-emerald-700 dark:text-emerald-300">Total Gross Pay</p>
-                      <p className="mt-2 text-3xl font-bold tracking-tight text-emerald-900 dark:text-emerald-100">
+                      <p className="mt-2 text-2xl font-semibold tracking-tight text-emerald-900 dark:text-emerald-100">
                         ${totalGross.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </p>
                     </div>
-                    <div className="rounded-2xl bg-emerald-600 p-3 text-white shadow-lg transition-transform group-hover:scale-110">
+                    <div className="rounded-xl bg-emerald-600 p-3 text-white shadow-md transition-opacity group-hover:opacity-90">
                       <TrendingUp className="h-6 w-6" />
                     </div>
                   </div>
                 </div>
 
-                <div className="group rounded-2xl border border-blue-200 bg-gradient-to-br from-blue-50 to-sky-100 p-5 shadow-md transition-all duration-200 hover:-translate-y-1 hover:shadow-xl dark:border-blue-900 dark:from-blue-950/40 dark:to-sky-950/30">
+                <div className="group rounded-xl border border-blue-200 bg-white p-5 shadow-sm transition-all duration-200 hover:shadow-md dark:border-blue-900 dark:bg-slate-950">
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="text-sm font-medium text-blue-700 dark:text-blue-300">Total Net Pay</p>
-                      <p className="mt-2 text-3xl font-bold tracking-tight text-blue-900 dark:text-blue-100">
+                      <p className="mt-2 text-2xl font-semibold tracking-tight text-blue-900 dark:text-blue-100">
                         ${grandTotalNet.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </p>
                     </div>
-                    <div className="rounded-2xl bg-blue-600 p-3 text-white shadow-lg transition-transform group-hover:scale-110">
+                    <div className="rounded-xl bg-blue-700 p-3 text-white shadow-md transition-opacity group-hover:opacity-90">
                       <DollarSign className="h-6 w-6" />
                     </div>
                   </div>
                 </div>
 
-                <div className="group rounded-2xl border border-amber-200 bg-gradient-to-br from-amber-50 to-orange-100 p-5 shadow-md transition-all duration-200 hover:-translate-y-1 hover:shadow-xl dark:border-amber-900 dark:from-amber-950/40 dark:to-orange-950/30">
+                <div className="group rounded-xl border border-amber-200 bg-white p-5 shadow-sm transition-all duration-200 hover:shadow-md dark:border-amber-900 dark:bg-slate-950">
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="text-sm font-medium text-amber-700 dark:text-amber-300">Employees Paid</p>
-                      <p className="mt-2 text-3xl font-bold tracking-tight text-amber-900 dark:text-amber-100">
+                      <p className="mt-2 text-2xl font-semibold tracking-tight text-amber-900 dark:text-amber-100">
                         {paidCount}/{payableLineItems.length || 0}
                       </p>
                     </div>
-                    <div className="rounded-2xl bg-amber-500 p-3 text-white shadow-lg transition-transform group-hover:scale-110">
+                    <div className="rounded-xl bg-amber-500 p-3 text-white shadow-md transition-opacity group-hover:opacity-90">
                       <Users className="h-6 w-6" />
                     </div>
                   </div>
                 </div>
 
-                <div className="group rounded-2xl border border-violet-200 bg-gradient-to-br from-violet-50 to-purple-100 p-5 shadow-md transition-all duration-200 hover:-translate-y-1 hover:shadow-xl dark:border-violet-900 dark:from-violet-950/40 dark:to-purple-950/30">
+                <div className="group rounded-xl border border-violet-200 bg-white p-5 shadow-sm transition-all duration-200 hover:shadow-md dark:border-violet-900 dark:bg-slate-950">
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="text-sm font-medium text-violet-700 dark:text-violet-300">Confirmed</p>
-                      <p className="mt-2 text-3xl font-bold tracking-tight text-violet-900 dark:text-violet-100">
+                      <p className="mt-2 text-2xl font-semibold tracking-tight text-violet-900 dark:text-violet-100">
                         {confirmedCount}/{lineItems.length}
                       </p>
                     </div>
-                    <div className="rounded-2xl bg-violet-600 p-3 text-white shadow-lg transition-transform group-hover:scale-110">
+                    <div className="rounded-xl bg-indigo-600 p-3 text-white shadow-md transition-opacity group-hover:opacity-90">
                       <CheckCircle2 className="h-6 w-6" />
                     </div>
                   </div>
@@ -1033,7 +1209,7 @@ console.log("Payroll Confirmations", payrollConfirmations);
                   variant="outline"
                   size="sm"
                   disabled={lineItems.length === 0}
-                  className="border-0 bg-gradient-to-r from-emerald-500 to-teal-600 text-white shadow-lg transition-all hover:-translate-y-0.5 hover:from-emerald-600 hover:to-teal-700 hover:shadow-xl"
+                  className="border-0 bg-emerald-600 text-white shadow-md transition-colors hover:bg-emerald-700 hover:shadow-xl"
                 >
                   <Download className="mr-2 h-4 w-4" /> CSV
                 </Button>
@@ -1041,7 +1217,7 @@ console.log("Payroll Confirmations", payrollConfirmations);
                 {currentStatus === "draft" && (
                   <Button
                     onClick={handleSendForConfirmation}
-                    className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-lg transition-all hover:-translate-y-0.5 hover:from-blue-700 hover:to-indigo-700 hover:shadow-xl"
+                    className="bg-blue-700 text-white shadow-md transition-colors hover:bg-blue-800 hover:shadow-xl"
                   >
                     <Send className="mr-2 h-4 w-4" />
                     Send for Confirmation
@@ -1054,7 +1230,7 @@ console.log("Payroll Confirmations", payrollConfirmations);
                     variant="secondary"
                     onClick={handleSaveWaitingOrReady}
                     disabled={isPaid}
-                    className="bg-gradient-to-r from-violet-600 to-indigo-600 text-white shadow-lg transition-all hover:-translate-y-0.5 hover:from-violet-700 hover:to-indigo-700 hover:shadow-xl"
+                    className="bg-indigo-700 text-white shadow-md transition-colors hover:bg-indigo-800 hover:shadow-xl"
                   >
                     Save & Re-send confirmation
                   </Button>
@@ -1079,7 +1255,7 @@ console.log("Payroll Confirmations", payrollConfirmations);
                 )}
               </div>
 
-              <div className="mb-6 grid grid-cols-1 items-end gap-4 rounded-2xl border border-blue-200 bg-gradient-to-br from-blue-50 to-indigo-50 p-5 shadow-md md:grid-cols-2 dark:border-blue-900 dark:from-blue-950/30 dark:to-indigo-950/20">
+              <div className="mb-6 grid grid-cols-1 items-end gap-4 rounded-xl border border-blue-200 bg-white p-5 shadow-sm md:grid-cols-2 dark:border-blue-900 dark:bg-slate-950">
                 <div className="space-y-2">
                   <Label>Pay Frequency</Label>
                   <Select
@@ -1149,7 +1325,7 @@ console.log("Payroll Confirmations", payrollConfirmations);
                 </div>
               </div>
 
-              <div className="mb-4 flex flex-wrap items-center gap-2 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-950">
+              <div className="mb-4 flex flex-wrap items-center gap-2 rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-950">
                 <PayrollStatusBadge status={currentStatus} />
 
                 <Badge variant={allConfirmed ? "default" : "secondary"}>
@@ -1166,7 +1342,7 @@ console.log("Payroll Confirmations", payrollConfirmations);
                   <Badge variant="outline">Rev. {currentPeriod.revision}</Badge>
                 )}
               </div>
-<div className="mb-5 rounded-2xl border border-emerald-200 bg-gradient-to-r from-emerald-50 to-teal-50 p-4 shadow-sm dark:border-emerald-900 dark:from-emerald-950/30 dark:to-teal-950/20">
+<div className="mb-5 rounded-xl border border-emerald-200 bg-emerald-50/70 p-4 shadow-sm dark:border-emerald-900 dark:bg-emerald-950/20">
   <div className="mb-2 flex items-center justify-between text-sm font-medium text-emerald-800 dark:text-emerald-300">
     <span>Payroll payment progress</span>
     <span>
@@ -1178,26 +1354,26 @@ console.log("Payroll Confirmations", payrollConfirmations);
     <div
       className={`h-full transition-all ${
   paidProgressPct === 100
-    ? "bg-gradient-to-r from-emerald-500 to-green-600"
+    ? "bg-emerald-600"
     : paidProgressPct > 50
-    ? "bg-gradient-to-r from-amber-400 to-orange-500"
-    : "bg-gradient-to-r from-rose-500 to-red-600"
+    ? "bg-amber-500"
+    : "bg-rose-600"
 }`}
       style={{ width: `${paidProgressPct}%` }}
     />
   </div>
 </div>
-              <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-lg dark:border-slate-800 dark:bg-slate-950">
+              <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-md dark:border-slate-800 dark:bg-slate-950">
               <ScrollArea className="h-96">
                 <Table>
-                  <TableHeader className="bg-gradient-to-r from-slate-900 to-blue-950">
+                  <TableHeader className="bg-slate-900">
                     <TableRow className="hover:bg-transparent">
                       <TableHead className="text-white">Employee</TableHead>
                       <TableHead className="text-white">Regular Hours</TableHead>
                       <TableHead className="text-white">Bonus Hours</TableHead>
                       <TableHead className="text-white">Gross</TableHead>
                       <TableHead className="text-white">Flat Bonus</TableHead>
-                      <TableHead className="text-white">Deductions</TableHead>
+                      <TableHead className="text-white">Taxes & Deductions</TableHead>
                       <TableHead className="text-right text-white">Net Pay</TableHead>
                       <TableHead className="text-right text-white">Actions</TableHead>
                     </TableRow>
@@ -1337,25 +1513,14 @@ console.log("Payroll Confirmations", payrollConfirmations);
                             </TableCell>
 
                             <TableCell>
-                              <Input
-                                type="number"
-                                value={
-                                  Number.isFinite(item.deductions)
-                                    ? item.deductions
-                                    : ""
-                                }
-                                onChange={(e) =>
-                                  handleLineItemChange(
-                                    item.employeeId,
-                                    "deductions",
-                                    Number.isFinite(Number(e.target.value))
-                                      ? Number(e.target.value)
-                                      : 0
-                                  )
-                                }
-                                className="w-24 h-8"
-                                disabled={isPaid || !!item.paid}
-                              />
+                              <div className="min-w-[130px]">
+                                <div className="font-mono font-semibold text-slate-800 dark:text-slate-200">
+                                  ${getEmployeeTaxesAndDeductions(item).toFixed(2)}
+                                </div>
+                                <div className="text-xs text-muted-foreground">
+                                  Manage in Taxes tab
+                                </div>
+                              </div>
                             </TableCell>
 
                             <TableCell className="text-right font-mono font-bold text-emerald-700 dark:text-emerald-300">
@@ -1391,7 +1556,7 @@ console.log("Payroll Confirmations", payrollConfirmations);
                                     onClick={() =>
                                       handleMarkEmployeePaid(item.employeeId)
                                     }
-                                    className="bg-gradient-to-r from-emerald-500 to-green-600 text-white shadow-md transition-all hover:-translate-y-0.5 hover:from-emerald-600 hover:to-green-700 hover:shadow-lg"
+                                    className="bg-emerald-600 text-white shadow-md transition-colors hover:bg-emerald-700 hover:shadow-md"
                                   >
                                     <DollarSign className="mr-2 h-4 w-4" />
                                     Mark Paid
@@ -1440,24 +1605,32 @@ console.log("Payroll Confirmations", payrollConfirmations);
               </ScrollArea>
               </div>
 
-              <div className="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-3">
-                <div className="rounded-2xl border border-emerald-200 bg-gradient-to-br from-emerald-50 to-green-100 p-4 shadow-sm dark:border-emerald-900 dark:from-emerald-950/30 dark:to-green-950/20">
+              <div className="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-5">
+                <div className="rounded-xl border border-emerald-200 bg-white p-4 shadow-sm dark:border-emerald-900 dark:from-emerald-950/30 dark:to-green-950/20">
                   <p className="text-sm text-emerald-700 dark:text-emerald-300">Gross Payroll</p>
-                  <p className="mt-1 text-2xl font-bold text-emerald-900 dark:text-emerald-100">${totalGross.toFixed(2)}</p>
+                  <p className="mt-1 text-xl font-semibold text-emerald-900 dark:text-emerald-100">${totalGross.toFixed(2)}</p>
                 </div>
-                <div className="rounded-2xl border border-blue-200 bg-gradient-to-br from-blue-50 to-sky-100 p-4 shadow-sm dark:border-blue-900 dark:from-blue-950/30 dark:to-sky-950/20">
+                <div className="rounded-xl border border-blue-200 bg-white p-4 shadow-sm dark:border-blue-900 dark:from-blue-950/30 dark:to-sky-950/20">
                   <p className="text-sm text-blue-700 dark:text-blue-300">Net Payroll</p>
-                  <p className="mt-1 text-2xl font-bold text-blue-900 dark:text-blue-100">${grandTotalNet.toFixed(2)}</p>
+                  <p className="mt-1 text-xl font-semibold text-blue-900 dark:text-blue-100">${grandTotalNet.toFixed(2)}</p>
                 </div>
-                <div className="rounded-2xl border border-violet-200 bg-gradient-to-br from-violet-50 to-purple-100 p-4 shadow-sm dark:border-violet-900 dark:from-violet-950/30 dark:to-purple-950/20">
-                  <p className="text-sm text-violet-700 dark:text-violet-300">Confirmations</p>
-                  <p className="mt-1 text-2xl font-bold text-violet-900 dark:text-violet-100">{confirmedCount}/{lineItems.length}</p>
+                <div className="rounded-xl border border-amber-200 bg-white p-4 shadow-sm dark:border-amber-900 dark:bg-slate-950">
+                  <p className="text-sm text-amber-700 dark:text-amber-300">Employee Taxes</p>
+                  <p className="mt-1 text-xl font-semibold text-amber-900 dark:text-amber-100">${totalEmployeeTaxes.toFixed(2)}</p>
+                </div>
+                <div className="rounded-xl border border-violet-200 bg-white p-4 shadow-sm dark:border-violet-900 dark:bg-slate-950">
+                  <p className="text-sm text-violet-700 dark:text-violet-300">Other Deductions</p>
+                  <p className="mt-1 text-xl font-semibold text-violet-900 dark:text-violet-100">${totalOtherDeductions.toFixed(2)}</p>
+                </div>
+                <div className="rounded-xl border border-slate-300 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-950">
+                  <p className="text-sm text-slate-600 dark:text-slate-300">Employer Payroll Cost</p>
+                  <p className="mt-1 text-xl font-semibold text-slate-900 dark:text-white">${totalEmployerCost.toFixed(2)}</p>
                 </div>
               </div>
             </TabsContent>
 
             <TabsContent value="yearly" className="mt-4">
-              <div className="mb-6 flex items-center gap-4 rounded-2xl border border-blue-200 bg-gradient-to-r from-blue-50 to-indigo-50 p-4 shadow-sm dark:border-blue-900 dark:from-blue-950/30 dark:to-indigo-950/20">
+              <div className="mb-6 flex items-center gap-4 rounded-xl border border-blue-200 bg-gradient-to-r from-blue-50 to-indigo-50 p-4 shadow-sm dark:border-blue-900 dark:bg-slate-950">
                 <Label htmlFor="year-select">Select Year</Label>
                 <Select value={selectedYear} onValueChange={setSelectedYear}>
                   <SelectTrigger id="year-select" className="w-48">
@@ -1473,14 +1646,17 @@ console.log("Payroll Confirmations", payrollConfirmations);
                 </Select>
               </div>
 
-              <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-lg dark:border-slate-800 dark:bg-slate-950">
+              <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-md dark:border-slate-800 dark:bg-slate-950">
               <ScrollArea className="h-[500px]">
                 <Table>
-                  <TableHeader className="bg-gradient-to-r from-slate-900 to-blue-950">
+                  <TableHeader className="bg-slate-900">
                     <TableRow className="hover:bg-transparent">
                       <TableHead className="text-white">Employee</TableHead>
-                      <TableHead className="text-right text-white">Total Gross Pay</TableHead>
-                      <TableHead className="text-right text-white">Total Net Pay</TableHead>
+                      <TableHead className="text-right text-white">Gross</TableHead>
+                      <TableHead className="text-right text-white">Employee Taxes</TableHead>
+                      <TableHead className="text-right text-white">Other Deductions</TableHead>
+                      <TableHead className="text-right text-white">Employer Taxes</TableHead>
+                      <TableHead className="text-right text-white">Net Pay</TableHead>
                     </TableRow>
                   </TableHeader>
 
@@ -1494,6 +1670,15 @@ console.log("Payroll Confirmations", payrollConfirmations);
                           <TableCell className="text-right font-mono">
                             ${summary.gross.toFixed(2)}
                           </TableCell>
+                          <TableCell className="text-right font-mono text-amber-700 dark:text-amber-300">
+                            ${summary.taxes.toFixed(2)}
+                          </TableCell>
+                          <TableCell className="text-right font-mono text-violet-700 dark:text-violet-300">
+                            ${summary.deductions.toFixed(2)}
+                          </TableCell>
+                          <TableCell className="text-right font-mono text-slate-700 dark:text-slate-300">
+                            ${summary.employerTaxes.toFixed(2)}
+                          </TableCell>
                           <TableCell className="text-right font-mono font-bold text-emerald-700 dark:text-emerald-300">
                             ${summary.net.toFixed(2)}
                           </TableCell>
@@ -1502,7 +1687,7 @@ console.log("Payroll Confirmations", payrollConfirmations);
                     ) : (
                       <TableRow>
                         <TableCell
-                          colSpan={3}
+                          colSpan={6}
                           className="h-24 text-center text-muted-foreground"
                         >
                           No paid payroll data for {selectedYear}.
@@ -1514,6 +1699,134 @@ console.log("Payroll Confirmations", payrollConfirmations);
               </ScrollArea>
               </div>
             </TabsContent>
+
+            <TabsContent value="taxes" className="mt-4">
+              <div className="mb-5 rounded-xl border border-amber-200 bg-amber-50/70 p-4 text-sm text-amber-900 shadow-sm dark:border-amber-900 dark:bg-amber-950/20 dark:text-amber-200">
+                <div className="flex items-start gap-3">
+                  <Clock3 className="mt-0.5 h-5 w-5 shrink-0" />
+                  <div>
+                    <p className="font-semibold">Payroll tax and deduction worksheet</p>
+                    <p className="mt-1 text-amber-800 dark:text-amber-300">
+                      Enter verified amounts from your payroll tax service or withholding calculation.
+                      This screen records payroll taxes and deductions; it does not replace federal,
+                      state, or local tax filing software.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="mb-5 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                <div className="rounded-xl border border-amber-200 bg-white p-4 shadow-sm dark:border-amber-900 dark:bg-slate-950">
+                  <p className="text-sm text-amber-700 dark:text-amber-300">Employee Taxes</p>
+                  <p className="mt-1 text-2xl font-semibold">${totalEmployeeTaxes.toFixed(2)}</p>
+                </div>
+                <div className="rounded-xl border border-violet-200 bg-white p-4 shadow-sm dark:border-violet-900 dark:bg-slate-950">
+                  <p className="text-sm text-violet-700 dark:text-violet-300">Other Deductions</p>
+                  <p className="mt-1 text-2xl font-semibold">${totalOtherDeductions.toFixed(2)}</p>
+                </div>
+                <div className="rounded-xl border border-slate-300 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-950">
+                  <p className="text-sm text-slate-600 dark:text-slate-300">Employer Taxes</p>
+                  <p className="mt-1 text-2xl font-semibold">${totalEmployerTaxes.toFixed(2)}</p>
+                </div>
+                <div className="rounded-xl border border-blue-200 bg-white p-4 shadow-sm dark:border-blue-900 dark:bg-slate-950">
+                  <p className="text-sm text-blue-700 dark:text-blue-300">Total Employer Cost</p>
+                  <p className="mt-1 text-2xl font-semibold">${totalEmployerCost.toFixed(2)}</p>
+                </div>
+              </div>
+
+              <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-md dark:border-slate-800 dark:bg-slate-950">
+                <ScrollArea className="h-[560px]">
+                  <Table>
+                    <TableHeader className="bg-slate-900">
+                      <TableRow className="hover:bg-transparent">
+                        <TableHead className="sticky left-0 z-10 min-w-[180px] bg-slate-900 text-white">Employee</TableHead>
+                        <TableHead className="min-w-[120px] text-right text-white">Gross</TableHead>
+                        <TableHead className="min-w-[120px] text-right text-white">Taxable Wages</TableHead>
+                        <TableHead className="min-w-[130px] text-white">Federal</TableHead>
+                        <TableHead className="min-w-[130px] text-white">State</TableHead>
+                        <TableHead className="min-w-[130px] text-white">Local</TableHead>
+                        <TableHead className="min-w-[130px] text-white">Social Security</TableHead>
+                        <TableHead className="min-w-[130px] text-white">Medicare</TableHead>
+                        <TableHead className="min-w-[130px] text-white">Pre-Tax</TableHead>
+                        <TableHead className="min-w-[130px] text-white">Post-Tax</TableHead>
+                        <TableHead className="min-w-[130px] text-white">Garnishments</TableHead>
+                        <TableHead className="min-w-[130px] text-white">Employer SS</TableHead>
+                        <TableHead className="min-w-[130px] text-white">Employer Medicare</TableHead>
+                        <TableHead className="min-w-[130px] text-white">FUTA</TableHead>
+                        <TableHead className="min-w-[130px] text-white">SUTA</TableHead>
+                        <TableHead className="min-w-[130px] text-right text-white">Net Pay</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {lineItems.length > 0 ? (
+                        lineItems.map((item) => {
+                          const fields: Array<{
+                            field: PayrollTaxField | EmployerTaxField;
+                            label: string;
+                          }> = [
+                            { field: "federalWithholding", label: "Federal withholding" },
+                            { field: "stateWithholding", label: "State withholding" },
+                            { field: "localWithholding", label: "Local withholding" },
+                            { field: "socialSecurityTax", label: "Social Security" },
+                            { field: "medicareTax", label: "Medicare" },
+                            { field: "preTaxDeductions", label: "Pre-tax deductions" },
+                            { field: "postTaxDeductions", label: "Post-tax deductions" },
+                            { field: "garnishments", label: "Garnishments" },
+                            { field: "employerSocialSecurityTax", label: "Employer Social Security" },
+                            { field: "employerMedicareTax", label: "Employer Medicare" },
+                            { field: "federalUnemploymentTax", label: "Federal unemployment tax" },
+                            { field: "stateUnemploymentTax", label: "State unemployment tax" },
+                          ];
+
+                          return (
+                            <TableRow key={`tax-${item.employeeId}`} className="odd:bg-white even:bg-slate-50/70 dark:odd:bg-slate-950 dark:even:bg-slate-900/60">
+                              <TableCell className="sticky left-0 z-10 bg-inherit font-medium">
+                                <div>{item.employeeName}</div>
+                                <div className="text-xs text-muted-foreground">
+                                  Total deductions: ${getEmployeeTaxesAndDeductions(item).toFixed(2)}
+                                </div>
+                              </TableCell>
+                              <TableCell className="text-right font-mono">${money(item.gross).toFixed(2)}</TableCell>
+                              <TableCell className="text-right font-mono">${money(item.taxableWages).toFixed(2)}</TableCell>
+                              {fields.map(({ field, label }) => (
+                                <TableCell key={field}>
+                                  <Input
+                                    aria-label={`${label} for ${item.employeeName}`}
+                                    type="number"
+                                    min="0"
+                                    step="0.01"
+                                    value={money(item[field])}
+                                    onChange={(event) =>
+                                      handleLineItemChange(
+                                        item.employeeId,
+                                        field,
+                                        Math.max(0, Number(event.target.value) || 0)
+                                      )
+                                    }
+                                    className="h-8 w-28 text-right font-mono"
+                                    disabled={isPaid || !!item.paid}
+                                  />
+                                </TableCell>
+                              ))}
+                              <TableCell className="text-right font-mono font-semibold text-emerald-700 dark:text-emerald-300">
+                                ${money(item.net).toFixed(2)}
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })
+                      ) : (
+                        <TableRow>
+                          <TableCell colSpan={16} className="h-24 text-center text-muted-foreground">
+                            No payroll lines are available for this period.
+                          </TableCell>
+                        </TableRow>
+                      )}
+                    </TableBody>
+                  </Table>
+                </ScrollArea>
+              </div>
+            </TabsContent>
+
           </Tabs>
         </CardContent>
       </Card>
