@@ -532,43 +532,71 @@ paidDate: (draftInvoice as any).paidDate || null,
   </Label>
 
   <Input
+  id="paidDate"
+  type="date"
+  value={(draftInvoice as any).paidDate || ""}
+  onChange={(e) =>
+    setDraftInvoice((prev) => ({
+      ...prev,
+      paidDate: e.target.value || null,
+      status: e.target.value
+        ? "paid"
+        : prev.status === "paid"
+          ? "sent"
+          : prev.status,
+    }))
+  }
+/>
+</div>
+                      <div className="space-y-2">
+  <Label htmlFor="paidDate">Paid Date</Label>
+
+  <Input
     id="paidDate"
     type="date"
     value={(draftInvoice as any).paidDate || ""}
     onChange={(e) =>
       setDraftInvoice((prev) => ({
         ...prev,
-        paidDate: e.target.value,
+        paidDate: e.target.value || null,
+        status: e.target.value
+          ? "paid"
+          : prev.status === "paid"
+            ? "sent"
+            : prev.status,
       }))
     }
   />
 </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="status">Status</Label>
-                        <Select
-                          value={draftInvoice.status}
-                          onValueChange={(v: any) =>
-  setDraftInvoice((prev) => ({
-    ...prev,
-    status: v,
-    paidDate:
-      v === "paid"
-        ? prev.paidDate || format(new Date(), "yyyy-MM-dd")
-        : prev.paidDate,
-  }))
-}
-                        >
-                          <SelectTrigger>
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="draft">Draft</SelectItem>
-                            <SelectItem value="sent">Sent</SelectItem>
-                            <SelectItem value="paid">Paid</SelectItem>
-                            <SelectItem value="void">Void</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
+
+<div className="space-y-2">
+  <Label htmlFor="status">Status</Label>
+
+  <Select
+  value={draftInvoice.status}
+  onValueChange={(v: Invoice["status"]) =>
+    setDraftInvoice((prev) => ({
+      ...prev,
+      status: v,
+      paidDate:
+        v === "paid"
+          ? prev.paidDate || format(new Date(), "yyyy-MM-dd")
+          : null,
+    }))
+  }
+>
+  <SelectTrigger>
+    <SelectValue />
+  </SelectTrigger>
+
+  <SelectContent>
+    <SelectItem value="draft">Draft</SelectItem>
+    <SelectItem value="sent">Sent</SelectItem>
+    <SelectItem value="paid">Paid</SelectItem>
+    <SelectItem value="void">Void</SelectItem>
+  </SelectContent>
+</Select>
+</div>
                       </div>
                     </div>
 
