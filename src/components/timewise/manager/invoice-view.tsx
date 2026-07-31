@@ -36,10 +36,14 @@ interface InvoiceViewProps {
 }
 
 const statusColors: Record<Invoice["status"], string> = {
-  draft: "bg-gray-500",
-  sent: "bg-blue-500",
-  paid: "bg-green-600",
-  void: "bg-red-700",
+  draft:
+    "border border-amber-200 bg-amber-100 text-amber-800 shadow-sm dark:border-amber-800 dark:bg-amber-950/50 dark:text-amber-300",
+  sent:
+    "border border-blue-200 bg-blue-100 text-blue-800 shadow-sm dark:border-blue-800 dark:bg-blue-950/50 dark:text-blue-300",
+  paid:
+    "border border-emerald-200 bg-emerald-100 text-emerald-800 shadow-sm dark:border-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-300",
+  void:
+    "border border-rose-200 bg-rose-100 text-rose-800 shadow-sm dark:border-rose-800 dark:bg-rose-950/50 dark:text-rose-300",
 };
 
 export function InvoiceView({ sites }: InvoiceViewProps) {
@@ -308,49 +312,69 @@ paidDate: (draftInvoice as any).paidDate || null,
   };
 
   return (
-    <Card>
-      <CardHeader>
+    <Card className="overflow-hidden border-0 bg-gradient-to-b from-slate-50 via-white to-blue-50/40 shadow-2xl dark:from-slate-950 dark:via-slate-950 dark:to-blue-950/20">
+      <CardHeader className="space-y-5 border-b border-blue-100 bg-gradient-to-r from-blue-700 via-indigo-700 to-violet-700 text-white dark:border-slate-800">
         <div className="flex justify-between items-center">
           <div>
-            <CardTitle>Invoices</CardTitle>
-            <CardDescription>Create, manage, and track invoices.</CardDescription>
+            <CardTitle className="text-3xl font-bold tracking-tight text-white">
+              Invoices
+            </CardTitle>
+            <CardDescription className="mt-1 text-blue-100">
+              Create, manage, and track invoices.
+            </CardDescription>
           </div>
         </div>
 
-        <div className="flex flex-wrap items-center justify-between gap-3 pt-4">
-          <div className="flex items-center gap-2">
-            <label className="text-sm text-muted-foreground">Billing month</label>
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-white/15 bg-white/10 p-4 shadow-inner backdrop-blur-sm">
+          <div className="flex flex-wrap items-center gap-2">
+            <label className="text-sm font-medium text-blue-100">Billing month</label>
             <Input
               type="month"
               value={monthISO}
               onChange={(e) => setMonthISO(e.target.value)}
-              className="w-40"
+              className="w-40 border-white/30 bg-white/95 text-slate-900 shadow-sm"
             />
-            <Button size="sm" variant="outline" onClick={handleGenerateRecurring}>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={handleGenerateRecurring}
+              className="border-violet-200 bg-violet-100 text-violet-800 shadow-md hover:bg-violet-200 dark:border-violet-800 dark:bg-violet-950/60 dark:text-violet-200"
+            >
               Generate recurring for this month
             </Button>
           </div>
 
           <div className="flex items-center gap-2">
-            <Button onClick={downloadCSV} variant="outline" size="sm" disabled={displayedInvoices.length === 0}>
+            <Button
+              onClick={downloadCSV}
+              variant="outline"
+              size="sm"
+              disabled={displayedInvoices.length === 0}
+              className="border-emerald-200 bg-emerald-100 text-emerald-800 shadow-md hover:bg-emerald-200 dark:border-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-200"
+            >
               <Download className="mr-2 h-4 w-4" /> CSV
             </Button>
 
             <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
               <DialogTrigger asChild>
-                <Button onClick={() => handleOpenDialog()}>
+                <Button
+                  onClick={() => handleOpenDialog()}
+                  className="bg-gradient-to-r from-cyan-500 to-blue-500 text-white shadow-lg hover:from-cyan-600 hover:to-blue-600"
+                >
                   <PlusCircle className="mr-2 h-4 w-4" /> Create Invoice
                 </Button>
               </DialogTrigger>
 
-              <DialogContent className="max-w-4xl">
-                <DialogHeader>
-                  <DialogTitle>{editingInvoice ? "Edit" : "Create"} Invoice</DialogTitle>
+              <DialogContent className="max-w-4xl overflow-hidden border-0 p-0 shadow-2xl">
+                <DialogHeader className="bg-gradient-to-r from-blue-700 via-indigo-700 to-violet-700 px-6 py-5 text-white">
+                  <DialogTitle className="text-2xl text-white">
+                    {editingInvoice ? "Edit" : "Create"} Invoice
+                  </DialogTitle>
                 </DialogHeader>
 
                 <ScrollArea className="max-h-[70vh]">
-                  <div className="space-y-4 py-4 px-2">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-5 bg-gradient-to-b from-slate-50 to-white px-6 py-5 dark:from-slate-950 dark:to-slate-900">
+                    <div className="grid grid-cols-1 gap-4 rounded-2xl border border-blue-200 bg-blue-50/70 p-4 shadow-sm md:grid-cols-2 dark:border-blue-900 dark:bg-blue-950/20">
                       <div className="space-y-2">
                         <Label htmlFor="siteName">Site</Label>
                         <Select
@@ -382,7 +406,7 @@ paidDate: (draftInvoice as any).paidDate || null,
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+                    <div className="grid grid-cols-1 gap-4 rounded-2xl border border-indigo-200 bg-indigo-50/70 p-4 shadow-sm md:grid-cols-5 dark:border-indigo-900 dark:bg-indigo-950/20">
                       <div className="space-y-2">
                         <Label htmlFor="date">Date</Label>
                         <Input
@@ -481,11 +505,13 @@ paidDate: (draftInvoice as any).paidDate || null,
                       </div>
                     </div>
 
-                    <div className="space-y-2 pt-4">
-                      <Label>Line Items</Label>
+                    <div className="space-y-3 rounded-2xl border border-emerald-200 bg-emerald-50/70 p-4 shadow-sm dark:border-emerald-900 dark:bg-emerald-950/20">
+                      <Label className="text-base font-semibold text-emerald-800 dark:text-emerald-300">
+                        Line Items
+                      </Label>
                       <div className="space-y-2">
                         {(draftInvoice.lineItems || []).map((item, index) => (
-                          <div key={item.id || index} className="flex items-center gap-2 p-2 border rounded-md">
+                          <div key={item.id || index} className="flex items-center gap-2 rounded-xl border border-emerald-200 bg-white p-3 shadow-sm transition hover:shadow-md dark:border-emerald-900 dark:bg-slate-950">
                             <Input
                               placeholder="Description"
                               className="flex-grow"
@@ -521,7 +547,7 @@ paidDate: (draftInvoice as any).paidDate || null,
                       </Button>
                     </div>
 
-                    <div className="pt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 gap-4 rounded-2xl border border-amber-200 bg-amber-50/70 p-4 shadow-sm md:grid-cols-2 dark:border-amber-900 dark:bg-amber-950/20">
                       <div className="space-y-2">
                         <Label htmlFor="notes">Notes (optional)</Label>
                         <Input
@@ -566,7 +592,7 @@ paidDate: (draftInvoice as any).paidDate || null,
                           </div>
                         </div>
 
-                        <div className="space-y-1 text-sm text-right">
+                        <div className="space-y-2 rounded-xl border border-emerald-200 bg-white p-4 text-sm shadow-sm dark:border-emerald-900 dark:bg-slate-950">
                           <div className="flex justify-between">
                             <span>Subtotal:</span>
                             <span>${derivedTotals.subtotal.toFixed(2)}</span>
@@ -579,7 +605,7 @@ paidDate: (draftInvoice as any).paidDate || null,
                             <span>Discount:</span>
                             <span>-${derivedTotals.discount.toFixed(2)}</span>
                           </div>
-                          <div className="flex justify-between font-bold text-base border-t mt-1 pt-1">
+                          <div className="mt-2 flex justify-between border-t border-emerald-200 pt-3 text-lg font-bold text-emerald-700 dark:border-emerald-900 dark:text-emerald-300">
                             <span>Total:</span>
                             <span>${derivedTotals.total.toFixed(2)}</span>
                           </div>
@@ -587,7 +613,7 @@ paidDate: (draftInvoice as any).paidDate || null,
                       </div>
                     </div>
 
-                    <div className="space-y-3 border-t pt-4 mt-4">
+                    <div className="space-y-3 rounded-2xl border border-violet-200 bg-violet-50/70 p-4 shadow-sm dark:border-violet-900 dark:bg-violet-950/20">
                       <div className="flex items-center gap-2">
                         <Checkbox
                           id="recurring"
@@ -653,26 +679,31 @@ paidDate: (draftInvoice as any).paidDate || null,
                   </div>
                 </ScrollArea>
 
-                <DialogFooter>
+                <DialogFooter className="border-t bg-white px-6 py-4 dark:bg-slate-950">
                   <DialogClose asChild>
                     <Button variant="outline">Cancel</Button>
                   </DialogClose>
-                  <Button onClick={handleSubmit}>Save Invoice</Button>
+                  <Button
+                    onClick={handleSubmit}
+                    className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-lg hover:from-blue-700 hover:to-indigo-700"
+                  >
+                    Save Invoice
+                  </Button>
                 </DialogFooter>
               </DialogContent>
             </Dialog>
           </div>
         </div>
 
-        <div className="flex flex-wrap items-center gap-3 pt-2">
+        <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-white/15 bg-white/10 p-4 backdrop-blur-sm">
           <Input
   placeholder="Search invoice #, site, status, date..."
   value={invoiceSearch}
   onChange={(e) => setInvoiceSearch(e.target.value)}
-  className="w-72"
+  className="w-72 border-white/30 bg-white/95 text-slate-900 shadow-sm placeholder:text-slate-400"
 />
 <div className="flex items-center gap-2">
-  <Label>Sort By</Label>
+  <Label className="text-blue-100">Sort By</Label>
 
   <Select
     value={sortBy}
@@ -706,7 +737,7 @@ paidDate: (draftInvoice as any).paidDate || null,
   </Select>
 </div>
           <div className="flex items-center gap-2">
-            <Label>Show</Label>
+            <Label className="text-blue-100">Show</Label>
             <Select
               value={filterMode}
               onValueChange={(v: "all" | "month" | "year") => setFilterMode(v)}
@@ -724,7 +755,7 @@ paidDate: (draftInvoice as any).paidDate || null,
 
           {filterMode === "month" && (
             <div className="flex items-center gap-2">
-              <Label>Month</Label>
+              <Label className="text-blue-100">Month</Label>
               <Input
                 type="month"
                 value={filterMonth}
@@ -736,7 +767,7 @@ paidDate: (draftInvoice as any).paidDate || null,
 
           {filterMode === "year" && (
             <div className="flex items-center gap-2">
-              <Label>Year</Label>
+              <Label className="text-blue-100">Year</Label>
               <Input
                 type="number"
                 min="2000"
@@ -750,31 +781,37 @@ paidDate: (draftInvoice as any).paidDate || null,
         </div>
       </CardHeader>
 
-      <CardContent>
+      <CardContent className="p-5">
+        <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-lg dark:border-slate-800 dark:bg-slate-950">
         <ScrollArea className="h-96">
           <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Status</TableHead>
-                <TableHead>Invoice #</TableHead>
-                <TableHead>Site</TableHead>
-                <TableHead>Date</TableHead>
-                <TableHead>Due Date</TableHead>
-                <TableHead className="text-right">Total</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
+            <TableHeader className="bg-gradient-to-r from-slate-900 to-blue-950">
+              <TableRow className="hover:bg-transparent">
+                <TableHead className="text-white">Status</TableHead>
+                <TableHead className="text-white">Invoice #</TableHead>
+                <TableHead className="text-white">Site</TableHead>
+                <TableHead className="text-white">Date</TableHead>
+                <TableHead className="text-white">Due Date</TableHead>
+                <TableHead className="text-right text-white">Total</TableHead>
+                <TableHead className="text-right text-white">Actions</TableHead>
               </TableRow>
             </TableHeader>
 
             <TableBody>
               {displayedInvoices.length > 0 ? (
                 displayedInvoices.map((inv) => (
-                  <TableRow key={inv.id}>
+                  <TableRow
+                    key={inv.id}
+                    className="transition-colors hover:bg-blue-50/70 dark:hover:bg-blue-950/20"
+                  >
                     <TableCell>
-                      <Badge className={cn("text-white capitalize", statusColors[inv.status])}>
+                      <Badge className={cn("rounded-full px-3 py-1 font-semibold capitalize", statusColors[inv.status])}>
                         {inv.status}
                       </Badge>
                     </TableCell>
-                    <TableCell className="font-medium">{inv.invoiceNumber}</TableCell>
+                    <TableCell className="font-semibold text-blue-700 dark:text-blue-300">
+                      {inv.invoiceNumber}
+                    </TableCell>
                     <TableCell>{inv.siteName}</TableCell>
                     <TableCell>
                       {inv.date && isValid(parseISO(inv.date))
@@ -786,17 +823,32 @@ paidDate: (draftInvoice as any).paidDate || null,
                         ? format(parseISO(inv.dueDate), "yyyy-MM-dd")
                         : "N/A"}
                     </TableCell>
-                    <TableCell className="text-right font-mono">
+                    <TableCell className="text-right font-mono font-bold text-emerald-700 dark:text-emerald-300">
                       ${(withComputed(inv).total || 0).toFixed(2)}
                     </TableCell>
                     <TableCell className="text-right">
-                      <Button variant="ghost" size="icon" onClick={() => exportInvoiceToPDF(inv)}>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="text-indigo-600 hover:bg-indigo-100 hover:text-indigo-700 dark:hover:bg-indigo-950/50"
+                        onClick={() => exportInvoiceToPDF(inv)}
+                      >
                         <Download className="h-4 w-4" />
                       </Button>
-                      <Button variant="ghost" size="icon" onClick={() => handleOpenDialog(inv)}>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="text-blue-600 hover:bg-blue-100 hover:text-blue-700 dark:hover:bg-blue-950/50"
+                        onClick={() => handleOpenDialog(inv)}
+                      >
                         <Edit className="h-4 w-4" />
                       </Button>
-                      <Button variant="ghost" size="icon" onClick={() => deleteInvoice(inv.id)}>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="hover:bg-rose-100 dark:hover:bg-rose-950/50"
+                        onClick={() => deleteInvoice(inv.id)}
+                      >
                         <Trash2 className="h-4 w-4 text-destructive" />
                       </Button>
                     </TableCell>
@@ -812,6 +864,7 @@ paidDate: (draftInvoice as any).paidDate || null,
             </TableBody>
           </Table>
         </ScrollArea>
+        </div>
       </CardContent>
     </Card>
   );
