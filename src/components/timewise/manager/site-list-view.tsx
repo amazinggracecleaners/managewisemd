@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useState, useMemo, useEffect } from "react";
@@ -22,6 +21,14 @@ import {
   Edit,
   MapPin,
   Trash2,
+  Building2,
+  Search,
+  Filter,
+  Layers3,
+  ContactRound,
+  ShieldCheck,
+  Clock3,
+  WalletCards,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -361,11 +368,16 @@ const groupedSites = useMemo(() => {
 
   return (
     <TooltipProvider>
-      <Card>
-        <CardHeader>
+      <Card className="overflow-hidden border-slate-200/80 bg-gradient-to-br from-white via-slate-50/70 to-blue-50/50 shadow-xl dark:border-slate-800 dark:from-slate-950 dark:via-slate-950 dark:to-blue-950/20">
+        <CardHeader className="border-b border-blue-100/80 bg-gradient-to-r from-blue-50 via-indigo-50/80 to-cyan-50/70 dark:border-blue-900/40 dark:from-blue-950/40 dark:via-indigo-950/30 dark:to-cyan-950/20">
           <div className="flex justify-between items-start flex-wrap gap-4">
             <div className="flex-grow space-y-2">
-  <CardTitle className="text-xl">Client Sites</CardTitle>
+  <CardTitle className="flex items-center gap-3 text-2xl font-bold tracking-tight text-slate-900 dark:text-slate-50">
+    <span className="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-blue-600 to-indigo-600 text-white shadow-md shadow-blue-500/20">
+      <Building2 className="h-5 w-5" />
+    </span>
+    Client Sites
+  </CardTitle>
 
   <CardDescription>
     Maintain addresses, contacts, access details, and rates for each
@@ -373,15 +385,15 @@ const groupedSites = useMemo(() => {
   </CardDescription>
 
   <div className="flex flex-wrap gap-2">
-    <Badge>
+    <Badge className="border border-emerald-200 bg-emerald-100 text-emerald-800 hover:bg-emerald-100 dark:border-emerald-900 dark:bg-emerald-950/60 dark:text-emerald-300">
       Active Sites: {activeSitesCount}
     </Badge>
 
-    <Badge variant="secondary">
+    <Badge className="border border-amber-200 bg-amber-100 text-amber-800 hover:bg-amber-100 dark:border-amber-900 dark:bg-amber-950/60 dark:text-amber-300">
       Inactive Sites: {inactiveSitesCount}
     </Badge>
 
-    <Badge variant="outline">
+    <Badge className="border border-blue-200 bg-blue-100 text-blue-800 hover:bg-blue-100 dark:border-blue-900 dark:bg-blue-950/60 dark:text-blue-300">
       All Sites: {allSitesCount}
     </Badge>
   </div>
@@ -396,19 +408,23 @@ const groupedSites = useMemo(() => {
 </div>
 
             <div className="flex items-center gap-2">
+              <div className="relative">
+                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
               <Input
                 placeholder="Search sites or contacts…"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full sm:w-56"
+                className="w-full border-blue-200 bg-white/90 pl-9 shadow-sm focus-visible:ring-blue-500 sm:w-64 dark:border-blue-900 dark:bg-slate-950/80"
               />
+              </div>
 
               <div className="w-36">
   <Select
     value={siteFilter}
     onValueChange={(v: "active" | "inactive" | "all") => setSiteFilter(v)}
   >
-    <SelectTrigger>
+    <SelectTrigger className="border-blue-200 bg-white/90 shadow-sm dark:border-blue-900 dark:bg-slate-950/80">
+      <Filter className="mr-2 h-4 w-4 text-blue-600" />
       <SelectValue placeholder="Site filter" />
     </SelectTrigger>
     <SelectContent>
@@ -423,7 +439,8 @@ const groupedSites = useMemo(() => {
                   value={groupBy}
                   onValueChange={(v: "none" | "city" | "amount") => setGroupBy(v)}
                 >
-                  <SelectTrigger>
+                  <SelectTrigger className="border-indigo-200 bg-white/90 shadow-sm dark:border-indigo-900 dark:bg-slate-950/80">
+                    <Layers3 className="mr-2 h-4 w-4 text-indigo-600" />
                     <SelectValue placeholder="Grouping" />
                   </SelectTrigger>
                   <SelectContent>
@@ -437,14 +454,15 @@ const groupedSites = useMemo(() => {
               </div>
               <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
                 <DialogTrigger asChild>
-                  <Button onClick={() => handleOpenDialog(null)}>
+                  <Button onClick={() => handleOpenDialog(null)} className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-md shadow-blue-500/20 hover:from-blue-700 hover:to-indigo-700">
                     <PlusCircle className="mr-2 h-4 w-4" />
                     Add site
                   </Button>
                 </DialogTrigger>
-                <DialogContent className="max-w-2xl">
-                  <DialogHeader>
-                    <DialogTitle>
+                <DialogContent className="max-w-2xl overflow-hidden border-blue-100 p-0 shadow-2xl dark:border-blue-900">
+                  <DialogHeader className="border-b border-blue-100 bg-gradient-to-r from-blue-50 via-indigo-50 to-cyan-50 px-6 py-5 dark:border-blue-900 dark:from-blue-950/60 dark:via-indigo-950/40 dark:to-cyan-950/30">
+                    <DialogTitle className="flex items-center gap-2 text-xl text-slate-900 dark:text-slate-50">
+                      <Building2 className="h-5 w-5 text-blue-600" />
                       {editingSite ? "Edit site" : "New site"}
                     </DialogTitle>
                   </DialogHeader>
@@ -453,9 +471,9 @@ const groupedSites = useMemo(() => {
     {/* =========================================================
         GENERAL
     ========================================================== */}
-    <section className="space-y-4">
+    <section className="space-y-4 rounded-2xl border border-blue-100 bg-blue-50/55 p-5 shadow-sm dark:border-blue-900/50 dark:bg-blue-950/20">
       <div className="border-b pb-2">
-        <h3 className="text-lg font-semibold">General</h3>
+        <h3 className="flex items-center gap-2 text-lg font-semibold text-blue-900 dark:text-blue-200"><Building2 className="h-5 w-5" />General</h3>
         <p className="text-sm text-muted-foreground">
           Basic site information, address, status, and GPS location.
         </p>
@@ -597,9 +615,9 @@ const groupedSites = useMemo(() => {
     {/* =========================================================
         CONTACTS
     ========================================================== */}
-    <section className="space-y-5 border-t pt-6">
+    <section className="space-y-5 rounded-2xl border border-violet-100 bg-violet-50/55 p-5 shadow-sm dark:border-violet-900/50 dark:bg-violet-950/20">
       <div className="border-b pb-2">
-        <h3 className="text-lg font-semibold">Contacts</h3>
+        <h3 className="flex items-center gap-2 text-lg font-semibold text-violet-900 dark:text-violet-200"><ContactRound className="h-5 w-5" />Contacts</h3>
         <p className="text-sm text-muted-foreground">
           Primary, billing, and emergency contacts for this site.
         </p>
@@ -654,7 +672,7 @@ const groupedSites = useMemo(() => {
       </div>
 
       {/* Billing contact */}
-      <div className="space-y-3 rounded-md border p-4">
+      <div className="space-y-3 rounded-xl border border-violet-200/70 bg-white/75 p-4 shadow-sm dark:border-violet-900 dark:bg-slate-950/50">
         <div>
           <h4 className="font-medium">Billing contact</h4>
           <p className="text-xs text-muted-foreground">
@@ -716,7 +734,7 @@ const groupedSites = useMemo(() => {
       </div>
 
       {/* Emergency contact */}
-      <div className="space-y-3 rounded-md border p-4">
+      <div className="space-y-3 rounded-xl border border-violet-200/70 bg-white/75 p-4 shadow-sm dark:border-violet-900 dark:bg-slate-950/50">
         <div>
           <h4 className="font-medium">Emergency contact</h4>
           <p className="text-xs text-muted-foreground">
@@ -781,9 +799,9 @@ const groupedSites = useMemo(() => {
     {/* =========================================================
         FINANCIAL
     ========================================================== */}
-    <section className="space-y-5 border-t pt-6">
+    <section className="space-y-5 rounded-2xl border border-emerald-100 bg-emerald-50/55 p-5 shadow-sm dark:border-emerald-900/50 dark:bg-emerald-950/20">
       <div className="border-b pb-2">
-        <h3 className="text-lg font-semibold">Financial</h3>
+        <h3 className="flex items-center gap-2 text-lg font-semibold text-emerald-900 dark:text-emerald-200"><WalletCards className="h-5 w-5" />Financial</h3>
         <p className="text-sm text-muted-foreground">
           Revenue, billing frequency, fees, and bonuses.
         </p>
@@ -840,7 +858,7 @@ const groupedSites = useMemo(() => {
       </div>
 
       {/* R/S fee */}
-      <div className="space-y-3 rounded-md border p-4">
+      <div className="space-y-3 rounded-xl border border-emerald-200/70 bg-white/75 p-4 shadow-sm dark:border-emerald-900 dark:bg-slate-950/50">
         <div>
           <h4 className="font-medium">R/S fee</h4>
           <p className="text-xs text-muted-foreground">
@@ -923,7 +941,7 @@ const groupedSites = useMemo(() => {
       </div>
 
       {/* Other fee */}
-      <div className="space-y-3 rounded-md border p-4">
+      <div className="space-y-3 rounded-xl border border-emerald-200/70 bg-white/75 p-4 shadow-sm dark:border-emerald-900 dark:bg-slate-950/50">
         <h4 className="font-medium">Other fee</h4>
 
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -1020,7 +1038,7 @@ const groupedSites = useMemo(() => {
       </div>
 
       {/* Bonus */}
-      <div className="space-y-3 rounded-md border p-4">
+      <div className="space-y-3 rounded-xl border border-emerald-200/70 bg-white/75 p-4 shadow-sm dark:border-emerald-900 dark:bg-slate-950/50">
         <h4 className="font-medium">Bonus</h4>
 
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -1082,9 +1100,9 @@ const groupedSites = useMemo(() => {
     {/* =========================================================
         OPERATIONS
     ========================================================== */}
-    <section className="space-y-5 border-t pt-6">
+    <section className="space-y-5 rounded-2xl border border-amber-100 bg-amber-50/55 p-5 shadow-sm dark:border-amber-900/50 dark:bg-amber-950/20">
       <div className="border-b pb-2">
-        <h3 className="text-lg font-semibold">Operations</h3>
+        <h3 className="flex items-center gap-2 text-lg font-semibold text-amber-900 dark:text-amber-200"><Clock3 className="h-5 w-5" />Operations</h3>
         <p className="text-sm text-muted-foreground">
           Work-time estimates and site access instructions.
         </p>
@@ -1207,11 +1225,11 @@ const groupedSites = useMemo(() => {
     </section>
   </div>
 </ScrollArea>
-                  <DialogFooter>
+                  <DialogFooter className="border-t border-slate-200 bg-white px-6 py-4 dark:border-slate-800 dark:bg-slate-950">
                     <DialogClose asChild>
                       <Button variant="outline">Cancel</Button>
                     </DialogClose>
-                    <Button onClick={handleSubmit}>Save site</Button>
+                    <Button onClick={handleSubmit} className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-md shadow-blue-500/20 hover:from-blue-700 hover:to-indigo-700">Save site</Button>
                   </DialogFooter>
                 </DialogContent>
               </Dialog>
@@ -1219,8 +1237,8 @@ const groupedSites = useMemo(() => {
           </div>
         </CardHeader>
 
-        <CardContent>
-          <ScrollArea className="h-[70vh]">
+        <CardContent className="bg-gradient-to-b from-white/80 to-slate-50/80 p-4 sm:p-6 dark:from-slate-950/80 dark:to-slate-900/70">
+          <ScrollArea className="h-[70vh] pr-2">
             {Object.keys(groupedSites).length > 0 ? (
               <Accordion
                 type="multiple"
@@ -1229,8 +1247,8 @@ const groupedSites = useMemo(() => {
                 {Object.entries(groupedSites)
                   .sort(([a], [b]) => a.localeCompare(b))
                   .map(([groupName, sitesInGroup]) => (
-                    <AccordionItem value={groupName} key={groupName}>
-                      <AccordionTrigger className="text-base font-semibold">
+                    <AccordionItem value={groupName} key={groupName} className="mb-4 overflow-hidden rounded-xl border border-slate-200 bg-white/80 px-4 shadow-sm dark:border-slate-800 dark:bg-slate-950/70">
+                      <AccordionTrigger className="text-base font-semibold text-slate-800 hover:no-underline dark:text-slate-100">
   {groupBy === "none" ? groupName : `${groupName} (${sitesInGroup.length})`}
 </AccordionTrigger>
                       <AccordionContent>
@@ -1244,15 +1262,16 @@ const groupedSites = useMemo(() => {
                             return (
                               <Card
                                 key={key}
-                                className="overflow-hidden"
+                                className="group overflow-hidden border-slate-200 bg-gradient-to-br from-white via-white to-slate-50 shadow-md transition-all duration-200 hover:-translate-y-0.5 hover:shadow-xl dark:border-slate-800 dark:from-slate-950 dark:via-slate-950 dark:to-slate-900"
                                 style={{
                                   borderTopColor: site.color,
                                   borderTopWidth: "4px",
                                 }}
                               >
-                                <CardHeader className="flex flex-row justify-between items-start gap-3">
+                                <CardHeader className="flex flex-row justify-between items-start gap-3 border-b border-slate-100 bg-gradient-to-r from-slate-50/90 to-blue-50/60 dark:border-slate-800 dark:from-slate-900/80 dark:to-blue-950/20">
                                   <div className="space-y-1">
-                                    <CardTitle className="text-lg flex items-center gap-2">
+                                    <CardTitle className="text-lg flex items-center gap-2 text-slate-900 dark:text-slate-50">
+                                      <span className="h-3 w-3 rounded-full shadow-sm" style={{ backgroundColor: site.color || "#2563eb" }} />
                                       {site.name}
                                     </CardTitle>
                                     {site.address && (
@@ -1296,10 +1315,10 @@ const groupedSites = useMemo(() => {
                                     </Button>
                                   </div>
                                 </CardHeader>
-                                <CardContent>
+                                <CardContent className="pt-5">
                                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-4 text-sm">
-                                    <div className="space-y-1">
-                                      <h4 className="font-semibold text-muted-foreground flex items-center gap-2">
+                                    <div className="space-y-2 rounded-xl border border-violet-100 bg-violet-50/50 p-4 dark:border-violet-900/50 dark:bg-violet-950/15">
+                                      <h4 className="font-semibold text-violet-800 flex items-center gap-2 dark:text-violet-300">
                                         <User className="h-4 w-4" />
                                         Contact
                                       </h4>
@@ -1354,8 +1373,8 @@ const groupedSites = useMemo(() => {
 </div>
                                     </div>
 
-                                    <div className="space-y-1">
-                                      <h4 className="font-semibold text-muted-foreground flex items-center gap-2">
+                                    <div className="space-y-2 rounded-xl border border-amber-100 bg-amber-50/50 p-4 dark:border-amber-900/50 dark:bg-amber-950/15">
+                                      <h4 className="font-semibold text-amber-800 flex items-center gap-2 dark:text-amber-300">
                                         <KeyRound className="h-4 w-4" />
                                         Access
                                       </h4>
@@ -1369,8 +1388,8 @@ const groupedSites = useMemo(() => {
                                       </p>
                                     </div>
 
-                                    <div className="space-y-1">
-                                      <h4 className="font-semibold text-muted-foreground flex items-center gap-2">
+                                    <div className="space-y-2 rounded-xl border border-emerald-100 bg-emerald-50/50 p-4 dark:border-emerald-900/50 dark:bg-emerald-950/15">
+                                      <h4 className="font-semibold text-emerald-800 flex items-center gap-2 dark:text-emerald-300">
                                         <DollarSign className="h-4 w-4" />
                                         Billing
                                       </h4>
@@ -1393,7 +1412,7 @@ const groupedSites = useMemo(() => {
     <>
       <p>
         <strong>Status:</strong>{" "}
-        <Badge variant={site.status === "inactive" ? "secondary" : "default"}>
+        <Badge className={site.status === "inactive" ? "border border-slate-300 bg-slate-100 text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300" : "border border-emerald-200 bg-emerald-100 text-emerald-800 dark:border-emerald-900 dark:bg-emerald-950/60 dark:text-emerald-300"}>
           {site.status || "active"}
         </Badge>
       </p>
@@ -1479,7 +1498,7 @@ const groupedSites = useMemo(() => {
 
                                       {settings.requireGeofence &&
   (site.lat === undefined || site.lng === undefined) && (
-    <Badge variant="destructive">
+    <Badge className="border border-rose-200 bg-rose-100 text-rose-800 dark:border-rose-900 dark:bg-rose-950/60 dark:text-rose-300">
       GPS coordinates are required for this site while geofencing is
       enabled.
     </Badge>
@@ -1516,7 +1535,7 @@ const groupedSites = useMemo(() => {
                   ))}
               </Accordion>
             ) : (
-              <div className="flex items-center justify-center h-48 text-muted-foreground border rounded-lg text-sm text-center px-6">
+              <div className="flex h-48 items-center justify-center rounded-2xl border border-dashed border-blue-200 bg-blue-50/50 px-6 text-center text-sm text-blue-700 dark:border-blue-900 dark:bg-blue-950/20 dark:text-blue-300">
                 {searchQuery
                   ? `No sites match “${searchQuery}”.`
                   : "No sites have been created yet. Use “Add site” to set up your first client location."}
