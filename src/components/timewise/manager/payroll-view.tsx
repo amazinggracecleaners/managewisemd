@@ -52,6 +52,8 @@ import {
   Clock3,
   WalletCards,
   TrendingUp,
+  Calculator,
+  Settings2,
 } from "lucide-react";
 import { groupSessions } from "@/lib/time-utils";
 import {
@@ -89,6 +91,55 @@ type PayFrequency =
 type PaymentMethod = "cash" | "zelle" | "bank";
 
 
+type TaxCalculationMode = "automatic" | "manual";
+
+type TaxSettings = {
+  workState: string;
+  federalWithholdingRate: number;
+  stateWithholdingRate: number;
+  localWithholdingRate: number;
+  employeeSocialSecurityRate: number;
+  employeeMedicareRate: number;
+  employerSocialSecurityRate: number;
+  employerMedicareRate: number;
+  federalUnemploymentRate: number;
+  stateUnemploymentRate: number;
+};
+
+const US_STATES = [
+  ["AL", "Alabama"], ["AK", "Alaska"], ["AZ", "Arizona"], ["AR", "Arkansas"],
+  ["CA", "California"], ["CO", "Colorado"], ["CT", "Connecticut"], ["DE", "Delaware"],
+  ["FL", "Florida"], ["GA", "Georgia"], ["HI", "Hawaii"], ["ID", "Idaho"],
+  ["IL", "Illinois"], ["IN", "Indiana"], ["IA", "Iowa"], ["KS", "Kansas"],
+  ["KY", "Kentucky"], ["LA", "Louisiana"], ["ME", "Maine"], ["MD", "Maryland"],
+  ["MA", "Massachusetts"], ["MI", "Michigan"], ["MN", "Minnesota"], ["MS", "Mississippi"],
+  ["MO", "Missouri"], ["MT", "Montana"], ["NE", "Nebraska"], ["NV", "Nevada"],
+  ["NH", "New Hampshire"], ["NJ", "New Jersey"], ["NM", "New Mexico"], ["NY", "New York"],
+  ["NC", "North Carolina"], ["ND", "North Dakota"], ["OH", "Ohio"], ["OK", "Oklahoma"],
+  ["OR", "Oregon"], ["PA", "Pennsylvania"], ["RI", "Rhode Island"], ["SC", "South Carolina"],
+  ["SD", "South Dakota"], ["TN", "Tennessee"], ["TX", "Texas"], ["UT", "Utah"],
+  ["VT", "Vermont"], ["VA", "Virginia"], ["WA", "Washington"], ["WV", "West Virginia"],
+  ["WI", "Wisconsin"], ["WY", "Wyoming"], ["DC", "District of Columbia"],
+] as const;
+
+const DEFAULT_TAX_SETTINGS: TaxSettings = {
+  workState: "KY",
+  federalWithholdingRate: 0,
+  stateWithholdingRate: 0,
+  localWithholdingRate: 0,
+  employeeSocialSecurityRate: 6.2,
+  employeeMedicareRate: 1.45,
+  employerSocialSecurityRate: 6.2,
+  employerMedicareRate: 1.45,
+  federalUnemploymentRate: 0,
+  stateUnemploymentRate: 0,
+};
+
+function percentOf(base: number, rate: number): number {
+  return Math.round(base * (rate / 100) * 100) / 100;
+}
+
+
 type PayrollTaxField =
   | "federalWithholding"
   | "stateWithholding"
@@ -106,6 +157,8 @@ type EmployerTaxField =
   | "stateUnemploymentTax";
 
 type TaxReadyPayrollLineItem = PayrollLineItem & {
+  taxCalculationMode?: TaxCalculationMode;
+  workState?: string;
   federalWithholding?: number;
   stateWithholding?: number;
   localWithholding?: number;
@@ -164,6 +217,46 @@ function calculateTaxReadyLine(item: TaxReadyPayrollLineItem): TaxReadyPayrollLi
     deductions,
     net,
   };
+}
+
+
+function calculateAutomaticTaxes(
+  item: TaxReadyPayrollLineItem,
+  settings: TaxSettings
+): TaxReadyPayrollLineItem {
+  const gross = money(item.gross);
+  const preTaxDeductions = money(item.preTaxDeductions);
+  const taxableWages = Math.max(0, gross - preTaxDeductions);
+
+  const next: TaxReadyPayrollLineItem = {
+    ...item,
+    taxCalculationMode: "automatic",
+    workState: settings.workState,
+    taxableWages,
+    federalWithholding: percentOf(taxableWages, settings.federalWithholdingRate),
+    stateWithholding: percentOf(taxableWages, settings.stateWithholdingRate),
+    localWithholding: percentOf(taxableWages, settings.localWithholdingRate),
+    socialSecurityTax: percentOf(taxableWages, settings.employeeSocialSecurityRate),
+    medicareTax: percentOf(taxableWages, settings.employeeMedicareRate),
+    employerSocialSecurityTax: percentOf(
+      taxableWages,
+      settings.employerSocialSecurityRate
+    ),
+    employerMedicareTax: percentOf(
+      taxableWages,
+      settings.employerMedicareRate
+    ),
+    federalUnemploymentTax: percentOf(
+      taxableWages,
+      settings.federalUnemploymentRate
+    ),
+    stateUnemploymentTax: percentOf(
+      taxableWages,
+      settings.stateUnemploymentRate
+    ),
+  };
+
+  return calculateTaxReadyLine(next);
 }
 
 interface PayrollViewProps {
@@ -307,6 +400,11 @@ export function PayrollView({
     Record<string, PaymentMethod>
   >({});
 
+  const [taxCalculationMode, setTaxCalculationMode] =
+    useState<TaxCalculationMode>("automatic");
+  const [taxSettings, setTaxSettings] =
+    useState<TaxSettings>(DEFAULT_TAX_SETTINGS);
+
   const availableYears = useMemo(() => {
     const years = new Set(
       payrollPeriods.map((p) => p.startDate.substring(0, 4))
@@ -444,7 +542,14 @@ const paidProgressPct = useMemo(() => {
 
   useEffect(() => {
     if (currentPeriod && currentStatus !== "draft") {
-      setLineItems((currentPeriod.lineItems ?? []).map((item) => calculateTaxReadyLine(item as TaxReadyPayrollLineItem)));
+      setLineItems(
+        (currentPeriod.lineItems ?? []).map((item) => {
+          const taxItem = item as TaxReadyPayrollLineItem;
+          return (taxItem.taxCalculationMode ?? taxCalculationMode) === "automatic"
+            ? calculateAutomaticTaxes(taxItem, taxSettings)
+            : calculateTaxReadyLine(taxItem);
+        })
+      );
 
       const restoredMethods: Record<string, PaymentMethod> = {};
       (currentPeriod.lineItems ?? []).forEach((item) => {
@@ -507,7 +612,7 @@ const paidProgressPct = useMemo(() => {
 
         const grossPay = basePay + flatBonus;
 
-        return {
+        const baseLine = {
           employeeId: employee.id,
           employeeName: employee.name,
           revision: currentPeriod?.revision ?? 1,
@@ -521,7 +626,13 @@ const paidProgressPct = useMemo(() => {
           paid: false,
           paidAt: undefined,
           paymentMethod: undefined,
+          taxCalculationMode,
+          workState: taxSettings.workState,
         } as TaxReadyPayrollLineItem;
+
+        return taxCalculationMode === "automatic"
+          ? calculateAutomaticTaxes(baseLine, taxSettings)
+          : calculateTaxReadyLine(baseLine);
       })
       .filter((item) => (item.minutes ?? 0) > 0 || (item.gross ?? 0) > 0)
       .sort((a, b) => a.employeeName.localeCompare(b.employeeName));
@@ -536,6 +647,8 @@ const paidProgressPct = useMemo(() => {
     siteMap,
     currentPeriod,
     currentStatus,
+    taxCalculationMode,
+    taxSettings,
   ]);
 
   const yearlySummary = useMemo(() => {
@@ -697,8 +810,51 @@ const isEditable = !isLocked;
           next.gross = grossWithoutFlat + money(next.flatBonus);
         }
 
-        return calculateTaxReadyLine(next);
+        const mode = next.taxCalculationMode ?? taxCalculationMode;
+        return mode === "automatic"
+          ? calculateAutomaticTaxes(next, taxSettings)
+          : calculateTaxReadyLine(next);
       })
+    );
+  };
+
+
+  const updateTaxSetting = <K extends keyof TaxSettings>(
+    field: K,
+    value: TaxSettings[K]
+  ) => {
+    setTaxSettings((previous) => ({
+      ...previous,
+      [field]: value,
+    }));
+  };
+
+  const applyAutomaticTaxes = () => {
+    setTaxCalculationMode("automatic");
+    setLineItems((previous) =>
+      previous.map((item) =>
+        item.paid
+          ? item
+          : calculateAutomaticTaxes(
+              {
+                ...item,
+                taxCalculationMode: "automatic",
+                workState: taxSettings.workState,
+              },
+              taxSettings
+            )
+      )
+    );
+  };
+
+  const switchToManualTaxes = () => {
+    setTaxCalculationMode("manual");
+    setLineItems((previous) =>
+      previous.map((item) => ({
+        ...item,
+        taxCalculationMode: "manual",
+        workState: taxSettings.workState,
+      }))
     );
   };
 
@@ -1701,15 +1857,121 @@ console.log("Payroll Confirmations", payrollConfirmations);
             </TabsContent>
 
             <TabsContent value="taxes" className="mt-4">
+              <div className="mb-5 rounded-xl border border-blue-200 bg-white p-5 shadow-sm dark:border-blue-900 dark:bg-slate-950">
+                <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <Settings2 className="h-5 w-5 text-blue-700 dark:text-blue-300" />
+                      <h3 className="font-semibold text-slate-900 dark:text-white">
+                        Tax calculation settings
+                      </h3>
+                    </div>
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      Select the employee work state, enter verified rates, then choose automatic calculation or manual entry.
+                    </p>
+                  </div>
+
+                  <div className="flex flex-wrap gap-2">
+                    <Button
+                      type="button"
+                      variant={taxCalculationMode === "automatic" ? "default" : "outline"}
+                      onClick={applyAutomaticTaxes}
+                      className={taxCalculationMode === "automatic" ? "bg-blue-700 hover:bg-blue-800" : ""}
+                    >
+                      <Calculator className="mr-2 h-4 w-4" />
+                      Automatic
+                    </Button>
+                    <Button
+                      type="button"
+                      variant={taxCalculationMode === "manual" ? "default" : "outline"}
+                      onClick={switchToManualTaxes}
+                      className={taxCalculationMode === "manual" ? "bg-slate-800 hover:bg-slate-900" : ""}
+                    >
+                      <Settings2 className="mr-2 h-4 w-4" />
+                      Manual
+                    </Button>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+                  <div className="space-y-2">
+                    <Label>Employee Work State</Label>
+                    <Select
+                      value={taxSettings.workState}
+                      onValueChange={(value) => updateTaxSetting("workState", value)}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select state" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {US_STATES.map(([code, name]) => (
+                          <SelectItem key={code} value={code}>
+                            {name} ({code})
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {[
+                    ["federalWithholdingRate", "Federal withholding %"],
+                    ["stateWithholdingRate", "State withholding %"],
+                    ["localWithholdingRate", "Local withholding %"],
+                    ["employeeSocialSecurityRate", "Employee Social Security %"],
+                    ["employeeMedicareRate", "Employee Medicare %"],
+                    ["employerSocialSecurityRate", "Employer Social Security %"],
+                    ["employerMedicareRate", "Employer Medicare %"],
+                    ["federalUnemploymentRate", "FUTA %"],
+                    ["stateUnemploymentRate", "SUTA %"],
+                  ].map(([field, label]) => (
+                    <div key={field} className="space-y-2">
+                      <Label>{label}</Label>
+                      <div className="relative">
+                        <Input
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          value={taxSettings[field as keyof TaxSettings] as number}
+                          onChange={(event) =>
+                            updateTaxSetting(
+                              field as keyof TaxSettings,
+                              Math.max(0, Number(event.target.value) || 0) as never
+                            )
+                          }
+                          className="pr-8 text-right"
+                          disabled={taxCalculationMode === "manual"}
+                        />
+                        <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">
+                          %
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 pt-4 text-sm dark:border-slate-800">
+                  <div className="text-muted-foreground">
+                    State: <span className="font-medium text-foreground">{taxSettings.workState}</span>
+                    {" • "}
+                    Mode: <span className="font-medium capitalize text-foreground">{taxCalculationMode}</span>
+                  </div>
+                  {taxCalculationMode === "automatic" && (
+                    <Button type="button" onClick={applyAutomaticTaxes} className="bg-blue-700 hover:bg-blue-800">
+                      Recalculate Payroll Taxes
+                    </Button>
+                  )}
+                </div>
+              </div>
+
               <div className="mb-5 rounded-xl border border-amber-200 bg-amber-50/70 p-4 text-sm text-amber-900 shadow-sm dark:border-amber-900 dark:bg-amber-950/20 dark:text-amber-200">
                 <div className="flex items-start gap-3">
                   <Clock3 className="mt-0.5 h-5 w-5 shrink-0" />
                   <div>
                     <p className="font-semibold">Payroll tax and deduction worksheet</p>
                     <p className="mt-1 text-amber-800 dark:text-amber-300">
-                      Enter verified amounts from your payroll tax service or withholding calculation.
-                      This screen records payroll taxes and deductions; it does not replace federal,
-                      state, or local tax filing software.
+                      Automatic mode applies the percentage rates entered above to taxable wages.
+                      Manual mode lets you override each employee amount. Official withholding can also
+                      depend on W-4 elections, wage bases, filing status, local jurisdiction, and current tax law.
                     </p>
                   </div>
                 </div>
@@ -1804,7 +2066,11 @@ console.log("Payroll Confirmations", payrollConfirmations);
                                       )
                                     }
                                     className="h-8 w-28 text-right font-mono"
-                                    disabled={isPaid || !!item.paid}
+                                    disabled={
+                                      isPaid ||
+                                      !!item.paid ||
+                                      taxCalculationMode === "automatic"
+                                    }
                                   />
                                 </TableCell>
                               ))}
