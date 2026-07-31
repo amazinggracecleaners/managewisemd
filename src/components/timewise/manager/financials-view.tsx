@@ -78,7 +78,7 @@ function InfoTip({ text }: { text: string }) {
 function revenueMarginBadge(margin: number) {
   if (margin >= 20) {
     return (
-      <span className="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium bg-green-100 text-green-800">
+      <span className="inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700 shadow-sm dark:border-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300">
         Healthy {margin.toFixed(2)}%
       </span>
     );
@@ -86,14 +86,14 @@ function revenueMarginBadge(margin: number) {
 
   if (margin >= 10) {
     return (
-      <span className="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium bg-yellow-100 text-yellow-800">
+      <span className="inline-flex items-center rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-700 shadow-sm dark:border-amber-800 dark:bg-amber-950/60 dark:text-amber-300">
         Watch {margin.toFixed(2)}%
       </span>
     );
   }
 
   return (
-    <span className="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium bg-red-100 text-red-800">
+    <span className="inline-flex items-center rounded-full border border-rose-200 bg-rose-50 px-2.5 py-1 text-xs font-semibold text-rose-700 shadow-sm dark:border-rose-800 dark:bg-rose-950/60 dark:text-rose-300">
       Action Needed {margin.toFixed(2)}%
     </span>
   );
@@ -727,10 +727,12 @@ const {
 
   return (
     <TooltipProvider>
-      <div className="space-y-6">
-        <Card>
-          <CardHeader>
-            <CardTitle>
+      <div className="space-y-6 rounded-3xl bg-gradient-to-br from-slate-50 via-white to-blue-50/70 p-1 sm:p-2 dark:from-slate-950 dark:via-slate-950 dark:to-blue-950/20">
+        <Card className="overflow-hidden border-0 bg-gradient-to-r from-slate-950 via-blue-950 to-indigo-950 text-white shadow-xl">
+          <CardHeader className="relative py-8">
+            <div className="pointer-events-none absolute -right-16 -top-20 h-52 w-52 rounded-full bg-cyan-400/15 blur-3xl" />
+            <div className="pointer-events-none absolute -bottom-24 left-1/3 h-48 w-48 rounded-full bg-violet-400/15 blur-3xl" />
+            <CardTitle className="relative text-2xl font-bold tracking-tight sm:text-3xl">
   Financial summary —{" "}
   {accountingView === "operational"
     ? "Operational P&L"
@@ -738,18 +740,18 @@ const {
     ? "Cash Flow"
     : "Operational P&L vs Cash Flow"}
 </CardTitle>
-            <CardDescription>
+            <CardDescription className="relative max-w-3xl text-sm leading-6 text-blue-100/85">
               Professional view of revenue, standard service charges, and
               operating costs for the selected reporting period.
             </CardDescription>
           </CardHeader>
         </Card>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Reporting period</CardTitle>
+        <Card className="border-slate-200/80 bg-white/90 shadow-md backdrop-blur dark:border-slate-800 dark:bg-slate-900/80">
+          <CardHeader className="border-b bg-gradient-to-r from-slate-50 to-blue-50/60 dark:from-slate-900 dark:to-blue-950/30">
+            <CardTitle className="text-lg text-slate-800 dark:text-slate-100">Reporting period</CardTitle>
           </CardHeader>
-          <CardContent className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+          <CardContent className="grid grid-cols-1 gap-4 p-5 md:grid-cols-4 md:items-end">
             <div className="space-y-2">
               <Label>View type</Label>
               <Select
@@ -833,9 +835,9 @@ const {
         </Card>
         {accountingView === "both" && (
   <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-    <Card>
-      <CardHeader>
-        <CardTitle>Operational P&amp;L</CardTitle>
+    <Card className="overflow-hidden border-emerald-200/80 bg-gradient-to-br from-white to-emerald-50/80 shadow-lg dark:border-emerald-900 dark:from-slate-900 dark:to-emerald-950/25">
+      <CardHeader className="border-b border-emerald-100 bg-emerald-50/70 dark:border-emerald-900 dark:bg-emerald-950/30">
+        <CardTitle className="text-emerald-800 dark:text-emerald-300">Operational P&amp;L</CardTitle>
         <CardDescription>
           Revenue earned and expenses accrued.
         </CardDescription>
@@ -859,9 +861,9 @@ const {
       </CardContent>
     </Card>
 
-    <Card>
-      <CardHeader>
-        <CardTitle>Cash Flow</CardTitle>
+    <Card className="overflow-hidden border-blue-200/80 bg-gradient-to-br from-white to-blue-50/80 shadow-lg dark:border-blue-900 dark:from-slate-900 dark:to-blue-950/25">
+      <CardHeader className="border-b border-blue-100 bg-blue-50/70 dark:border-blue-900 dark:bg-blue-950/30">
+        <CardTitle className="text-blue-800 dark:text-blue-300">Cash Flow</CardTitle>
         <CardDescription>
           Cash collected and cash-based expenses.
         </CardDescription>
@@ -886,16 +888,16 @@ const {
 )}
 
 {accountingView === "both" && (
-  <p className="text-sm text-muted-foreground">
+  <p className="rounded-xl border border-blue-100 bg-blue-50/70 px-4 py-3 text-sm text-blue-700 shadow-sm dark:border-blue-900 dark:bg-blue-950/30 dark:text-blue-300">
     The chart and monthly breakdown below display Operational P&amp;L data.
   </p>
 )}
 
         {accountingView !== "both" && (
   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6 gap-4">
-          <Card className="shadow-sm">
-            <CardHeader>
-              <CardTitle className="flex items-center">
+          <Card className="overflow-hidden border-emerald-200 bg-gradient-to-br from-white to-emerald-50 shadow-md transition-all hover:-translate-y-0.5 hover:shadow-lg dark:border-emerald-900 dark:from-slate-900 dark:to-emerald-950/30">
+            <CardHeader className="pb-2">
+              <CardTitle className="flex items-center text-sm font-semibold text-emerald-800 dark:text-emerald-300">
                 Total revenue
                 <InfoTip
   text={
@@ -906,30 +908,30 @@ const {
 />
               </CardTitle>
             </CardHeader>
-            <CardContent className="text-2xl font-semibold">
+            <CardContent className="text-2xl font-bold tracking-tight">
               ${kpis.totalRevenue.toFixed(2)}
             </CardContent>
           </Card>
 
           {accountingView === "operational" && (
-  <Card className="shadow-sm">
-    <CardHeader>
-      <CardTitle className="flex items-center">
+  <Card className="overflow-hidden border-blue-200 bg-gradient-to-br from-white to-blue-50 shadow-md transition-all hover:-translate-y-0.5 hover:shadow-lg dark:border-blue-900 dark:from-slate-900 dark:to-blue-950/30">
+    <CardHeader className="pb-2">
+      <CardTitle className="flex items-center text-sm font-semibold text-blue-800 dark:text-blue-300">
   Contract revenue
   <InfoTip text="Sum of the monthly revenue stored in each serviced site's profile. Each site is counted once per month." />
 </CardTitle>
     </CardHeader>
 
-    <CardContent className="text-2xl font-semibold">
+    <CardContent className="text-2xl font-bold tracking-tight">
       ${kpis.totalContractRevenue.toFixed(2)}
     </CardContent>
   </Card>
 )}
 
           {accountingView === "operational" && (
-  <Card className="shadow-sm">
-    <CardHeader>
-      <CardTitle className="flex items-center">
+  <Card className="overflow-hidden border-violet-200 bg-gradient-to-br from-white to-violet-50 shadow-md transition-all hover:-translate-y-0.5 hover:shadow-lg dark:border-violet-900 dark:from-slate-900 dark:to-violet-950/30">
+    <CardHeader className="pb-2">
+      <CardTitle className="flex items-center text-sm font-semibold text-violet-800 dark:text-violet-300">
   Revenue variance
   <InfoTip text="Invoice revenue minus monthly contract revenue." />
 </CardTitle>
@@ -947,35 +949,35 @@ const {
   </Card>
 )}
 
-          <Card className="shadow-sm">
-            <CardHeader>
-              <CardTitle className="flex items-center">
+          <Card className="overflow-hidden border-rose-200 bg-gradient-to-br from-white to-rose-50 shadow-md transition-all hover:-translate-y-0.5 hover:shadow-lg dark:border-rose-900 dark:from-slate-900 dark:to-rose-950/30">
+            <CardHeader className="pb-2">
+              <CardTitle className="flex items-center text-sm font-semibold text-rose-800 dark:text-rose-300">
                 Total operating expenses
                 <InfoTip text="Combined total of payroll, mileage reimbursements, and other operating expenses." />
               </CardTitle>
             </CardHeader>
-            <CardContent className="text-2xl font-semibold">
+            <CardContent className="text-2xl font-bold tracking-tight">
               ${kpis.totalExpenses.toFixed(2)}
             </CardContent>
           </Card>
 
           {viewType === "monthly" && payrollProgress && (
-            <Card className="shadow-sm">
-              <CardHeader>
-                <CardTitle className="flex items-center">
+            <Card className="overflow-hidden border-amber-200 bg-gradient-to-br from-white to-amber-50 shadow-md transition-all hover:-translate-y-0.5 hover:shadow-lg dark:border-amber-900 dark:from-slate-900 dark:to-amber-950/30">
+              <CardHeader className="pb-2">
+                <CardTitle className="flex items-center text-sm font-semibold text-amber-800 dark:text-amber-300">
                   Payroll Progress
                   <InfoTip text="Accrued labor so far this month compared with a projected full-month payroll based on the current pace." />
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
-                <div className="text-2xl font-semibold">
+                <div className="text-2xl font-bold tracking-tight">
                   ${payrollProgress.accrued.toFixed(2)} / $
                   {payrollProgress.projected.toFixed(2)} projected
                 </div>
 
-                <div className="h-2 w-full rounded bg-muted overflow-hidden">
+                <div className="h-2.5 w-full overflow-hidden rounded-full bg-amber-100 dark:bg-amber-950">
                   <div
-                    className="h-full bg-blue-600 transition-all"
+                    className="h-full rounded-full bg-gradient-to-r from-amber-400 via-orange-500 to-rose-500 transition-all"
                     style={{
                       width: `${Math.min(
                         100,
@@ -997,9 +999,9 @@ const {
             </Card>
           )}
 
-          <Card className="shadow-sm">
-            <CardHeader>
-              <CardTitle className="flex items-center">
+          <Card className="overflow-hidden border-cyan-200 bg-gradient-to-br from-white to-cyan-50 shadow-md transition-all hover:-translate-y-0.5 hover:shadow-lg dark:border-cyan-900 dark:from-slate-900 dark:to-cyan-950/30">
+            <CardHeader className="pb-2">
+              <CardTitle className="flex items-center text-sm font-semibold text-cyan-800 dark:text-cyan-300">
                {accountingView === "operational"
   ? "Net income"
   : "Net cash flow"}
@@ -1015,9 +1017,9 @@ const {
             </CardContent>
           </Card>
 
-          <Card className="shadow-sm">
-            <CardHeader>
-              <CardTitle>Expense mix</CardTitle>
+          <Card className="overflow-hidden border-indigo-200 bg-gradient-to-br from-white to-indigo-50 shadow-md transition-all hover:-translate-y-0.5 hover:shadow-lg dark:border-indigo-900 dark:from-slate-900 dark:to-indigo-950/30">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-semibold text-indigo-800 dark:text-indigo-300">Expense mix</CardTitle>
               <CardDescription>
                 Relative share of payroll, other expenses, and mileage.
               </CardDescription>
@@ -1035,7 +1037,7 @@ const {
                     {expenseBreakdown.map((_, i) => (
                       <Cell
                         key={i}
-                        fill={["#8884d8", "#82ca9d", "#ffc658"][i % 3]}
+                        fill={["#6366f1", "#f43f5e", "#f59e0b"][i % 3]}
                       />
                     ))}
                   </Pie>
@@ -1048,9 +1050,9 @@ const {
           </Card>
         </div>)}
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Revenue vs. expenses</CardTitle>
+        <Card className="overflow-hidden border-slate-200 bg-white shadow-lg dark:border-slate-800 dark:bg-slate-900">
+          <CardHeader className="border-b bg-gradient-to-r from-blue-50 via-white to-emerald-50 dark:from-blue-950/30 dark:via-slate-900 dark:to-emerald-950/30">
+            <CardTitle className="text-xl text-slate-800 dark:text-slate-100">Revenue vs. expenses</CardTitle>
             <CardDescription>
               Month-over-month view of billed revenue, operating expenses, and
               net result.
@@ -1059,24 +1061,24 @@ const {
           <CardContent className="h-80">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={chartSeries}>
-                <CartesianGrid strokeDasharray="3 3" />
+                <CartesianGrid strokeDasharray="4 4" vertical={false} stroke="#cbd5e1" />
                 <XAxis dataKey="month" />
                 <YAxis tickFormatter={(v) => `$${v}`} />
                 <RechartsTooltip
                   formatter={(v: any) => `$${Number(v).toFixed(2)}`}
                 />
                 <Legend />
-                <Bar dataKey="Revenue" fill="#82ca9d" />
-                <Bar dataKey="Expenses" fill="#8884d8" />
-                <Line type="monotone" dataKey="Net" stroke="#ff7300" />
+                <Bar dataKey="Revenue" fill="#10b981" radius={[6, 6, 0, 0]} />
+                <Bar dataKey="Expenses" fill="#6366f1" radius={[6, 6, 0, 0]} />
+                <Line type="monotone" dataKey="Net" stroke="#f97316" strokeWidth={3} dot={{ r: 4 }} />
               </BarChart>
             </ResponsiveContainer>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Monthly breakdown</CardTitle>
+        <Card className="overflow-hidden border-slate-200 bg-white shadow-lg dark:border-slate-800 dark:bg-slate-900">
+          <CardHeader className="border-b bg-gradient-to-r from-slate-50 to-indigo-50/70 dark:from-slate-900 dark:to-indigo-950/30">
+            <CardTitle className="text-xl text-slate-800 dark:text-slate-100">Monthly breakdown</CardTitle>
             <CardDescription>
               Comparison of standard service charges, actual revenue, and
               expense categories by month.
@@ -1084,8 +1086,8 @@ const {
           </CardHeader>
           <CardContent className="overflow-x-auto">
             <Table>
-              <TableHeader>
-                <TableRow>
+              <TableHeader className="bg-slate-100/90 dark:bg-slate-800/90">
+                <TableRow className="hover:bg-transparent">
                   <TableHead>Month</TableHead>
                   {accountingView === "operational" && (
                   <TableHead className="text-right">
@@ -1162,8 +1164,8 @@ const {
                   </TableRow>
                 ) : (
                   monthlyRows.map((r) => (
-                    <TableRow key={r.month}>
-                      <TableCell className="font-medium">{r.month}</TableCell>
+                    <TableRow key={r.month} className="transition-colors hover:bg-blue-50/60 dark:hover:bg-blue-950/20">
+                      <TableCell className="font-semibold text-slate-700 dark:text-slate-200">{r.month}</TableCell>
 
                       {accountingView === "operational" && (
   <TableCell className="text-right">
