@@ -25,6 +25,17 @@ type PaystubCardProps = {
   companyContact?: string;
 };
 
+const currency = new Intl.NumberFormat("en-US", {
+  style: "currency",
+  currency: "USD",
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 2,
+});
+
+function formatMoney(value: number) {
+  return currency.format(Number.isFinite(value) ? value : 0);
+}
+
 export function PaystubCard({
   companyName,
   logoUrl,
@@ -43,197 +54,349 @@ export function PaystubCard({
   netPay,
   companyContact,
 }: PaystubCardProps) {
-    const totalDeductions = deductions.reduce((sum, d) => sum + d.amount, 0);
+  const safeDeductions = deductions.filter(
+    (deduction) =>
+      deduction &&
+      typeof deduction.label === "string" &&
+      Number.isFinite(deduction.amount)
+  );
 
-  const regularAmount =
-    payRate != null ? regularHours * payRate : 0;
+  const totalDeductions = safeDeductions.reduce(
+    (sum, deduction) => sum + deduction.amount,
+    0
+  );
 
-  const bonusRate =
-    payRate != null ? payRate + 0.5 : 0;
+  const regularAmount = payRate != null ? regularHours * payRate : 0;
 
-  const bonusAmount =
-    payRate != null ? bonusHours * bonusRate : 0;
+  // Preserves your existing payroll rule:
+  // bonus-hour rate = regular hourly rate + $0.50.
+  const bonusRate = payRate != null ? payRate + 0.5 : 0;
+  const bonusAmount = payRate != null ? bonusHours * bonusRate : 0;
+
+  const totalHours = regularHours + bonusHours;
+  const initials = employeeName
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part.charAt(0).toUpperCase())
+    .join("");
 
   return (
-    <div className="mx-auto w-full max-w-4xl bg-white text-black shadow-sm print:max-w-none print:shadow-none">
-      <div className="border-b px-6 py-5">
-        <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+    <article
+      className="mx-auto w-full max-w-5xl overflow-hidden rounded-2xl border border-slate-200 bg-white text-slate-950 shadow-xl print:max-w-none print:rounded-none print:border-0 print:shadow-none"
+      aria-label={`Pay stub for ${employeeName}`}
+    >
+      {/* Branded header */}
+      <header className="relative overflow-hidden bg-gradient-to-r from-slate-950 via-blue-950 to-indigo-950 px-6 py-6 text-white sm:px-8">
+        <div className="absolute -right-16 -top-20 h-56 w-56 rounded-full bg-cyan-400/15 blur-3xl" />
+        <div className="absolute -bottom-24 left-1/3 h-52 w-52 rounded-full bg-violet-500/15 blur-3xl" />
+
+        <div className="relative flex flex-col gap-6 sm:flex-row sm:items-start sm:justify-between">
           <div className="flex items-center gap-4">
             {logoUrl ? (
-              <img
-                src={logoUrl}
-                alt={`${companyName} logo`}
-                className="h-14 w-auto object-contain"
-              />
+              <div className="flex h-16 w-20 items-center justify-center rounded-2xl border border-white/15 bg-white p-2 shadow-lg">
+                <img
+                  src={logoUrl}
+                  alt={`${companyName} logo`}
+                  className="max-h-12 w-auto object-contain"
+                />
+              </div>
             ) : (
-              <div className="text-lg font-bold">{companyName}</div>
+              <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-cyan-400 to-blue-500 text-xl font-black shadow-lg">
+                {companyName.charAt(0).toUpperCase()}
+              </div>
             )}
 
             <div>
-              <h1 className="text-xl font-bold tracking-tight">
-  {companyName}
-</h1>
-<p className="text-xs text-gray-500">
-  Commercial Cleaning Services
-</p>
-              <p className="text-sm text-gray-600">Employee Pay Stub</p>
+              <p className="text-xs font-semibold uppercase tracking-[0.22em] text-cyan-200">
+                Official Pay Statement
+              </p>
+              <h1 className="mt-1 text-xl font-bold tracking-tight sm:text-2xl">
+                {companyName}
+              </h1>
+              <p className="mt-1 text-sm text-blue-100/80">
+                Employee earnings and deductions
+              </p>
             </div>
           </div>
 
-          <div className="text-sm">
-            <div>
-              <span className="font-semibold">Pay Date:</span> {payDate}
+          <div className="min-w-[240px] rounded-2xl border border-white/15 bg-white/10 p-4 backdrop-blur">
+            <div className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-sm">
+              <span className="text-blue-200">Pay date</span>
+              <span className="text-right font-semibold">{payDate}</span>
+
+              <span className="text-blue-200">Pay period</span>
+              <span className="text-right font-semibold">
+                {payPeriodStart} – {payPeriodEnd}
+              </span>
+
+              {employeeId ? (
+                <>
+                  <span className="text-blue-200">Employee ID</span>
+                  <span className="text-right font-semibold">{employeeId}</span>
+                </>
+              ) : null}
             </div>
-            <div>
-              <span className="font-semibold">Pay Period:</span> {payPeriodStart} - {payPeriodEnd}
+          </div>
+        </div>
+      </header>
+
+      {/* Employee and pay summary */}
+      <section className="grid gap-4 bg-slate-50 px-6 py-5 sm:grid-cols-2 sm:px-8">
+        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+          <div className="flex items-start gap-4">
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-100 to-indigo-100 font-bold text-blue-700">
+              {initials || "E"}
             </div>
-            {employeeId ? (
-              <div>
-                <span className="font-semibold">Employee ID:</span> {employeeId}
+
+            <div className="min-w-0">
+              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
+                Employee
+              </p>
+              <h2 className="mt-1 truncate text-lg font-bold text-slate-950">
+                {employeeName}
+              </h2>
+
+              <div className="mt-3 space-y-1 text-sm text-slate-600">
+                <p>
+                  <span className="font-semibold text-slate-800">Address:</span>{" "}
+                  {employeeAddress || "Not provided"}
+                </p>
+
+                {payRate != null ? (
+                  <p>
+                    <span className="font-semibold text-slate-800">
+                      Regular rate:
+                    </span>{" "}
+                    {formatMoney(payRate)}/hr
+                  </p>
+                ) : null}
+
+                <p>
+                  <span className="font-semibold text-slate-800">
+                    Total hours:
+                  </span>{" "}
+                  {totalHours.toFixed(2)}
+                </p>
               </div>
-            ) : null}
-          </div>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 gap-4 px-6 py-4 md:grid-cols-2">
-        <div className="rounded-md border p-4">
-          <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-gray-600">
-            Employee Information
-          </h2>
-          <div className="space-y-1 text-sm">
-            <div>
-              <span className="font-semibold">Name:</span> {employeeName}
-            </div>
-            <div>
-  <span className="font-semibold">Address:</span>{" "}
-  {employeeAddress || "—"}
-</div>
-            {payRate != null ? (
-              <div>
-                <span className="font-semibold">Pay Rate:</span> ${payRate.toFixed(2)}/hr
-              </div>
-            ) : null}
-            <div>
-  <span className="font-semibold">Hours Worked:</span>{" "}
-  {(regularHours + bonusHours).toFixed(2)}
-</div>
-          </div>
-        </div>
-
-        <div className="rounded-md border p-4">
-          <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-gray-600">
-            Pay Summary
-          </h2>
-          <div className="space-y-1 text-sm">
-            <div>
-              <span className="font-semibold">Gross Pay:</span> ${grossPay.toFixed(2)}
-            </div>
-            <div>
-              <span className="font-semibold">Total Deductions:</span> ${totalDeductions.toFixed(2)}
-            </div>
-            <div className="text-lg font-bold text-green-700">
-              <span>Net Pay:</span> ${netPay.toFixed(2)}
             </div>
           </div>
         </div>
-      </div>
 
-      <div className="px-6 py-2">
-        <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-gray-600">
-          Earnings
-        </h2>
-        <table className="w-full border-collapse text-sm">
-          <thead>
-            <tr>
-              <th className="border-b bg-gray-50 px-3 py-2 text-left font-semibold">Description</th>
-              <th className="border-b bg-gray-50 px-3 py-2 text-right font-semibold">Hours</th>
-              <th className="border-b bg-gray-50 px-3 py-2 text-right font-semibold">Rate</th>
-              <th className="border-b bg-gray-50 px-3 py-2 text-right font-semibold">Amount</th>
-            </tr>
-          </thead>
-          <tbody>
-  <tr>
-    <td className="border-b px-3 py-2">Regular</td>
-    <td className="border-b px-3 py-2 text-right">
-      {regularHours.toFixed(2)}
-    </td>
-    <td className="border-b px-3 py-2 text-right">
-      {payRate != null ? `$${payRate.toFixed(2)}` : "-"}
-    </td>
-    <td className="border-b px-3 py-2 text-right">
-      ${regularAmount.toFixed(2)}
-    </td>
-  </tr>
+        <div className="rounded-2xl border border-emerald-200 bg-gradient-to-br from-emerald-50 to-teal-50 p-5 shadow-sm">
+          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-emerald-700">
+            Take-home pay
+          </p>
+          <p className="mt-2 text-4xl font-black tracking-tight text-emerald-700">
+            {formatMoney(netPay)}
+          </p>
 
-  {bonusHours > 0 ? (
-    <tr>
-      <td className="border-b px-3 py-2">Bonus</td>
-      <td className="border-b px-3 py-2 text-right">
-        {bonusHours.toFixed(2)}
-      </td>
-      <td className="border-b px-3 py-2 text-right">
-        ${bonusRate.toFixed(2)}
-      </td>
-      <td className="border-b px-3 py-2 text-right">
-        ${bonusAmount.toFixed(2)}
-      </td>
-    </tr>
-  ) : null}
+          <div className="mt-4 grid grid-cols-2 gap-3 border-t border-emerald-200 pt-4 text-sm">
+            <div>
+              <p className="text-slate-500">Gross pay</p>
+              <p className="mt-1 font-bold text-slate-900">
+                {formatMoney(grossPay)}
+              </p>
+            </div>
+            <div className="text-right">
+              <p className="text-slate-500">Deductions</p>
+              <p className="mt-1 font-bold text-rose-600">
+                −{formatMoney(totalDeductions)}
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
 
-  {flatBonus > 0 ? (
-    <tr>
-      <td className="border-b px-3 py-2">Flat Bonus</td>
-      <td className="border-b px-3 py-2 text-right">-</td>
-      <td className="border-b px-3 py-2 text-right">-</td>
-      <td className="border-b px-3 py-2 text-right">
-        ${flatBonus.toFixed(2)}
-      </td>
-    </tr>
-  ) : null}
-</tbody>
-        </table>
-      </div>
+      {/* Earnings */}
+      <section className="px-6 py-5 sm:px-8">
+        <div className="mb-3 flex items-center justify-between">
+          <div>
+            <h2 className="text-base font-bold text-slate-950">Earnings</h2>
+            <p className="text-xs text-slate-500">
+              Hours, rates, and earnings for this pay period
+            </p>
+          </div>
+          <span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700">
+            Gross {formatMoney(grossPay)}
+          </span>
+        </div>
 
-      <div className="px-6 py-4">
-        <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-gray-600">
-          Deductions
-        </h2>
-        <table className="w-full border-collapse text-sm">
-          <thead>
-            <tr>
-              <th className="border-b bg-gray-50 px-3 py-2 text-left font-semibold">Description</th>
-              <th className="border-b bg-gray-50 px-3 py-2 text-right font-semibold">Amount</th>
-            </tr>
-          </thead>
-          <tbody>
-            {deductions.length > 0 ? (
-              deductions.map((d) => (
-                <tr key={d.label}>
-                  <td className="border-b px-3 py-2">{d.label}</td>
-                  <td className="border-b px-3 py-2 text-right">${d.amount.toFixed(2)}</td>
-                </tr>
-              ))
-            ) : (
-              <tr>
-                <td className="border-b px-3 py-2">No deductions</td>
-                <td className="border-b px-3 py-2 text-right">$0.00</td>
+        <div className="overflow-hidden rounded-2xl border border-slate-200">
+          <table className="w-full border-collapse text-sm">
+            <thead>
+              <tr className="bg-slate-100 text-slate-700">
+                <th className="px-4 py-3 text-left font-semibold">
+                  Description
+                </th>
+                <th className="px-4 py-3 text-right font-semibold">Hours</th>
+                <th className="px-4 py-3 text-right font-semibold">Rate</th>
+                <th className="px-4 py-3 text-right font-semibold">Amount</th>
               </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
+            </thead>
 
-      <div className="border-t px-6 py-4 text-xs text-gray-500 space-y-1">
-  <div>This is a generated pay statement from .</div>
+            <tbody className="divide-y divide-slate-200">
+              <tr>
+                <td className="px-4 py-3 font-medium text-slate-900">
+                  Regular earnings
+                </td>
+                <td className="px-4 py-3 text-right text-slate-600">
+                  {regularHours.toFixed(2)}
+                </td>
+                <td className="px-4 py-3 text-right text-slate-600">
+                  {payRate != null ? formatMoney(payRate) : "—"}
+                </td>
+                <td className="px-4 py-3 text-right font-semibold text-slate-900">
+                  {formatMoney(regularAmount)}
+                </td>
+              </tr>
 
-  <div className="font-medium text-gray-700">
-    Amazing Grace Cleaners LLC
-  </div>
+              {bonusHours > 0 ? (
+                <tr>
+                  <td className="px-4 py-3 font-medium text-slate-900">
+                    Bonus hours
+                  </td>
+                  <td className="px-4 py-3 text-right text-slate-600">
+                    {bonusHours.toFixed(2)}
+                  </td>
+                  <td className="px-4 py-3 text-right text-slate-600">
+                    {payRate != null ? formatMoney(bonusRate) : "—"}
+                  </td>
+                  <td className="px-4 py-3 text-right font-semibold text-slate-900">
+                    {formatMoney(bonusAmount)}
+                  </td>
+                </tr>
+              ) : null}
 
-  <div>Email: amazinggracecleaners1@gmail.com</div>
-  <div>Phone: (859) 740-0101</div>
-</div>
-    </div>
+              {flatBonus > 0 ? (
+                <tr>
+                  <td className="px-4 py-3 font-medium text-slate-900">
+                    Flat bonus
+                  </td>
+                  <td className="px-4 py-3 text-right text-slate-400">—</td>
+                  <td className="px-4 py-3 text-right text-slate-400">—</td>
+                  <td className="px-4 py-3 text-right font-semibold text-blue-700">
+                    {formatMoney(flatBonus)}
+                  </td>
+                </tr>
+              ) : null}
+            </tbody>
+
+            <tfoot>
+              <tr className="bg-blue-50">
+                <td
+                  colSpan={3}
+                  className="px-4 py-3 text-right font-bold text-blue-900"
+                >
+                  Total gross pay
+                </td>
+                <td className="px-4 py-3 text-right text-base font-black text-blue-700">
+                  {formatMoney(grossPay)}
+                </td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      </section>
+
+      {/* Deductions */}
+      <section className="border-t border-slate-100 px-6 py-5 sm:px-8">
+        <div className="mb-3 flex items-center justify-between">
+          <div>
+            <h2 className="text-base font-bold text-slate-950">
+              Taxes & Deductions
+            </h2>
+            <p className="text-xs text-slate-500">
+              Amounts withheld from gross pay
+            </p>
+          </div>
+          <span className="rounded-full bg-rose-50 px-3 py-1 text-xs font-semibold text-rose-700">
+            Total {formatMoney(totalDeductions)}
+          </span>
+        </div>
+
+        <div className="overflow-hidden rounded-2xl border border-slate-200">
+          <table className="w-full border-collapse text-sm">
+            <thead>
+              <tr className="bg-slate-100 text-slate-700">
+                <th className="px-4 py-3 text-left font-semibold">
+                  Description
+                </th>
+                <th className="px-4 py-3 text-right font-semibold">Amount</th>
+              </tr>
+            </thead>
+
+            <tbody className="divide-y divide-slate-200">
+              {safeDeductions.length > 0 ? (
+                safeDeductions.map((deduction, index) => (
+                  <tr key={`${deduction.label}-${index}`}>
+                    <td className="px-4 py-3 font-medium text-slate-800">
+                      {deduction.label}
+                    </td>
+                    <td className="px-4 py-3 text-right font-semibold text-rose-600">
+                      −{formatMoney(deduction.amount)}
+                    </td>
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td className="px-4 py-4 text-slate-600">No deductions</td>
+                  <td className="px-4 py-4 text-right font-semibold text-slate-700">
+                    {formatMoney(0)}
+                  </td>
+                </tr>
+              )}
+            </tbody>
+
+            <tfoot>
+              <tr className="bg-rose-50">
+                <td className="px-4 py-3 text-right font-bold text-rose-900">
+                  Total deductions
+                </td>
+                <td className="px-4 py-3 text-right text-base font-black text-rose-700">
+                  −{formatMoney(totalDeductions)}
+                </td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      </section>
+
+      {/* Final net-pay band */}
+      <section className="mx-6 mb-6 rounded-2xl bg-gradient-to-r from-emerald-600 to-teal-600 px-5 py-4 text-white shadow-lg shadow-emerald-600/15 sm:mx-8">
+        <div className="flex items-center justify-between gap-4">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-100">
+              Net pay
+            </p>
+            <p className="mt-1 text-sm text-emerald-50/90">
+              Gross pay minus taxes and deductions
+            </p>
+          </div>
+          <p className="text-3xl font-black tracking-tight">
+            {formatMoney(netPay)}
+          </p>
+        </div>
+      </section>
+
+      {/* Footer */}
+      <footer className="border-t border-slate-200 bg-slate-50 px-6 py-4 text-xs text-slate-500 sm:px-8">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <p>
+              This is an electronically generated pay statement from{" "}
+              <span className="font-semibold text-slate-700">{companyName}</span>.
+            </p>
+            {companyContact ? (
+              <p className="mt-1 text-slate-600">{companyContact}</p>
+            ) : null}
+          </div>
+
+          <p className="font-medium text-slate-500">
+            Keep this statement for your records.
+          </p>
+        </div>
+      </footer>
+    </article>
   );
 }
