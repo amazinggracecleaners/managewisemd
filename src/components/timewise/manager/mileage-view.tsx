@@ -364,9 +364,9 @@ export function MileageView({
   }, [mileageLogs]);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 bg-gradient-to-b from-slate-50 to-white p-2 rounded-xl">
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <Card>
+        <Card className="border-0 shadow-lg bg-gradient-to-r from-blue-600 to-indigo-600 text-white">
           <CardHeader>
             <CardTitle>Date Range</CardTitle>
           </CardHeader>
@@ -423,7 +423,7 @@ export function MileageView({
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="border-0 shadow-lg bg-gradient-to-r from-emerald-600 to-teal-600 text-white">
           <CardHeader>
             <CardTitle>Mileage Totals</CardTitle>
             <CardDescription>At-a-glance mileage summary.</CardDescription>
@@ -471,8 +471,8 @@ export function MileageView({
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* SUMMARY */}
-        <Card>
-          <CardHeader>
+        <Card className="shadow-xl border-indigo-200 hover:shadow-2xl transition-all">
+          <CardHeader className="bg-gradient-to-r from-indigo-50 to-blue-50">
             <div className="flex justify-between items-center gap-3">
               <div>
                 <CardTitle>Mileage Summary</CardTitle>
@@ -496,7 +496,7 @@ export function MileageView({
           <CardContent>
             <ScrollArea className="h-[450px]">
               <Table>
-                <TableHeader>
+                <TableHeader className="bg-slate-100">
                   <TableRow>
                     <TableHead className="capitalize">{groupBy}</TableHead>
                     <TableHead># Trips</TableHead>
@@ -528,8 +528,8 @@ export function MileageView({
         </Card>
 
         {/* TRACKER */}
-        <Card>
-          <CardHeader>
+        <Card className="shadow-xl border-emerald-200 hover:shadow-2xl transition-all">
+          <CardHeader className="bg-gradient-to-r from-emerald-50 to-cyan-50">
             <div className="flex justify-between items-center gap-3 flex-wrap">
               <div>
                 <CardTitle>Mileage Tracker</CardTitle>
@@ -664,12 +664,12 @@ export function MileageView({
                   </div>
 
                   {!isTracking ? (
-                    <Button onClick={startTracking} className="w-full" disabled={!tripPurpose.trim()}>
+                    <Button onClick={startTracking} className="w-full bg-emerald-600 hover:bg-emerald-700 text-white shadow-lg" disabled={!tripPurpose.trim()}>
                       <Play className="mr-2" />
                       Start Trip
                     </Button>
                   ) : (
-                    <Button onClick={stopTracking} variant="destructive" className="w-full">
+                    <Button onClick={stopTracking} variant="destructive" className="w-full shadow-lg animate-pulse">
                       <Square className="mr-2" />
                       Stop Trip
                     </Button>
@@ -681,7 +681,7 @@ export function MileageView({
             {/* Logs table */}
             <ScrollArea className="h-72">
               <Table>
-                <TableHeader>
+                <TableHeader className="bg-slate-100">
                   <TableRow>
                     <TableHead>Date</TableHead>
                     <TableHead>Purpose</TableHead>
