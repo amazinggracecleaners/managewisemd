@@ -1,5 +1,3 @@
-
-
 "use client";
 
 import React, { useState, useMemo } from 'react';
@@ -9,7 +7,19 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { PlusCircle, Trash2, Edit, Download, Paperclip } from 'lucide-react';
+import {
+  PlusCircle,
+  Trash2,
+  Edit,
+  Download,
+  Paperclip,
+  CalendarDays,
+  ReceiptText,
+  Tags,
+  CircleDollarSign,
+  WalletCards,
+  Store,
+} from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -285,11 +295,45 @@ setPaidDate('');
 
     return (
         <div className="space-y-6">
-            <Card>
-                <CardHeader>
-                    <CardTitle>Date Range</CardTitle>
+            <Card className="overflow-hidden border-0 bg-gradient-to-r from-slate-950 via-indigo-950 to-violet-900 text-white shadow-xl">
+                <CardHeader className="relative">
+                    <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(255,255,255,0.18),transparent_35%)]" />
+                    <div className="relative flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                        <div className="space-y-2">
+                            <div className="flex items-center gap-3">
+                                <div className="rounded-2xl bg-white/10 p-3 ring-1 ring-white/20 backdrop-blur">
+                                    <WalletCards className="h-6 w-6 text-violet-100" />
+                                </div>
+                                <div>
+                                    <CardTitle className="text-2xl text-white">Other Expenses</CardTitle>
+                                    <CardDescription className="mt-1 text-slate-200">
+                                        Track operating costs, receipts, vendors, and site-related spending.
+                                    </CardDescription>
+                                </div>
+                            </div>
+                        </div>
+                        <div className="rounded-2xl bg-white/10 px-5 py-3 text-right ring-1 ring-white/20 backdrop-blur">
+                            <p className="text-xs font-medium uppercase tracking-[0.18em] text-violet-200">Selected period</p>
+                            <p className="mt-1 text-2xl font-bold text-white">${totalExpenses.toFixed(2)}</p>
+                            <p className="text-xs text-slate-300">{filteredExpenses.length} expense{filteredExpenses.length === 1 ? "" : "s"}</p>
+                        </div>
+                    </div>
                 </CardHeader>
-                <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
+            </Card>
+
+            <Card className="border-indigo-100 bg-gradient-to-br from-white to-indigo-50/70 shadow-md dark:border-indigo-950 dark:from-slate-950 dark:to-indigo-950/30">
+                <CardHeader className="pb-3">
+                    <CardTitle className="flex items-center gap-2 text-lg">
+                        <span className="rounded-lg bg-indigo-100 p-2 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300">
+                            <CalendarDays className="h-4 w-4" />
+                        </span>
+                        Reporting Period
+                    </CardTitle>
+                    <CardDescription>
+                        Choose the reporting range and accounting perspective.
+                    </CardDescription>
+                </CardHeader>
+                <CardContent className="grid grid-cols-1 gap-4 items-end md:grid-cols-4">
                     <div className="space-y-2">
                         <Label>View Type</Label>
                         <Select value={viewType} onValueChange={(v: any) => setViewType(v)}>
@@ -349,13 +393,20 @@ setPaidDate('');
 </div>
                 </CardContent>
             </Card>
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <Card>
-                    <CardHeader>
+            <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
+                <Card className="overflow-hidden border-violet-100 shadow-lg transition-shadow hover:shadow-xl dark:border-violet-950">
+                    <CardHeader className="border-b border-violet-100 bg-gradient-to-r from-violet-50 via-fuchsia-50 to-white dark:border-violet-950 dark:from-violet-950/40 dark:via-fuchsia-950/20 dark:to-slate-950">
                         <div className="flex justify-between items-center flex-wrap gap-2">
-                            <div>
-                                <CardTitle>Expense Summary</CardTitle>
-                                <CardDescription>A pivot table summarizing expenses for the selected period.</CardDescription>
+                            <div className="flex items-start gap-3">
+                                <span className="rounded-xl bg-violet-100 p-2.5 text-violet-700 dark:bg-violet-950 dark:text-violet-300">
+                                    <Tags className="h-5 w-5" />
+                                </span>
+                                <div>
+                                    <CardTitle>Expense Summary</CardTitle>
+                                    <CardDescription className="mt-1">
+                                        A categorized view of spending for the selected period.
+                                    </CardDescription>
+                                </div>
                             </div>
                             <div className="flex items-center gap-2">
                                 <div className="w-48">
@@ -370,17 +421,27 @@ setPaidDate('');
                                         </SelectContent>
                                     </Select>
                                 </div>
-                                <Button onClick={downloadSummaryCSV} variant="outline" size="sm" disabled={expenseSummary.length === 0}>
+                                <Button onClick={downloadSummaryCSV} variant="outline" size="sm" disabled={expenseSummary.length === 0} className="border-violet-200 text-violet-700 hover:bg-violet-50 dark:border-violet-800 dark:text-violet-300 dark:hover:bg-violet-950">
                                     <Download className="mr-2 h-4 w-4" /> CSV
                                 </Button>
                             </div>
                         </div>
                     </CardHeader>
-                    <CardContent>
+                    <CardContent className="p-0">
+                        <div className="grid grid-cols-2 gap-3 border-b bg-slate-50/80 p-4 dark:bg-slate-900/60">
+                            <div className="rounded-xl border border-rose-100 bg-rose-50 p-3 dark:border-rose-950 dark:bg-rose-950/30">
+                                <p className="text-xs font-medium uppercase tracking-wide text-rose-600 dark:text-rose-300">Total spending</p>
+                                <p className="mt-1 text-xl font-bold text-rose-700 dark:text-rose-200">${totalExpenses.toFixed(2)}</p>
+                            </div>
+                            <div className="rounded-xl border border-violet-100 bg-violet-50 p-3 dark:border-violet-950 dark:bg-violet-950/30">
+                                <p className="text-xs font-medium uppercase tracking-wide text-violet-600 dark:text-violet-300">Categories</p>
+                                <p className="mt-1 text-xl font-bold text-violet-700 dark:text-violet-200">{expenseSummary.length}</p>
+                            </div>
+                        </div>
                         <ScrollArea className="h-96">
                             <Table>
-                                <TableHeader>
-                                    <TableRow>
+                                <TableHeader className="sticky top-0 z-10 bg-violet-50/95 backdrop-blur dark:bg-violet-950/80">
+                                    <TableRow className="hover:bg-transparent">
                                         <TableHead className="capitalize">{groupBy}</TableHead>
                                         <TableHead>Count</TableHead>
                                         <TableHead className="text-right">Total Amount</TableHead>
@@ -389,10 +450,14 @@ setPaidDate('');
                                 <TableBody>
                                     {expenseSummary.length > 0 ? (
                                         expenseSummary.map(item => (
-                                            <TableRow key={item.key}>
+                                            <TableRow key={item.key} className="transition-colors hover:bg-violet-50/60 dark:hover:bg-violet-950/20">
                                                 <TableCell className="font-medium">{item.key}</TableCell>
-                                                <TableCell>{item.count}</TableCell>
-                                                <TableCell className="text-right">${item.totalAmount.toFixed(2)}</TableCell>
+                                                <TableCell>
+                                                    <span className="inline-flex min-w-7 items-center justify-center rounded-full bg-violet-100 px-2 py-0.5 text-xs font-semibold text-violet-700 dark:bg-violet-950 dark:text-violet-300">
+                                                        {item.count}
+                                                    </span>
+                                                </TableCell>
+                                                <TableCell className="text-right font-semibold text-rose-600 dark:text-rose-300">${item.totalAmount.toFixed(2)}</TableCell>
                                             </TableRow>
                                         ))
                                     ) : (
@@ -405,27 +470,46 @@ setPaidDate('');
                         </ScrollArea>
                     </CardContent>
                 </Card>
-                <Card>
-                    <CardHeader>
+                <Card className="overflow-hidden border-emerald-100 shadow-lg transition-shadow hover:shadow-xl dark:border-emerald-950">
+                    <CardHeader className="border-b border-emerald-100 bg-gradient-to-r from-emerald-50 via-cyan-50 to-white dark:border-emerald-950 dark:from-emerald-950/35 dark:via-cyan-950/20 dark:to-slate-950">
                         <div className="flex justify-between items-center">
-                            <div>
-                                <CardTitle>Expense Log</CardTitle>
-                                <CardDescription>Log and manage miscellaneous business expenses.</CardDescription>
+                            <div className="flex items-start gap-3">
+                                <span className="rounded-xl bg-emerald-100 p-2.5 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300">
+                                    <ReceiptText className="h-5 w-5" />
+                                </span>
+                                <div>
+                                    <CardTitle>Expense Log</CardTitle>
+                                    <CardDescription className="mt-1">
+                                        Review receipts, vendors, sites, and individual transactions.
+                                    </CardDescription>
+                                </div>
                             </div>
                             <div className="flex items-center gap-2">
-                                <Button onClick={downloadCSV} variant="outline" size="sm" disabled={filteredExpenses.length === 0}>
+                                <Button onClick={downloadCSV} variant="outline" size="sm" disabled={filteredExpenses.length === 0} className="border-emerald-200 text-emerald-700 hover:bg-emerald-50 dark:border-emerald-800 dark:text-emerald-300 dark:hover:bg-emerald-950">
                                     <Download className="mr-2 h-4 w-4" /> CSV
                                 </Button>
                                 <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
                                     <DialogTrigger asChild>
-                                        <Button onClick={() => handleOpenDialog()} size="sm">
+                                        <Button onClick={() => handleOpenDialog()} size="sm" className="bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-md hover:from-emerald-700 hover:to-teal-700">
                                             <PlusCircle className="mr-2 h-4 w-4" /> Add Expense
                                         </Button>
                                     </DialogTrigger>
-                                    <DialogContent>
-                                        <DialogHeader>
+                                    <DialogContent className="max-w-lg overflow-hidden border-0 p-0 shadow-2xl">
+                                        <div className="bg-gradient-to-r from-emerald-700 via-teal-700 to-cyan-700 px-6 py-5 text-white">
+                                            <div className="flex items-center gap-3">
+                                                <span className="rounded-xl bg-white/15 p-2 ring-1 ring-white/20">
+                                                    <CircleDollarSign className="h-5 w-5" />
+                                                </span>
+                                                <div>
+                                                    <p className="text-xs uppercase tracking-[0.18em] text-emerald-100">Expense record</p>
+                                                    <p className="font-semibold">{editingExpense ? 'Update transaction details' : 'Create a new transaction'}</p>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <DialogHeader className="px-6 pt-5">
                                             <DialogTitle>{editingExpense ? 'Edit' : 'Add'} Expense</DialogTitle>
                                         </DialogHeader>
+                                        <ScrollArea className="max-h-[65vh] px-6">
                                         <div className="space-y-4 py-4">
                                             <div className="space-y-2">
                                                 <Label htmlFor="date">Legacy Date</Label>
@@ -494,22 +578,23 @@ setPaidDate('');
                                                 )}
                                             </div>
                                         </div>
-                                        <DialogFooter>
+                                        </ScrollArea>
+                                        <DialogFooter className="border-t bg-slate-50 px-6 py-4 dark:bg-slate-900">
                                             <DialogClose asChild>
                                                 <Button variant="outline" disabled={isSaving}>Cancel</Button>
                                             </DialogClose>
-                                            <Button onClick={handleSubmit} disabled={isSaving}>{isSaving ? 'Saving...' : 'Save'}</Button>
+                                            <Button onClick={handleSubmit} disabled={isSaving} className="bg-gradient-to-r from-emerald-600 to-teal-600 text-white hover:from-emerald-700 hover:to-teal-700">{isSaving ? 'Saving...' : 'Save Expense'}</Button>
                                         </DialogFooter>
                                     </DialogContent>
                                 </Dialog>
                             </div>
                         </div>
                     </CardHeader>
-                    <CardContent>
-                        <ScrollArea className="h-[300px]">
+                    <CardContent className="p-0">
+                        <ScrollArea className="h-[360px]">
                             <Table>
-                                <TableHeader>
-                                  <TableRow>
+                                <TableHeader className="sticky top-0 z-10 bg-emerald-50/95 backdrop-blur dark:bg-emerald-950/80">
+                                  <TableRow className="hover:bg-transparent">
                                     <TableHead>Date</TableHead>
                                     <TableHead>Site</TableHead>
                                     <TableHead>Vendor</TableHead>
@@ -525,7 +610,7 @@ setPaidDate('');
                                             const showImage = isImageReceipt(expense.receiptUrl, expense.receiptMime);
                                             const siteName = sites.find(s => s.id === expense.siteId)?.name ?? "No Site";
                                             return (
-                                              <TableRow key={expense.id}>
+                                              <TableRow key={expense.id} className="transition-colors hover:bg-emerald-50/60 dark:hover:bg-emerald-950/20">
                                                 <TableCell>
   {accountingView === "cash"
     ? expense.paidDate || expense.date
@@ -534,7 +619,7 @@ setPaidDate('');
                                                 <TableCell>{siteName}</TableCell>
                                                 <TableCell>{expense.vendor || '—'}</TableCell>
                                                 <TableCell>{expense.description || '—'}</TableCell>
-                                                <TableCell>${expense.amount.toFixed(2)}</TableCell>
+                                                <TableCell className="font-semibold text-rose-600 dark:text-rose-300">${expense.amount.toFixed(2)}</TableCell>
 
                                                 <TableCell>
                                                   {expense.receiptUrl ? (
@@ -594,8 +679,15 @@ setPaidDate('');
                                 </TableBody>
                             </Table>
                         </ScrollArea>
-                        <div className="text-right font-bold mt-4">
-                            Total for Period: ${totalExpenses.toFixed(2)}
+                        <div className="flex items-center justify-between border-t bg-gradient-to-r from-slate-50 to-emerald-50 px-5 py-4 dark:from-slate-950 dark:to-emerald-950/30">
+                            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                                <Store className="h-4 w-4" />
+                                {filteredExpenses.length} transaction{filteredExpenses.length === 1 ? "" : "s"} in this period
+                            </div>
+                            <div className="rounded-xl bg-rose-100 px-4 py-2 text-right dark:bg-rose-950/40">
+                                <p className="text-xs font-medium uppercase tracking-wide text-rose-600 dark:text-rose-300">Total for period</p>
+                                <p className="text-xl font-bold text-rose-700 dark:text-rose-200">${totalExpenses.toFixed(2)}</p>
+                            </div>
                         </div>
                     </CardContent>
                 </Card>
