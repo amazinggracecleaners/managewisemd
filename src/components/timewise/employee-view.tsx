@@ -46,6 +46,13 @@ import {
   FilePenLine,
   Bell,
   CalendarDays,
+  Clock3,
+  CalendarRange,
+  Building2,
+  Home,
+  LockKeyhole,
+  Send,
+  Activity,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -80,8 +87,6 @@ import { EmployeePayrollView } from "./employee-payroll-view";
 import { cn } from "@/lib/utils";
 import { getGoogleMapsUrl } from "@/lib/navigation";
 import {
-  haversineMiles,
-  estimateDriveMinutes,
   optimizeRouteFromStart,
 } from "@/lib/routing";
 import {
@@ -252,6 +257,9 @@ export function EmployeeView({
   const { toast } = useToast();
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [currentDate, setCurrentDate] = useState(startOfDay(new Date()));
+  const [activeTab, setActiveTab] = useState<
+    "schedule" | "messages" | "activity" | "payroll"
+  >("schedule");
 const [dailySearch, setDailySearch] = useState("");
 
 const [statusFilter, setStatusFilter] = useState<
@@ -1102,176 +1110,154 @@ const employeeUnreadMessages = employeeMessages.filter(
   (m) => m.sender === "manager" && !m.readByEmployee
 ).length;
 
-const getTravelEstimateText = useCallback(
-  (site?: Site | null) => {
-    if (!settings.enableTravelDurations) return null;
+const employeeFirstName =
+  employee.firstName?.trim() ||
+  employee.name.trim().split(/\s+/)[0] ||
+  "there";
 
-    if (!coord || !site?.lat || !site?.lng) {
-      return null;
-    }
+const selectedWeekStart = startOfWeek(currentDate, {
+  weekStartsOn: settings.weekStartsOn,
+});
+const selectedWeekEnd = endOfWeek(currentDate, {
+  weekStartsOn: settings.weekStartsOn,
+});
 
-    const miles = haversineMiles(
-      coord.lat,
-      coord.lng,
-      site.lat,
-      site.lng
-    );
+const recentMessages = employeeMessages
+  .filter((message) => message.sender === "manager")
+  .slice(-2)
+  .reverse();
 
-    const minutes = estimateDriveMinutes(miles);
-
-    return `~${minutes} min drive • ${miles.toFixed(1)} mi`;
-  },
-  [coord, settings.enableTravelDurations]
-);
+const recentHeaderNotifications = headerNotifications.slice(0, 3);
 
  return (
   <>
-    <Card className="mb-6">
-      <CardHeader>
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-          <CardTitle>Welcome, {employee.name}</CardTitle>
-
-          {!isManagerPreview && (
-            <div className="flex items-center gap-2 flex-wrap">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setIsProfileOpen(true)}
-              >
-                <User className="mr-2 h-4 w-4" />
-                My Profile
-              </Button>
-
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="outline" size="sm" className="relative">
-                    <Bell className="mr-2 h-4 w-4" />
-                    Notifications
-
-                    {unreadNotificationCount > 0 && (
-                      <span className="ml-2 inline-flex min-w-[1.25rem] items-center justify-center rounded-full bg-red-600 px-1.5 py-0.5 text-[10px] font-semibold text-white">
-                        {unreadNotificationCount}
-                      </span>
-                    )}
-                  </Button>
-                </DropdownMenuTrigger>
-
-                <DropdownMenuContent align="end" className="w-96">
-                
-                    <div className="px-3 py-2 border-b flex justify-between items-center">
-  <span className="font-semibold text-sm">Notifications</span>
-
-  {unreadNotificationCount > 0 && (
-    <Button
-      variant="ghost"
-      size="sm"
-      onClick={markAllHeaderNotificationsRead}
-    >
-      Mark all as read
-    </Button>
-  )}
-</div>
-                  
-
-                  <DropdownMenuSeparator />
-
-                  {headerNotifications.length === 0 ? (
-                    <div className="p-4 text-sm text-muted-foreground">
-                      No notifications
-                    </div>
-                  ) : (
-                    <>
-                      {headerNotifications.slice(0, 3).map((n) => (
-                        <DropdownMenuItem
-                          key={n.id}
-                          onClick={() => {
-                            if (!n.read) void markHeaderNotificationRead(n.id);
-                          }}
-                          className="flex flex-col items-start gap-1 cursor-pointer hover:bg-muted"
-                        >
-                          <div className="flex justify-between w-full">
-                            <span className="font-medium">{n.title}</span>
-                            {!n.read && (
-                              <Badge
-                                variant="destructive"
-                                className="text-[10px]"
-                              >
-                                New
-                              </Badge>
-                            )}
-                          </div>
-
-                          <span className="text-xs text-muted-foreground line-clamp-2">
-                            {n.message}
-                          </span>
-                        </DropdownMenuItem>
-                      ))}
-
-                      <DropdownMenuSeparator />
-
-                      <Button
-                        variant="ghost"
-                        className="w-full"
-                        onClick={() => setOpenNotifications(true)}
-                      >
-                        View all notifications
-                      </Button>
-                    </>
-                  )}
-                </DropdownMenuContent>
-              </DropdownMenu>
-
-              <Dialog
-                open={openNotifications}
-                onOpenChange={setOpenNotifications}
-              >
-                <DialogContent className="max-w-2xl">
-                  <DialogHeader>
-                    <DialogTitle>Notifications</DialogTitle>
-                    <DialogDescription>
-                      Schedule updates, payroll confirmations, and payments
-                    </DialogDescription>
-                  </DialogHeader>
-
-                  <EmployeeNotifications
-                    employee={employee}
-                    companyId={companyId}
-                  />
-                </DialogContent>
-              </Dialog>
-
-              <Button variant="ghost" size="sm" onClick={onLogout}>
-                <Power className="mr-2 h-4 w-4" />
-                Logout
-              </Button>
-            </div>
-          )}
+    <section className="mb-6 rounded-3xl border border-slate-200 bg-gradient-to-br from-white via-blue-50/40 to-violet-50/60 p-5 shadow-sm dark:border-slate-800 dark:from-slate-950 dark:via-blue-950/20 dark:to-violet-950/20 sm:p-6">
+      <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight text-slate-950 dark:text-white sm:text-4xl">
+            Good Morning, {employeeFirstName}! <span aria-hidden="true">👋</span>
+          </h1>
+          <p className="mt-2 text-base text-slate-600 dark:text-slate-300">
+            Here&apos;s what&apos;s happening today.
+          </p>
         </div>
-         
-          <CardDescription className="flex flex-wrap items-center gap-2">
-            <span>View today&apos;s assignment, clock activity, messages, and manager-approved payroll.</span>
-            {activeShiftsCount > 0 ? (
-              <Badge className="bg-emerald-600 text-white">
-                Clocked IN
-              </Badge>
-            ) : (
-              <Badge variant="secondary">
-                Clocked OUT
-              </Badge>
-            )}
-            {isManagerPreview && (
-              <Badge variant="destructive">
-                Read-only Preview
-              </Badge>
-            )}
-          </CardDescription>
-        </CardHeader>
-      </Card>
+
+        {!isManagerPreview && (
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setIsProfileOpen(true)}
+              className="rounded-xl"
+            >
+              <User className="mr-2 h-4 w-4" />
+              My Profile
+            </Button>
+
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm" className="relative rounded-xl">
+                  <Bell className="mr-2 h-4 w-4" />
+                  Notifications
+                  {unreadNotificationCount > 0 && (
+                    <span className="ml-2 inline-flex min-w-[1.25rem] items-center justify-center rounded-full bg-red-600 px-1.5 py-0.5 text-[10px] font-semibold text-white">
+                      {unreadNotificationCount}
+                    </span>
+                  )}
+                </Button>
+              </DropdownMenuTrigger>
+
+              <DropdownMenuContent align="end" className="w-96">
+                <div className="flex items-center justify-between border-b px-3 py-2">
+                  <span className="text-sm font-semibold">Notifications</span>
+                  {unreadNotificationCount > 0 && (
+                    <Button variant="ghost" size="sm" onClick={markAllHeaderNotificationsRead}>
+                      Mark all as read
+                    </Button>
+                  )}
+                </div>
+
+                {headerNotifications.length === 0 ? (
+                  <div className="p-4 text-sm text-muted-foreground">
+                    No notifications
+                  </div>
+                ) : (
+                  <>
+                    {headerNotifications.slice(0, 3).map((notification) => (
+                      <DropdownMenuItem
+                        key={notification.id}
+                        onClick={() => {
+                          if (!notification.read) {
+                            void markHeaderNotificationRead(notification.id);
+                          }
+                        }}
+                        className="flex cursor-pointer flex-col items-start gap-1"
+                      >
+                        <div className="flex w-full justify-between">
+                          <span className="font-medium">{notification.title}</span>
+                          {!notification.read && (
+                            <Badge variant="destructive" className="text-[10px]">
+                              New
+                            </Badge>
+                          )}
+                        </div>
+                        <span className="line-clamp-2 text-xs text-muted-foreground">
+                          {notification.message}
+                        </span>
+                      </DropdownMenuItem>
+                    ))}
+                    <DropdownMenuSeparator />
+                    <Button
+                      variant="ghost"
+                      className="w-full"
+                      onClick={() => setOpenNotifications(true)}
+                    >
+                      View all notifications
+                    </Button>
+                  </>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
+
+            <Button variant="ghost" size="sm" onClick={onLogout} className="rounded-xl">
+              <Power className="mr-2 h-4 w-4" />
+              Logout
+            </Button>
+          </div>
+        )}
+      </div>
+
+      <div className="mt-5 flex flex-wrap items-center gap-2">
+        {activeShiftsCount > 0 ? (
+          <Badge className="bg-emerald-600 text-white">
+            Clocked IN
+          </Badge>
+        ) : (
+          <Badge variant="secondary">Clocked OUT</Badge>
+        )}
+        {isManagerPreview && (
+          <Badge variant="destructive">Read-only Preview</Badge>
+        )}
+      </div>
+    </section>
+
+    <Dialog open={openNotifications} onOpenChange={setOpenNotifications}>
+      <DialogContent className="max-w-2xl">
+        <DialogHeader>
+          <DialogTitle>Notifications</DialogTitle>
+          <DialogDescription>
+            Schedule updates, payroll confirmations, and payments
+          </DialogDescription>
+        </DialogHeader>
+        <EmployeeNotifications employee={employee} companyId={companyId} />
+      </DialogContent>
+    </Dialog>
 
       <Tabs
-  defaultValue="schedule"
+  value={activeTab}
   className="w-full"
   onValueChange={async (value) => {
+    setActiveTab(value as "schedule" | "messages" | "activity" | "payroll");
     if (value !== "messages") return;
 
     const unread = employeeMessages.filter(
@@ -1288,10 +1274,13 @@ const getTravelEstimateText = useCallback(
   
 
   {/* 🔥 Sticky Tabs Bar */}
-  <div className="sticky top-0 z-40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b">
+  <div className="sticky top-0 z-40 rounded-2xl border bg-background/95 p-1 shadow-sm backdrop-blur supports-[backdrop-filter]:bg-background/80">
     <div className="w-full overflow-x-auto">
-      <TabsList className="flex w-max min-w-full gap-1">
-        <TabsTrigger value="schedule">Schedule & Actions</TabsTrigger>
+      <TabsList className="flex w-max min-w-full gap-1 bg-transparent">
+        <TabsTrigger value="schedule" className="rounded-xl">
+          <Home className="mr-2 h-4 w-4" />
+          Home
+        </TabsTrigger>
         <TabsTrigger value="messages" className="relative">
   Messages
   {employeeUnreadMessages > 0 && (
@@ -1300,8 +1289,13 @@ const getTravelEstimateText = useCallback(
     </span>
   )}
 </TabsTrigger>
-        <TabsTrigger value="activity">Recent Activity</TabsTrigger>
-        <TabsTrigger value="payroll">Payroll</TabsTrigger>
+        <TabsTrigger value="activity" className="rounded-xl">
+          <Activity className="mr-2 h-4 w-4" />
+          Recent Activity
+        </TabsTrigger>
+        <TabsTrigger value="payroll" className="rounded-xl">
+          Payroll
+        </TabsTrigger>
       </TabsList>
     </div>
   </div>
@@ -1309,43 +1303,122 @@ const getTravelEstimateText = useCallback(
         {/* SCHEDULE TAB */}
         <TabsContent value="schedule" className="mt-6">
           <div className="grid grid-cols-1 gap-6">
-            <Card className="overflow-hidden border-violet-200 bg-gradient-to-r from-violet-50 via-white to-blue-50 shadow-sm">
-              <CardContent className="flex flex-col gap-3 p-5 sm:flex-row sm:items-center sm:justify-between">
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-violet-600">
-                    Selected Day
-                  </p>
-                  <h2 className="mt-1 text-xl font-bold text-slate-900">
-                    {formatDateHeader(currentDate)}
-                  </h2>
-                  <p className="mt-1 text-sm text-slate-600">
-                    Only assignments scheduled for this day are shown below.
-                  </p>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Button variant="outline" size="sm" onClick={() => changeDay(-1)}>
-                    <ChevronLeft className="mr-1 h-4 w-4" />
-                    Previous Day
-                  </Button>
-                  <Button variant="outline" size="sm" onClick={() => changeDay(1)}>
-                    Next Day
-                    <ChevronRight className="ml-1 h-4 w-4" />
-                  </Button>
+            <Card className="overflow-hidden rounded-3xl border-slate-200 shadow-sm dark:border-slate-800">
+              <CardContent className="p-5 sm:p-6">
+                <div className="grid grid-cols-1 items-center gap-4 md:grid-cols-[1fr_auto_1fr]">
+                  <div className="flex justify-start">
+                    <Button variant="ghost" onClick={() => changeDay(-1)} className="rounded-xl text-violet-700">
+                      <ChevronLeft className="mr-2 h-4 w-4" />
+                      Previous Day
+                    </Button>
+                  </div>
+
+                  <div className="text-center">
+                    <div className="flex items-center justify-center gap-2">
+                      <CalendarDays className="h-5 w-5 text-slate-600" />
+                      <h2 className="text-lg font-bold text-slate-950 dark:text-white sm:text-xl">
+                        {format(currentDate, "EEEE, MMMM d, yyyy")}
+                      </h2>
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="mt-3 rounded-full border-violet-400 px-6 text-violet-700"
+                      onClick={() => setCurrentDate(startOfDay(new Date()))}
+                    >
+                      Today
+                    </Button>
+                  </div>
+
+                  <div className="flex justify-end">
+                    <Button variant="ghost" onClick={() => changeDay(1)} className="rounded-xl text-violet-700">
+                      Next Day
+                      <ChevronRight className="ml-2 h-4 w-4" />
+                    </Button>
+                  </div>
                 </div>
               </CardContent>
             </Card>
+
+            <div className="grid gap-4 md:grid-cols-3">
+              <Card className="border-emerald-200 bg-gradient-to-br from-emerald-50 to-white shadow-sm dark:border-emerald-900 dark:from-emerald-950/30 dark:to-slate-950">
+                <CardContent className="flex items-center gap-4 p-5">
+                  <div className="rounded-2xl bg-emerald-100 p-3 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300">
+                    <Clock3 className="h-6 w-6" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-semibold text-slate-700 dark:text-slate-300">
+                      Hours Worked Today
+                    </p>
+                    <p className="mt-1 text-2xl font-bold text-emerald-700 dark:text-emerald-300">
+                      {totalHoursTodayHHMM}
+                    </p>
+                    <p className="mt-1 text-xs text-slate-500">Updated just now</p>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="border-blue-200 bg-gradient-to-br from-blue-50 to-white shadow-sm dark:border-blue-900 dark:from-blue-950/30 dark:to-slate-950">
+                <CardContent className="flex items-center gap-4 p-5">
+                  <div className="rounded-2xl bg-blue-100 p-3 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300">
+                    <CalendarRange className="h-6 w-6" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-semibold text-slate-700 dark:text-slate-300">
+                      Hours Worked This Week
+                    </p>
+                    <p className="mt-1 text-2xl font-bold text-blue-700 dark:text-blue-300">
+                      {totalHoursThisWeekHHMM}
+                    </p>
+                    <p className="mt-1 text-xs text-slate-500">
+                      {format(selectedWeekStart, "MMM d")} – {format(selectedWeekEnd, "MMM d")}
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="border-violet-200 bg-gradient-to-br from-violet-50 to-white shadow-sm dark:border-violet-900 dark:from-violet-950/30 dark:to-slate-950">
+                <CardContent className="flex items-center gap-4 p-5">
+                  <div className="rounded-2xl bg-violet-100 p-3 text-violet-700 dark:bg-violet-950/60 dark:text-violet-300">
+                    <CalendarDays className="h-6 w-6" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-semibold text-slate-700 dark:text-slate-300">
+                      Hours Worked This Month
+                    </p>
+                    <p className="mt-1 text-2xl font-bold text-violet-700 dark:text-violet-300">
+                      {totalHoursThisMonthHHMM}
+                    </p>
+                    <p className="mt-1 text-xs text-slate-500">
+                      {format(startOfMonth(currentDate), "MMMM d")} – {format(endOfMonth(currentDate), "MMMM d")}
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
 
             {/* Schedule */}
             {employee.name && (
               <Card className="border-blue-100 shadow-md">
                 <CardHeader className="border-b bg-gradient-to-r from-blue-50 via-white to-violet-50">
-                  <CardTitle className="flex items-center gap-2 text-xl">
-                    <CalendarDays className="h-5 w-5 text-blue-600" />
-                    Your Assignments
-                  </CardTitle>
-                  <CardDescription>
-                    Showing only the assignments for the selected day. Use Previous Day or Next Day to view another date.
-                  </CardDescription>
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                      <CardTitle className="flex items-center gap-2 text-xl">
+                        <Building2 className="h-5 w-5 text-emerald-600" />
+                        Your Assignments — {format(currentDate, "EEEE")}
+                        <Badge className="ml-1 bg-violet-100 text-violet-700 hover:bg-violet-100">
+                          {filteredDailySchedules.length}
+                        </Badge>
+                      </CardTitle>
+                      <CardDescription className="mt-1">
+                        Only assignments scheduled for this selected day are shown.
+                      </CardDescription>
+                    </div>
+                    <Button variant="ghost" size="sm" onClick={() => setActiveTab("schedule")} className="text-violet-700">
+                      View Full Schedule
+                      <ChevronRight className="ml-1 h-4 w-4" />
+                    </Button>
+                  </div>
                 </CardHeader>
                <CardContent className="p-3 sm:p-4">
                   <Tabs defaultValue="daily">
@@ -1510,13 +1583,24 @@ const hoursSpent =
           <div className="flex items-center gap-2 flex-wrap">
 
 
-  <div>
+  <div className="flex items-start gap-3">
+    <div className="rounded-2xl bg-emerald-100 p-3 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300">
+      <Building2 className="h-6 w-6" />
+    </div>
+    <div>
   <p
-    className="font-semibold"
-    style={{ color: scheduleSite?.color }}
+    className="text-lg font-bold text-slate-950 dark:text-white"
   >
     {getScheduleDisplayName(schedule)}
   </p>
+  <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">
+    Scheduled for: <span className="font-semibold text-emerald-700 dark:text-emerald-300">{format(currentDate, "EEEE, MMM d")}</span>
+  </p>
+  {scheduleSite?.address && (
+    <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">
+      {scheduleSite.address}
+    </p>
+  )}
 
   {schedule.siteNames &&
     schedule.siteNames.length > 1 &&
@@ -1525,7 +1609,8 @@ const hoursSpent =
         {schedule.siteNames.join(" • ")}
       </p>
     )}
-</div>
+    </div>
+  </div>
 </div>
   
 
@@ -1631,42 +1716,54 @@ const hoursSpent =
                               {day.schedules.length > 0 ? (
                                 <div className="pl-4 border-l-2 border-primary/50 space-y-2">
                                   {day.schedules.map((schedule) => {
-                                    const scheduleSite = settings.sites.find((s) => s.name === schedule.siteName);
-                                    return (
-                                      <div
-                                        key={schedule.id}
-                                        className="text-xs p-2 rounded-md bg-muted/30"
-                                        style={{
-                                          borderLeftColor: scheduleSite?.color,
-                                          borderLeftWidth: "2px",
-                                        }}
-                                      >
-                                        <div>
-  <p
-    className="font-semibold"
-    style={{ color: scheduleSite?.color }}
-  >
-    {getScheduleDisplayName(schedule)}
-  </p>
+  const scheduleSite = settings.sites.find(
+    (s) => s.name === schedule.siteName
+  );
 
-  {schedule.siteNames &&
-    schedule.siteNames.length > 1 &&
-    schedule.siteGroupLabelMode === "custom" && (
-      <p className="text-[11px] text-muted-foreground">
-        {schedule.siteNames.join(" • ")}
-      </p>
-    )}
-</div>
-                                        <p className="text-muted-foreground">{schedule.tasks}</p>
-                                        {asNoteText(schedule.note) && (
-                                          <p className="text-xs italic text-amber-700 truncate">
-                                            <MessageSquare className="inline h-3 w-3 mr-1" />
-                                            {asNoteText(schedule.note)}
-                                          </p>
-                                        )}
-                                      </div>
-                                    );
-                                  })}
+  return (
+    <div
+      key={schedule.id}
+      className="rounded-xl border bg-white p-3 text-xs shadow-sm"
+      style={{
+        borderLeftColor: scheduleSite?.color,
+        borderLeftWidth: "3px",
+      }}
+    >
+      <div className="flex items-start gap-3">
+        <div className="rounded-xl bg-emerald-100 p-2 text-emerald-700">
+          <Building2 className="h-4 w-4" />
+        </div>
+
+        <div className="min-w-0 flex-1">
+          <p className="font-semibold text-slate-900">
+            {getScheduleDisplayName(schedule)}
+          </p>
+
+          {schedule.siteNames &&
+            schedule.siteNames.length > 1 &&
+            schedule.siteGroupLabelMode === "custom" && (
+              <p className="mt-1 text-[11px] text-muted-foreground">
+                {schedule.siteNames.join(" • ")}
+              </p>
+            )}
+
+          {schedule.tasks && (
+            <p className="mt-1 text-muted-foreground">
+              {schedule.tasks}
+            </p>
+          )}
+
+          {asNoteText(schedule.note) && (
+            <p className="mt-1 truncate text-xs italic text-amber-700">
+              <MessageSquare className="mr-1 inline h-3 w-3" />
+              {asNoteText(schedule.note)}
+            </p>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+})}
                                 </div>
                               ) : (
                                 <p className="pl-4 text-xs text-muted-foreground">No tasks scheduled.</p>
@@ -1680,6 +1777,146 @@ const hoursSpent =
                 </CardContent>
               </Card>
             )}
+          </div>
+
+          <div className="mt-6 grid gap-6 lg:grid-cols-2">
+            <Card className="rounded-3xl border-slate-200 shadow-sm dark:border-slate-800">
+              <CardHeader className="flex flex-row items-center justify-between">
+                <div>
+                  <CardTitle>Recent Activity</CardTitle>
+                  <CardDescription>Your latest clock events</CardDescription>
+                </div>
+                <Button variant="ghost" size="sm" onClick={() => setActiveTab("activity")} className="text-violet-700">
+                  View All
+                </Button>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {userEntries.slice(0, 5).map((entry) => (
+                  <div key={`home-${entry.id}`} className="flex items-start gap-3">
+                    <div
+                      className={`rounded-full p-2 ${
+                        entry.action === "in"
+                          ? "bg-blue-100 text-blue-700"
+                          : "bg-emerald-100 text-emerald-700"
+                      }`}
+                    >
+                      {entry.action === "in" ? (
+                        <LogIn className="h-4 w-4" />
+                      ) : (
+                        <LogOut className="h-4 w-4" />
+                      )}
+                    </div>
+                    <div>
+                      <p className="font-medium text-slate-900 dark:text-white">
+                        Clocked {entry.action === "in" ? "in" : "out"} — {entry.site || "Unknown site"}
+                      </p>
+                      <p className="text-sm text-slate-500">{formatDT(entry.ts)}</p>
+                    </div>
+                  </div>
+                ))}
+                {userEntries.length === 0 && (
+                  <p className="text-sm text-muted-foreground">No recent activity.</p>
+                )}
+              </CardContent>
+            </Card>
+
+            <div className="space-y-6">
+              <Card className="rounded-3xl border-slate-200 shadow-sm dark:border-slate-800">
+                <CardHeader className="flex flex-row items-center justify-between">
+                  <div>
+                    <CardTitle className="flex items-center gap-2">
+                      Messages
+                      {employeeUnreadMessages > 0 && (
+                        <Badge variant="destructive">{employeeUnreadMessages}</Badge>
+                      )}
+                    </CardTitle>
+                  </div>
+                  <Button variant="ghost" size="sm" onClick={() => setActiveTab("messages")} className="text-violet-700">
+                    View All
+                  </Button>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {recentMessages.length > 0 ? (
+                    recentMessages.map((message) => (
+                      <div key={`home-message-${message.id}`} className="border-b pb-3 last:border-0 last:pb-0">
+                        <p className="font-medium text-slate-900 dark:text-white">
+                          Manager
+                        </p>
+                        <p className="mt-1 line-clamp-2 text-sm text-slate-600 dark:text-slate-300">
+                          {message.message}
+                        </p>
+                      </div>
+                    ))
+                  ) : (
+                    <p className="text-sm text-muted-foreground">No messages yet.</p>
+                  )}
+                </CardContent>
+              </Card>
+
+              <Card className="rounded-3xl border-slate-200 shadow-sm dark:border-slate-800">
+                <CardHeader className="flex flex-row items-center justify-between">
+                  <CardTitle className="flex items-center gap-2">
+                    Notifications
+                    {unreadNotificationCount > 0 && (
+                      <Badge variant="destructive">{unreadNotificationCount}</Badge>
+                    )}
+                  </CardTitle>
+                  <Button variant="ghost" size="sm" onClick={() => setOpenNotifications(true)} className="text-violet-700">
+                    View All
+                  </Button>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {recentHeaderNotifications.length > 0 ? (
+                    recentHeaderNotifications.map((notification) => (
+                      <div key={`home-notification-${notification.id}`} className="flex items-start gap-3">
+                        <div className="rounded-full bg-violet-100 p-2 text-violet-700">
+                          <Bell className="h-4 w-4" />
+                        </div>
+                        <div>
+                          <p className="font-medium text-slate-900 dark:text-white">
+                            {notification.title}
+                          </p>
+                          <p className="mt-1 line-clamp-2 text-sm text-slate-600 dark:text-slate-300">
+                            {notification.message}
+                          </p>
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    <p className="text-sm text-muted-foreground">No notifications.</p>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+          </div>
+
+          <Card className="mt-6 rounded-3xl border-slate-200 shadow-sm dark:border-slate-800">
+            <CardHeader>
+              <CardTitle>Quick Actions</CardTitle>
+            </CardHeader>
+            <CardContent className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              <Button variant="outline" className="h-24 rounded-2xl" onClick={() => setActiveTab("schedule")}>
+                <Clock3 className="mr-2 h-5 w-5 text-violet-700" />
+                Clock In / Out
+              </Button>
+              <Button variant="outline" className="h-24 rounded-2xl" onClick={() => setActiveTab("schedule")}>
+                <Navigation className="mr-2 h-5 w-5 text-blue-700" />
+                Get Directions
+              </Button>
+              <Button variant="outline" className="h-24 rounded-2xl" onClick={() => setActiveTab("messages")}>
+                <Send className="mr-2 h-5 w-5 text-emerald-700" />
+                Send Message
+              </Button>
+              <Button variant="outline" className="h-24 rounded-2xl" onClick={() => setActiveTab("schedule")}>
+                <CalendarDays className="mr-2 h-5 w-5 text-orange-600" />
+                View My Schedule
+              </Button>
+            </CardContent>
+          </Card>
+
+          <div className="mt-5 flex items-center justify-center gap-2 text-xs text-slate-500">
+            <LockKeyhole className="h-4 w-4" />
+            Your data is secure and private.
           </div>
         </TabsContent>
 
