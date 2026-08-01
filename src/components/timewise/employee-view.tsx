@@ -84,6 +84,8 @@ import {
   endOfMonth,
   isBefore,
   startOfMonth,
+  startOfYear,
+  endOfYear,
   isToday,
 } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
@@ -238,6 +240,24 @@ function decimalHoursToHHMM(hours: number): string {
     .toString()
     .padStart(2, "0")}`;
 }
+
+function formatWorkedDuration(totalMinutes: number): string {
+  const safeMinutes = Math.max(0, Math.round(totalMinutes));
+  const hours = Math.floor(safeMinutes / 60);
+  const minutes = safeMinutes % 60;
+
+  if (hours === 0) {
+    return `${minutes} ${minutes === 1 ? "minute" : "minutes"}`;
+  }
+
+  if (minutes === 0) {
+    return `${hours} ${hours === 1 ? "hour" : "hours"}`;
+  }
+
+  return `${hours} ${hours === 1 ? "hour" : "hours"} ${minutes} ${
+    minutes === 1 ? "minute" : "minutes"
+  }`;
+}
 export function EmployeeView({
   employee,
   onLogout,
@@ -265,6 +285,9 @@ export function EmployeeView({
   const [activeTab, setActiveTab] = useState<
     "schedule" | "messages" | "activity" | "payroll"
   >("schedule");
+  const [schedulePanelMode, setSchedulePanelMode] = useState<
+    "home" | "assignments" | "timeclock"
+  >("home");
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
 const [dailySearch, setDailySearch] = useState("");
 
@@ -753,18 +776,22 @@ const getLiveHoursForOpenShift = useCallback(
     siteName: string,
     scheduleId?: string
   ) => {
-    const site = settings.sites.find((s) => s.name === siteName);
+    const site = settings.sites.find((candidate) => candidate.name === siteName);
+
     if (!site) {
-      toast({ variant: "destructive", title: "Site not found." });
+      toast({
+        variant: "destructive",
+        title: "Site not found.",
+      });
       return;
     }
 
-    const selectedDay = startOfDay(currentDate);
-    const today = startOfToday();
-
-    const isPastDay = isBefore(selectedDay, today);
-    const isFutureDay = isBefore(today, selectedDay);
-    const isDateOverride = !!isManagerPreview;
+    const scheduleDateKey = format(currentDate, "yyyy-MM-dd");
+    const scheduledDateLabel = format(
+      currentDate,
+      "EEEE, MMMM dd/yy"
+    );
+    const isDateOverride = Boolean(isManagerPreview);
 
     if (action === "in") {
       const activeSomewhere = isClockedIn(undefined, employee.id);
@@ -781,52 +808,88 @@ const getLiveHoursForOpenShift = useCallback(
       }
 
       recordEntry(
-  "in",
-  site,
-  currentDate,
-  scheduleId,
-  format(currentDate, "yyyy-MM-dd"),
-  undefined,
-  employee.id,
-  isDateOverride,
-  {
-    source: "employee-clock",
-    initiatedBy: employee.id,
-  }
-);
+        "in",
+        site,
+        currentDate,
+        scheduleId,
+        scheduleDateKey,
+        undefined,
+        employee.id,
+        isDateOverride,
+        {
+          source: "employee-clock",
+          initiatedBy: employee.id,
+        }
+      );
+
+      toast({
+        title: "Clock-in successful",
+        description: `You successfully clocked in at ${site.name} scheduled on ${scheduledDateLabel}.`,
+      });
+
       return;
     }
 
     const confirmed = window.confirm(
-  `Are you sure you want to clock out from ${siteName}?`
-);
+      `Are you sure you want to clock out from ${siteName}?`
+    );
 
-if (!confirmed) return;
+    if (!confirmed) {
+      return;
+    }
 
-recordEntry(
-  "out",
-  site,
-  currentDate,
-  scheduleId,
-  format(currentDate, "yyyy-MM-dd"),
-  undefined,
-  employee.id,
-  isDateOverride,
-  {
-    source: "employee-clock",
-    initiatedBy: employee.id,
-  }
-);
+    const activeShift =
+      scheduleId
+        ? getActiveShiftForScheduleOccurrence(
+            scheduleId,
+            scheduleDateKey
+          )
+        : getActiveShiftForSiteOnDate(
+            siteName,
+            currentDate
+          );
+
+    const workedMinutes = activeShift?.in
+      ? Math.max(
+          0,
+          Math.round(
+            (Date.now() - activeShift.in.ts) / 60000
+          )
+        )
+      : 0;
+
+    recordEntry(
+      "out",
+      site,
+      currentDate,
+      scheduleId,
+      scheduleDateKey,
+      undefined,
+      employee.id,
+      isDateOverride,
+      {
+        source: "employee-clock",
+        initiatedBy: employee.id,
+      }
+    );
+
+    toast({
+      title: "Clock-out successful",
+      description: `You successfully clocked out at ${site.name} scheduled on ${scheduledDateLabel}. Hours worked: ${formatWorkedDuration(
+        workedMinutes
+      )}.`,
+    });
   },
   [
     settings.sites,
-
     isClockedIn,
     employee.id,
     currentDate,
     recordEntry,
     toast,
     isManagerPreview,
+    getActiveShiftForScheduleOccurrence,
+    getActiveShiftForSiteOnDate,
   ]
 );
 
@@ -882,6 +945,12 @@ recordEntry(
     return calculateHoursForPeriod(start, end);
   }, [calculateHoursForPeriod, currentDate]);
 
+  const totalHoursThisYear = useMemo(() => {
+    const start = startOfYear(currentDate);
+    const end = endOfYear(currentDate);
+    return calculateHoursForPeriod(start, end);
+  }, [calculateHoursForPeriod, currentDate]);
+
   const changeDay = (amount: number) => {
     setCurrentDate((prev) => add(prev, { days: amount }));
   };
@@ -898,6 +967,11 @@ const totalHoursThisWeekHHMM = useMemo(
 const totalHoursThisMonthHHMM = useMemo(
   () => decimalHoursToHHMM(totalHoursThisMonth),
   [totalHoursThisMonth]
+);
+
+const totalHoursThisYearHHMM = useMemo(
+  () => decimalHoursToHHMM(totalHoursThisYear),
+  [totalHoursThisYear]
 );
 
 // ✅ Daily Site Summary for Employee
@@ -1160,6 +1234,11 @@ const closeMobileSidebar = useCallback(() => {
 const openEmployeeTab = useCallback(
   (tab: "schedule" | "messages" | "activity" | "payroll") => {
     setActiveTab(tab);
+
+    if (tab !== "schedule") {
+      setSchedulePanelMode("home");
+    }
+
     closeMobileSidebar();
 
     window.setTimeout(() => {
@@ -1169,8 +1248,39 @@ const openEmployeeTab = useCallback(
   [closeMobileSidebar]
 );
 
+const openHome = useCallback(() => {
+  setActiveTab("schedule");
+  setSchedulePanelMode("home");
+  closeMobileSidebar();
+
+  window.setTimeout(() => {
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }, 50);
+}, [closeMobileSidebar]);
+
+const openAssignmentsOnly = useCallback(() => {
+  setActiveTab("schedule");
+  setSchedulePanelMode("assignments");
+  closeMobileSidebar();
+
+  window.setTimeout(() => {
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }, 50);
+}, [closeMobileSidebar]);
+
+const openTimeClockOnly = useCallback(() => {
+  setActiveTab("schedule");
+  setSchedulePanelMode("timeclock");
+  closeMobileSidebar();
+
+  window.setTimeout(() => {
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }, 50);
+}, [closeMobileSidebar]);
+
 const scrollToAssignments = useCallback(() => {
   setActiveTab("schedule");
+  setSchedulePanelMode("assignments");
   closeMobileSidebar();
 
   window.setTimeout(() => {
@@ -1217,10 +1327,11 @@ const EmployeeSidebar = ({
       <Button
         type="button"
         variant="ghost"
-        onClick={() => openEmployeeTab("schedule")}
+        onClick={openHome}
         className={cn(
           "h-12 w-full justify-start rounded-2xl px-4",
           activeTab === "schedule" &&
+            schedulePanelMode === "home" &&
             "bg-violet-100 text-violet-800 hover:bg-violet-100 dark:bg-violet-950/50 dark:text-violet-200"
         )}
       >
@@ -1231,8 +1342,13 @@ const EmployeeSidebar = ({
       <Button
         type="button"
         variant="ghost"
-        onClick={scrollToAssignments}
-        className="h-12 w-full justify-start rounded-2xl px-4"
+        onClick={openAssignmentsOnly}
+        className={cn(
+          "h-12 w-full justify-start rounded-2xl px-4",
+          activeTab === "schedule" &&
+            schedulePanelMode === "assignments" &&
+            "bg-violet-100 text-violet-800 hover:bg-violet-100 dark:bg-violet-950/50 dark:text-violet-200"
+        )}
       >
         <CalendarDays className="mr-3 h-5 w-5" />
         My Schedule
@@ -1241,8 +1357,13 @@ const EmployeeSidebar = ({
       <Button
         type="button"
         variant="ghost"
-        onClick={scrollToAssignments}
-        className="h-12 w-full justify-start rounded-2xl px-4"
+        onClick={openTimeClockOnly}
+        className={cn(
+          "h-12 w-full justify-start rounded-2xl px-4",
+          activeTab === "schedule" &&
+            schedulePanelMode === "timeclock" &&
+            "bg-violet-100 text-violet-800 hover:bg-violet-100 dark:bg-violet-950/50 dark:text-violet-200"
+        )}
       >
         <Clock3 className="mr-3 h-5 w-5" />
         Time Clock
@@ -1608,7 +1729,12 @@ const EmployeeSidebar = ({
         {/* SCHEDULE TAB */}
         <TabsContent value="schedule" className="mt-6">
           <div className="grid grid-cols-1 gap-6">
-            <Card className="overflow-hidden rounded-3xl border-slate-200 shadow-sm dark:border-slate-800">
+            <Card
+              className={cn(
+                "overflow-hidden rounded-3xl border-slate-200 shadow-sm dark:border-slate-800",
+                schedulePanelMode === "timeclock" && "hidden"
+              )}
+            >
               <CardContent className="p-5 sm:p-6">
                 <div className="grid grid-cols-1 items-center gap-4 md:grid-cols-[1fr_auto_1fr]">
                   <div className="flex justify-start">
@@ -1645,7 +1771,15 @@ const EmployeeSidebar = ({
               </CardContent>
             </Card>
 
-            <div className="grid gap-4 md:grid-cols-3">
+            <div
+              className={cn(
+                "grid gap-4 md:grid-cols-2",
+                schedulePanelMode === "assignments" && "hidden",
+                schedulePanelMode === "timeclock"
+                  ? "xl:grid-cols-4"
+                  : "xl:grid-cols-3"
+              )}
+            >
               <Card className="border-emerald-200 bg-gradient-to-br from-emerald-50 to-white shadow-sm dark:border-emerald-900 dark:from-emerald-950/30 dark:to-slate-950">
                 <CardContent className="flex items-center gap-4 p-5">
                   <div className="rounded-2xl bg-emerald-100 p-3 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300">
@@ -1700,13 +1834,37 @@ const EmployeeSidebar = ({
                   </div>
                 </CardContent>
               </Card>
+
+              {schedulePanelMode === "timeclock" && (
+                <Card className="border-amber-200 bg-gradient-to-br from-amber-50 to-white shadow-sm dark:border-amber-900 dark:from-amber-950/30 dark:to-slate-950">
+                  <CardContent className="flex items-center gap-4 p-5">
+                    <div className="rounded-2xl bg-amber-100 p-3 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300">
+                      <CalendarRange className="h-6 w-6" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-semibold text-slate-700 dark:text-slate-300">
+                        Hours Worked This Year
+                      </p>
+                      <p className="mt-1 text-2xl font-bold text-amber-700 dark:text-amber-300">
+                        {totalHoursThisYearHHMM}
+                      </p>
+                      <p className="mt-1 text-xs text-slate-500">
+                        January 1 – December 31, {format(currentDate, "yyyy")}
+                      </p>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
             </div>
 
             {/* Schedule */}
             {employee.name && (
               <Card
                 id="employee-assignments"
-                className="scroll-mt-24 border-blue-100 shadow-md"
+                className={cn(
+                  "scroll-mt-24 border-blue-100 shadow-md",
+                  schedulePanelMode === "timeclock" && "hidden"
+                )}
               >
                 <CardHeader className="border-b bg-gradient-to-r from-blue-50 via-white to-violet-50">
                   <div className="flex flex-wrap items-center justify-between gap-3">
@@ -1722,7 +1880,7 @@ const EmployeeSidebar = ({
                         Only assignments scheduled for this selected day are shown.
                       </CardDescription>
                     </div>
-                    <Button variant="ghost" size="sm" onClick={() => setActiveTab("schedule")} className="text-violet-700">
+                    <Button variant="ghost" size="sm" onClick={openAssignmentsOnly} className="text-violet-700">
                       View Full Schedule
                       <ChevronRight className="ml-1 h-4 w-4" />
                     </Button>
@@ -2087,7 +2245,12 @@ const hoursSpent =
             )}
           </div>
 
-          <div className="mt-6 grid gap-6 lg:grid-cols-2">
+          <div
+            className={cn(
+              "mt-6 grid gap-6 lg:grid-cols-2",
+              schedulePanelMode !== "home" && "hidden"
+            )}
+          >
             <Card className="rounded-3xl border-slate-200 shadow-sm dark:border-slate-800">
               <CardHeader className="flex flex-row items-center justify-between">
                 <div>
@@ -2198,16 +2361,21 @@ const hoursSpent =
             </div>
           </div>
 
-          <Card className="mt-6 rounded-3xl border-slate-200 shadow-sm dark:border-slate-800">
+          <Card
+            className={cn(
+              "mt-6 rounded-3xl border-slate-200 shadow-sm dark:border-slate-800",
+              schedulePanelMode !== "home" && "hidden"
+            )}
+          >
             <CardHeader>
               <CardTitle>Quick Actions</CardTitle>
             </CardHeader>
             <CardContent className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-              <Button variant="outline" className="h-24 rounded-2xl" onClick={() => setActiveTab("schedule")}>
+              <Button variant="outline" className="h-24 rounded-2xl" onClick={openAssignmentsOnly}>
                 <Clock3 className="mr-2 h-5 w-5 text-violet-700" />
                 Clock In / Out
               </Button>
-              <Button variant="outline" className="h-24 rounded-2xl" onClick={() => setActiveTab("schedule")}>
+              <Button variant="outline" className="h-24 rounded-2xl" onClick={openAssignmentsOnly}>
                 <Navigation className="mr-2 h-5 w-5 text-blue-700" />
                 Get Directions
               </Button>
@@ -2215,14 +2383,19 @@ const hoursSpent =
                 <Send className="mr-2 h-5 w-5 text-emerald-700" />
                 Send Message
               </Button>
-              <Button variant="outline" className="h-24 rounded-2xl" onClick={() => setActiveTab("schedule")}>
+              <Button variant="outline" className="h-24 rounded-2xl" onClick={openAssignmentsOnly}>
                 <CalendarDays className="mr-2 h-5 w-5 text-orange-600" />
                 View My Schedule
               </Button>
             </CardContent>
           </Card>
 
-          <div className="mt-5 flex items-center justify-center gap-2 text-xs text-slate-500">
+          <div
+            className={cn(
+              "mt-5 flex items-center justify-center gap-2 text-xs text-slate-500",
+              schedulePanelMode !== "home" && "hidden"
+            )}
+          >
             <LockKeyhole className="h-4 w-4" />
             Your data is secure and private.
           </div>
