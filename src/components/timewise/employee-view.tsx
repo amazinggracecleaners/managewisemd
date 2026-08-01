@@ -37,7 +37,6 @@ import { formatDT, groupSessions, minutesToHHMM } from "@/lib/time-utils";
 import {
   LogIn,
   LogOut,
-  ExternalLink,
   Navigation,
   Power,
   User,
@@ -46,6 +45,7 @@ import {
   MessageSquare,
   FilePenLine,
   Bell,
+  CalendarDays,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -1248,19 +1248,19 @@ const getTravelEstimateText = useCallback(
           )}
         </div>
          
-          <CardDescription>
-            Your base pay rate is ${employee.payRate.toFixed(2)}/hour.
+          <CardDescription className="flex flex-wrap items-center gap-2">
+            <span>View today&apos;s assignment, clock activity, messages, and manager-approved payroll.</span>
             {activeShiftsCount > 0 ? (
-              <Badge variant="default" className="bg-green-600 ml-2">
-                Clocked IN ({activeShiftsCount} {activeShiftsCount > 1 ? "sites" : "site"})
+              <Badge className="bg-emerald-600 text-white">
+                Clocked IN
               </Badge>
             ) : (
-              <Badge variant="secondary" className="ml-2">
+              <Badge variant="secondary">
                 Clocked OUT
               </Badge>
             )}
             {isManagerPreview && (
-              <Badge variant="destructive" className="ml-2">
+              <Badge variant="destructive">
                 Read-only Preview
               </Badge>
             )}
@@ -1308,50 +1308,44 @@ const getTravelEstimateText = useCallback(
 
         {/* SCHEDULE TAB */}
         <TabsContent value="schedule" className="mt-6">
-          <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-            {/* Hours Summary */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base font-medium">Your Hours Worked</CardTitle>
-                <CardDescription>Based on your completed shifts.</CardDescription>
-              </CardHeader>
-             <CardContent className="p-3 sm:p-4">
-                <Tabs defaultValue="week">
-                  <div className="w-full overflow-x-auto">
-  <TabsList className="flex w-max min-w-full gap-1">
-                    <TabsTrigger value="today">Today</TabsTrigger>
-                    <TabsTrigger value="week">This Week</TabsTrigger>
-                    <TabsTrigger value="month">This Month</TabsTrigger>
-                  </TabsList>
-</div>
-                  <TabsContent value="today" className="pt-4">
-                    <div className="text-center">
-                     <p className="text-3xl font-bold">{totalHoursTodayHHMM}</p>
-<p className="text-sm text-muted-foreground">hours today</p>
-                    </div>
-                  </TabsContent>
-                  <TabsContent value="week" className="pt-4">
-                    <div className="text-center">
-                      <p className="text-3xl font-bold">{totalHoursThisWeekHHMM}</p>
-<p className="text-sm text-muted-foreground">hours this week</p>
-                    </div>
-                  </TabsContent>
-                  <TabsContent value="month" className="pt-4">
-                    <div className="text-center">
-                      <p className="text-3xl font-bold">{totalHoursThisMonthHHMM}</p>
-<p className="text-sm text-muted-foreground">hours this month</p>
-                    </div>
-                  </TabsContent>
-                </Tabs>
+          <div className="grid grid-cols-1 gap-6">
+            <Card className="overflow-hidden border-violet-200 bg-gradient-to-r from-violet-50 via-white to-blue-50 shadow-sm">
+              <CardContent className="flex flex-col gap-3 p-5 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-violet-600">
+                    Selected Day
+                  </p>
+                  <h2 className="mt-1 text-xl font-bold text-slate-900">
+                    {formatDateHeader(currentDate)}
+                  </h2>
+                  <p className="mt-1 text-sm text-slate-600">
+                    Only assignments scheduled for this day are shown below.
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button variant="outline" size="sm" onClick={() => changeDay(-1)}>
+                    <ChevronLeft className="mr-1 h-4 w-4" />
+                    Previous Day
+                  </Button>
+                  <Button variant="outline" size="sm" onClick={() => changeDay(1)}>
+                    Next Day
+                    <ChevronRight className="ml-1 h-4 w-4" />
+                  </Button>
+                </div>
               </CardContent>
             </Card>
 
             {/* Schedule */}
             {employee.name && (
-              <Card>
-                <CardHeader>
-                  <CardTitle>Your Schedule</CardTitle>
-                  <CardDescription>Tasks assigned to you.</CardDescription>
+              <Card className="border-blue-100 shadow-md">
+                <CardHeader className="border-b bg-gradient-to-r from-blue-50 via-white to-violet-50">
+                  <CardTitle className="flex items-center gap-2 text-xl">
+                    <CalendarDays className="h-5 w-5 text-blue-600" />
+                    Your Assignments
+                  </CardTitle>
+                  <CardDescription>
+                    Showing only the assignments for the selected day. Use Previous Day or Next Day to view another date.
+                  </CardDescription>
                 </CardHeader>
                <CardContent className="p-3 sm:p-4">
                   <Tabs defaultValue="daily">
@@ -1368,9 +1362,7 @@ const getTravelEstimateText = useCallback(
       {formatDateHeader(currentDate)}
     </h3>
 
-    <Badge variant="outline">
-      Total Hours: {dailyWorkedHHMM}
-    </Badge>
+
   </div>
                         <div className="flex gap-1">
                           <Button variant="outline" size="icon" className="h-7 w-7" onClick={() => changeDay(-1)}>
@@ -1448,13 +1440,7 @@ const getTravelEstimateText = useCallback(
 
 </div>
 
-{settings.enableRouteOptimization &&
-  routedDailySchedules.length > 1 && (
-    <div className="mb-3 rounded-md border border-blue-200 bg-blue-50 p-3 text-sm text-blue-900">
-      Suggested route order is enabled for today.
-      Employees may still follow manager instructions if needed.
-    </div>
-)}
+
                       <ScrollArea className="h-[60vh]">
   {filteredDailySchedules.length > 0 ? (
     <ul className="space-y-4">
@@ -1510,7 +1496,7 @@ const hoursSpent =
     <li
       key={schedule.id}
       className={cn(
-        "p-3 rounded-md border bg-muted/20 transition-all",
+        "rounded-xl border bg-white p-4 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md",
         clockedInAtThisSite && "ring-2 ring-green-500 bg-green-50/40 dark:bg-green-950/20"
       )}
       style={{
@@ -1522,12 +1508,7 @@ const hoursSpent =
         <div>
                     
           <div className="flex items-center gap-2 flex-wrap">
-  {settings.enableRouteOptimization &&
-    routedDailySchedules.length > 1 && (
-      <Badge variant="secondary">
-        Stop {index + 1}
-      </Badge>
-    )}
+
 
   <div>
   <p
@@ -1548,11 +1529,7 @@ const hoursSpent =
 </div>
   
 
-          {getTravelEstimateText(scheduleSite) && (
-  <p className="text-xs text-muted-foreground">
-    {getTravelEstimateText(scheduleSite)}
-  </p>
-)}
+
 
         </div>
 
@@ -1625,7 +1602,7 @@ const hoursSpent =
       rel="noopener noreferrer"
     >
       <Navigation className="mr-2 h-4 w-4" />
-      Navigate
+      Directions
     </a>
   </Button>
 )}
@@ -1795,7 +1772,7 @@ const hoursSpent =
           <Card>
             <CardHeader>
               <CardTitle>Your Recent Activity</CardTitle>
-              <CardDescription>Your last 20 clock-in/out events.</CardDescription>
+              <CardDescription>Your last 20 clock-in/out events and completed work history.</CardDescription>
             </CardHeader>
             <CardContent className="p-3 sm:p-4">
               <ScrollArea className="h-[500px]">
@@ -1806,7 +1783,6 @@ const hoursSpent =
                       <TableHead>When</TableHead>
                       <TableHead>Action</TableHead>
                       <TableHead>Site</TableHead>
-                      <TableHead>Location</TableHead>
                       <TableHead>Note</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -1828,22 +1804,6 @@ const hoursSpent =
                             </Badge>
                           </TableCell>
                           <TableCell>{e.site || "—"}</TableCell>
-                          <TableCell>
-                            {e.lat && e.lng ? (
-                              <Button asChild variant="ghost" size="icon">
-                                <a
-                                  href={`https://maps.google.com/?q=${e.lat},${e.lng}`}
-                                  target="_blank"
-                                  rel="noreferrer"
-                                  title="View on map"
-                                >
-                                  <ExternalLink className="h-4 w-4" />
-                                </a>
-                              </Button>
-                            ) : (
-                              <span className="text-muted-foreground">—</span>
-                            )}
-                          </TableCell>
                           <TableCell className="truncate max-w-[10rem]" title={asNoteText(e.note)}>
                             {asNoteText(e.note) || "—"}
                           </TableCell>
@@ -1851,7 +1811,7 @@ const hoursSpent =
                       ))
                     ) : (
                       <TableRow>
-                        <TableCell colSpan={5} className="h-24 text-center text-muted-foreground">
+                        <TableCell colSpan={4} className="h-24 text-center text-muted-foreground">
                           {employee.name ? "No entries yet." : "Enter your name to see your activity."}
                         </TableCell>
                       </TableRow>
