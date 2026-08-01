@@ -1358,7 +1358,7 @@ const EmployeeSidebar = ({
 }: {
   mobile?: boolean;
 }) => (
-  <div className="flex h-full flex-col bg-white dark:bg-slate-950">
+  <div className="flex h-full min-h-0 flex-col overflow-hidden bg-white dark:bg-slate-950">
     <div className="flex items-center justify-between border-b border-slate-100 px-5 py-5 dark:border-slate-800">
       <div className="min-w-0">
         <img
@@ -1385,7 +1385,7 @@ const EmployeeSidebar = ({
       )}
     </div>
 
-    <nav className="flex-1 space-y-2 overflow-y-auto p-4">
+    <nav className="min-h-0 flex-1 space-y-2 overflow-y-auto overscroll-contain p-4 [scrollbar-width:thin]">
       <Button
         type="button"
         variant="ghost"
@@ -1565,20 +1565,20 @@ const EmployeeSidebar = ({
 
     {/* Mobile and tablet vertical slide-out sidebar */}
     <aside
-      className={cn(
-        "fixed inset-y-0 left-0 z-[70] w-[86vw] max-w-xs transform border-r border-slate-200 bg-white shadow-2xl transition-transform duration-300 ease-out dark:border-slate-800 dark:bg-slate-950 lg:hidden",
-        mobileSidebarOpen ? "translate-x-0" : "-translate-x-full"
-      )}
-      aria-hidden={!mobileSidebarOpen}
-    >
-      <EmployeeSidebar mobile />
-    </aside>
+  className={cn(
+    "fixed inset-y-0 left-0 z-[70] flex h-dvh w-[86vw] max-w-xs transform overflow-hidden border-r border-slate-200 bg-white shadow-2xl transition-transform duration-300 ease-out dark:border-slate-800 dark:bg-slate-950 lg:hidden",
+    mobileSidebarOpen ? "translate-x-0" : "-translate-x-full"
+  )}
+  aria-hidden={!mobileSidebarOpen}
+>
+  <EmployeeSidebar mobile />
+</aside>
 
     <div className="mx-auto flex w-full max-w-[1600px] gap-5 p-3 sm:p-4 lg:gap-6 lg:p-6">
       {/* Permanent desktop vertical sidebar */}
-      <aside className="sticky top-6 hidden h-[calc(100vh-3rem)] w-64 shrink-0 overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-lg dark:border-slate-800 dark:bg-slate-950 lg:block">
-        <EmployeeSidebar />
-      </aside>
+      <aside className="sticky top-6 hidden h-[calc(100dvh-3rem)] min-h-0 w-64 shrink-0 overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-lg dark:border-slate-800 dark:bg-slate-950 lg:block">
+  <EmployeeSidebar />
+</aside>
 
       <main className="min-w-0 flex-1">
         {/* Mobile/tablet menu bar */}
