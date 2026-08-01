@@ -900,23 +900,40 @@ const getLiveHoursForOpenShift = useCallback(
 
       let totalMinutes = 0;
 
-      for (const s of sessionsForEmployee) {
-        if (!s.in) continue;
+      for (const session of sessionsForEmployee) {
+        if (!session.in) continue;
 
-        const sessionStart = s.in.ts;
-        const sessionEnd = s.out?.ts ?? Date.now();
+        /*
+         * Cross-midnight rule:
+         * the ENTIRE shift belongs to the calendar period in which
+         * the employee clocked in.
+         *
+         * Example:
+         * Clock in Saturday at 11:00 PM
+         * Clock out Sunday at 2:00 AM
+         *
+         * All 3 hours are counted on Saturday and in Saturday's
+         * week/month/year. The shift is not split at midnight.
+         */
+        const sessionStart = session.in.ts;
 
-        const overlapStart = Math.max(sessionStart, from);
-        const overlapEnd = Math.min(sessionEnd, to);
-
-        if (overlapEnd > overlapStart) {
-          totalMinutes += (overlapEnd - overlapStart) / 60000;
+        if (sessionStart < from || sessionStart > to) {
+          continue;
         }
+
+        const sessionEnd =
+          session.out?.ts ??
+          Math.max(Date.now(), sessionStart);
+
+        totalMinutes += Math.max(
+          0,
+          (sessionEnd - sessionStart) / 60000
+        );
       }
 
       return totalMinutes / 60;
     },
-    [sessionsForEmployee]
+    [sessionsForEmployee, liveNow]
   );
 
   const activeShiftsCount = useMemo(() => {
@@ -1237,14 +1254,21 @@ const selectedDayLabel = useMemo(() => {
   if (difference === 0) return "Today";
   if (difference === 1) return "Tomorrow";
 
-  return format(currentDate, "MMM d");
+  // For dates outside Yesterday / Today / Tomorrow,
+  // do not add a short date label such as "Jul 30".
+  return "";
 }, [currentDate]);
 
 const assignmentDateHeading = useMemo(() => {
-  return `${selectedDayLabel}, ${format(
-    currentDate,
-    "EEEE, MMMM d, yyyy"
-  )}`;
+  const fullDate = format(currentDate, "EEEE, MMMM d, yyyy");
+
+  // Yesterday / Today / Tomorrow keep the friendly relative label.
+  if (selectedDayLabel) {
+    return `${selectedDayLabel}, ${fullDate}`;
+  }
+
+  // All other days show the full date only once.
+  return fullDate;
 }, [currentDate, selectedDayLabel]);
 
 const greeting = useMemo(() => {
@@ -1781,7 +1805,9 @@ const EmployeeSidebar = ({
                     <p className="mt-1 text-2xl font-bold text-emerald-700 dark:text-emerald-300">
                       {totalHoursTodayHHMM}
                     </p>
-                    <p className="mt-1 text-xs text-slate-500">Updated just now</p>
+                    <p className="mt-1 text-xs text-slate-500">
+                      {format(currentDate, "EEEE, MMMM d, yyyy")}
+                    </p>
                   </div>
                 </CardContent>
               </Card>
