@@ -1195,6 +1195,24 @@ const employeeFirstName =
   employee.name.trim().split(/\s+/)[0] ||
   "there";
 
+const employeePhotoUrl =
+  (employee as any).photoUrl ||
+  (employee as any).profilePhotoUrl ||
+  (employee as any).avatarUrl ||
+  (employee as any).imageUrl ||
+  "";
+
+const employeeInitials =
+  `${employee.firstName?.trim().charAt(0) || ""}${
+    employee.lastName?.trim().charAt(0) || ""
+  }`.toUpperCase() ||
+  employee.name
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part.charAt(0).toUpperCase())
+    .join("");
+
 const selectedWeekStart = startOfWeek(currentDate, {
   weekStartsOn: settings.weekStartsOn,
 });
@@ -1208,6 +1226,26 @@ const recentMessages = employeeMessages
   .reverse();
 
 const recentHeaderNotifications = headerNotifications.slice(0, 3);
+
+const selectedDayLabel = useMemo(() => {
+  const difference = differenceInCalendarDays(
+    startOfDay(currentDate),
+    startOfToday()
+  );
+
+  if (difference === -1) return "Yesterday";
+  if (difference === 0) return "Today";
+  if (difference === 1) return "Tomorrow";
+
+  return format(currentDate, "MMM d");
+}, [currentDate]);
+
+const assignmentDateHeading = useMemo(() => {
+  return `${selectedDayLabel}, ${format(
+    currentDate,
+    "EEEE, MMMM d, yyyy"
+  )}`;
+}, [currentDate, selectedDayLabel]);
 
 const greeting = useMemo(() => {
   const hour = new Date(liveNow).getHours();
@@ -1559,98 +1597,44 @@ const EmployeeSidebar = ({
         </div>
     <section className="mb-6 rounded-3xl border border-slate-200 bg-gradient-to-br from-white via-blue-50/40 to-violet-50/60 p-5 shadow-sm dark:border-slate-800 dark:from-slate-950 dark:via-blue-950/20 dark:to-violet-950/20 sm:p-6">
       <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight text-slate-950 dark:text-white sm:text-4xl">
-            {greeting}, {employeeFirstName}! <span aria-hidden="true">👋</span>
-          </h1>
-          <p className="mt-2 text-base text-slate-600 dark:text-slate-300">
-            Here&apos;s what&apos;s happening today.
-          </p>
+        <div className="flex items-center gap-4 sm:gap-5">
+          <div className="relative shrink-0">
+            {employeePhotoUrl ? (
+              <img
+                src={employeePhotoUrl}
+                alt={`${employee.name} profile`}
+                className="h-16 w-16 rounded-2xl border-4 border-white object-cover shadow-lg sm:h-20 sm:w-20 dark:border-slate-900"
+              />
+            ) : (
+              <div
+                className="flex h-16 w-16 items-center justify-center rounded-2xl border-4 border-white text-lg font-bold text-white shadow-lg sm:h-20 sm:w-20 sm:text-xl dark:border-slate-900"
+                style={{
+                  backgroundColor: employee.color || "#4f46e5",
+                }}
+              >
+                {employeeInitials || "E"}
+              </div>
+            )}
+
+            <span
+              className={cn(
+                "absolute -bottom-1 -right-1 h-4 w-4 rounded-full border-2 border-white dark:border-slate-900",
+                activeShiftsCount > 0 ? "bg-emerald-500" : "bg-slate-400"
+              )}
+              aria-label={activeShiftsCount > 0 ? "Clocked in" : "Clocked out"}
+            />
+          </div>
+
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight text-slate-950 dark:text-white sm:text-4xl">
+              {greeting}, {employeeFirstName}! <span aria-hidden="true">👋</span>
+            </h1>
+            <p className="mt-2 text-base text-slate-600 dark:text-slate-300">
+              Here&apos;s what&apos;s happening today.
+            </p>
+          </div>
         </div>
 
-        {!isManagerPreview && (
-          <div className="flex flex-wrap items-center gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setIsProfileOpen(true)}
-              className="rounded-xl"
-            >
-              <User className="mr-2 h-4 w-4" />
-              My Profile
-            </Button>
-
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline" size="sm" className="relative rounded-xl">
-                  <Bell className="mr-2 h-4 w-4" />
-                  Notifications
-                  {unreadNotificationCount > 0 && (
-                    <span className="ml-2 inline-flex min-w-[1.25rem] items-center justify-center rounded-full bg-red-600 px-1.5 py-0.5 text-[10px] font-semibold text-white">
-                      {unreadNotificationCount}
-                    </span>
-                  )}
-                </Button>
-              </DropdownMenuTrigger>
-
-              <DropdownMenuContent align="end" className="w-96">
-                <div className="flex items-center justify-between border-b px-3 py-2">
-                  <span className="text-sm font-semibold">Notifications</span>
-                  {unreadNotificationCount > 0 && (
-                    <Button variant="ghost" size="sm" onClick={markAllHeaderNotificationsRead}>
-                      Mark all as read
-                    </Button>
-                  )}
-                </div>
-
-                {headerNotifications.length === 0 ? (
-                  <div className="p-4 text-sm text-muted-foreground">
-                    No notifications
-                  </div>
-                ) : (
-                  <>
-                    {headerNotifications.slice(0, 3).map((notification) => (
-                      <DropdownMenuItem
-                        key={notification.id}
-                        onClick={() => {
-                          if (!notification.read) {
-                            void markHeaderNotificationRead(notification.id);
-                          }
-                        }}
-                        className="flex cursor-pointer flex-col items-start gap-1"
-                      >
-                        <div className="flex w-full justify-between">
-                          <span className="font-medium">{notification.title}</span>
-                          {!notification.read && (
-                            <Badge variant="destructive" className="text-[10px]">
-                              New
-                            </Badge>
-                          )}
-                        </div>
-                        <span className="line-clamp-2 text-xs text-muted-foreground">
-                          {notification.message}
-                        </span>
-                      </DropdownMenuItem>
-                    ))}
-                    <DropdownMenuSeparator />
-                    <Button
-                      variant="ghost"
-                      className="w-full"
-                      onClick={() => setOpenNotifications(true)}
-                    >
-                      View all notifications
-                    </Button>
-                  </>
-                )}
-              </DropdownMenuContent>
-            </DropdownMenu>
-
-            <Button variant="ghost" size="sm" onClick={onLogout} className="rounded-xl">
-              <Power className="mr-2 h-4 w-4" />
-              Logout
-            </Button>
-          </div>
-        )}
       </div>
 
       <div className="mt-5 flex flex-wrap items-center gap-2">
@@ -1756,8 +1740,13 @@ const EmployeeSidebar = ({
                       size="sm"
                       className="mt-3 rounded-full border-violet-400 px-6 text-violet-700"
                       onClick={() => setCurrentDate(startOfDay(new Date()))}
+                      title={
+                        selectedDayLabel === "Today"
+                          ? "Currently viewing today"
+                          : "Return to today"
+                      }
                     >
-                      Today
+                      {selectedDayLabel}
                     </Button>
                   </div>
 
@@ -1866,26 +1855,6 @@ const EmployeeSidebar = ({
                   schedulePanelMode === "timeclock" && "hidden"
                 )}
               >
-                <CardHeader className="border-b bg-gradient-to-r from-blue-50 via-white to-violet-50">
-                  <div className="flex flex-wrap items-center justify-between gap-3">
-                    <div>
-                      <CardTitle className="flex items-center gap-2 text-xl">
-                        <Building2 className="h-5 w-5 text-emerald-600" />
-                        Your Assignments — {format(currentDate, "EEEE")}
-                        <Badge className="ml-1 bg-violet-100 text-violet-700 hover:bg-violet-100">
-                          {filteredDailySchedules.length}
-                        </Badge>
-                      </CardTitle>
-                      <CardDescription className="mt-1">
-                        Only assignments scheduled for this selected day are shown.
-                      </CardDescription>
-                    </div>
-                    <Button variant="ghost" size="sm" onClick={openAssignmentsOnly} className="text-violet-700">
-                      View Full Schedule
-                      <ChevronRight className="ml-1 h-4 w-4" />
-                    </Button>
-                  </div>
-                </CardHeader>
                <CardContent className="p-3 sm:p-4">
                   <Tabs defaultValue="daily">
                     <TabsList className="grid w-full grid-cols-2">
@@ -1895,90 +1864,82 @@ const EmployeeSidebar = ({
 
                     {/* DAILY VIEW */}
                     <TabsContent value="daily">
-                      <div className="flex justify-between items-center my-2 flex-wrap gap-2">
-  <div className="flex items-center gap-2 flex-wrap">
-    <h3 className="font-semibold">
-      {formatDateHeader(currentDate)}
-    </h3>
+                      <div className="my-4 rounded-2xl border border-slate-200 bg-gradient-to-r from-white via-emerald-50/40 to-violet-50/50 p-4 shadow-sm dark:border-slate-800 dark:from-slate-950 dark:via-emerald-950/20 dark:to-violet-950/20">
+                        <div className="flex flex-col gap-4">
+                          <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
+                            <div>
+                              <h3 className="flex flex-wrap items-center gap-2 text-lg font-bold text-slate-950 dark:text-white">
+                                <Building2 className="h-5 w-5 text-emerald-600" />
+                                Your Assignments — {assignmentDateHeading}
+                              </h3>
+                              <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+                                Only assignments scheduled for this selected day are shown.
+                              </p>
+                            </div>
 
+                            <div className="flex flex-wrap gap-2">
+                              <Badge variant="outline">
+                                Total: {dailySiteSummary.total}
+                              </Badge>
 
-  </div>
-                        <div className="flex gap-1">
-                          <Button variant="outline" size="icon" className="h-7 w-7" onClick={() => changeDay(-1)}>
-                            <ChevronLeft />
-                          </Button>
-                          <Button
-  variant={isSameDay(currentDate, startOfDay(new Date())) ? "default" : "outline"}
-  className="h-7 min-w-[110px]"
-  onClick={() => setCurrentDate(startOfDay(new Date()))}
-  title="Jump back to today"
->
-  {formatDateHeader(currentDate)}
-</Button>
-                          <Button variant="outline" size="icon" className="h-7 w-7" onClick={() => changeDay(1)}>
-                            <ChevronRight />
-                          </Button>
+                              <Badge className="bg-green-600 text-white hover:bg-green-600">
+                                Complete: {dailySiteSummary.complete}
+                              </Badge>
+
+                              <Badge className="bg-yellow-500 text-white hover:bg-yellow-500">
+                                In Process: {dailySiteSummary.inProcess}
+                              </Badge>
+
+                              <Badge className="bg-red-500 text-white hover:bg-red-500">
+                                Incomplete: {dailySiteSummary.incomplete}
+                              </Badge>
+                            </div>
+                          </div>
+
+                          <div className="grid gap-3 border-t border-slate-200/80 pt-4 dark:border-slate-800 md:grid-cols-[minmax(0,1fr)_220px]">
+                            <div className="relative">
+                              <Input
+                                placeholder="Search site or task..."
+                                value={dailySearch}
+                                onChange={(event) => setDailySearch(event.target.value)}
+                                className="h-11 rounded-xl bg-white pr-10 shadow-sm dark:bg-slate-950"
+                              />
+
+                              {dailySearch && (
+                                <button
+                                  type="button"
+                                  onClick={() => setDailySearch("")}
+                                  className="absolute right-3 top-1/2 -translate-y-1/2 rounded-md px-1 text-sm text-muted-foreground hover:text-foreground"
+                                  aria-label="Clear search"
+                                >
+                                  ✕
+                                </button>
+                              )}
+                            </div>
+
+                            <Select
+                              value={statusFilter}
+                              onValueChange={(
+                                value:
+                                  | "all"
+                                  | "complete"
+                                  | "in-process"
+                                  | "incomplete"
+                              ) => setStatusFilter(value)}
+                            >
+                              <SelectTrigger className="h-11 w-full rounded-xl bg-white shadow-sm dark:bg-slate-950">
+                                <SelectValue placeholder="Filter by status" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="all">All statuses</SelectItem>
+                                <SelectItem value="complete">Complete</SelectItem>
+                                <SelectItem value="in-process">In Progress</SelectItem>
+                                <SelectItem value="incomplete">Incomplete</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
                         </div>
                       </div>
-{/* ✅ Daily Site Summary */}
-<div className="flex flex-wrap gap-3 mb-3">
-  <Badge variant="outline">
-    Total: {dailySiteSummary.total}
-  </Badge>
-
-  <Badge className="bg-green-600 text-white">
-    Complete: {dailySiteSummary.complete}
-  </Badge>
-
-  <Badge className="bg-yellow-500 text-white">
-    In Process: {dailySiteSummary.inProcess}
-  </Badge>
-
-  <Badge className="bg-red-500 text-white">
-    Incomplete: {dailySiteSummary.incomplete}
-  </Badge>
-</div>
- <div className="mb-3 flex flex-col sm:flex-row gap-2 sm:items-center">
-
-  {/* 🔍 Search */}
-  <div className="relative flex-1 min-w-[220px]">
-    <Input
-      placeholder="Search site or task..."
-      value={dailySearch}
-      onChange={(e) => setDailySearch(e.target.value)}
-      className="pr-8"
-    />
-
-    {dailySearch && (
-      <button
-        onClick={() => setDailySearch("")}
-        className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-muted-foreground"
-      >
-        ✕
-      </button>
-    )}
-  </div>
-
-  {/* 🎯 Status Filter */}
-  <Select
-    value={statusFilter}
-    onValueChange={(v: "all" | "complete" | "in-process" | "incomplete") =>
-      setStatusFilter(v)
-    }
-  >
-    <SelectTrigger className="w-[180px]">
-      <SelectValue placeholder="Filter by status" />
-    </SelectTrigger>
-    <SelectContent>
-      <SelectItem value="all">All statuses</SelectItem>
-      <SelectItem value="complete">Complete</SelectItem>
-      <SelectItem value="in-process">In Progress</SelectItem>
-      <SelectItem value="incomplete">Incomplete</SelectItem>
-    </SelectContent>
-  </Select>
-
-</div>
-
 
                       <ScrollArea className="h-[60vh]">
   {filteredDailySchedules.length > 0 ? (
