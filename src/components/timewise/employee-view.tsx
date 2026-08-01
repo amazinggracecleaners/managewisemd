@@ -53,6 +53,11 @@ import {
   LockKeyhole,
   Send,
   Activity,
+  Menu,
+  X,
+  WalletCards,
+  CircleHelp,
+  ClipboardList,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -260,6 +265,7 @@ export function EmployeeView({
   const [activeTab, setActiveTab] = useState<
     "schedule" | "messages" | "activity" | "payroll"
   >("schedule");
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
 const [dailySearch, setDailySearch] = useState("");
 
 const [statusFilter, setStatusFilter] = useState<
@@ -1129,13 +1135,312 @@ const recentMessages = employeeMessages
 
 const recentHeaderNotifications = headerNotifications.slice(0, 3);
 
+const greeting = useMemo(() => {
+  const hour = new Date(liveNow).getHours();
+
+  if (hour >= 5 && hour < 12) {
+    return "Good Morning";
+  }
+
+  if (hour >= 12 && hour < 17) {
+    return "Good Afternoon";
+  }
+
+  if (hour >= 17 && hour < 22) {
+    return "Good Evening";
+  }
+
+  return "Good Night";
+}, [liveNow]);
+
+const closeMobileSidebar = useCallback(() => {
+  setMobileSidebarOpen(false);
+}, []);
+
+const openEmployeeTab = useCallback(
+  (tab: "schedule" | "messages" | "activity" | "payroll") => {
+    setActiveTab(tab);
+    closeMobileSidebar();
+
+    window.setTimeout(() => {
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }, 50);
+  },
+  [closeMobileSidebar]
+);
+
+const scrollToAssignments = useCallback(() => {
+  setActiveTab("schedule");
+  closeMobileSidebar();
+
+  window.setTimeout(() => {
+    document.getElementById("employee-assignments")?.scrollIntoView({
+      behavior: "smooth",
+      block: "start",
+    });
+  }, 100);
+}, [closeMobileSidebar]);
+
+const EmployeeSidebar = ({
+  mobile = false,
+}: {
+  mobile?: boolean;
+}) => (
+  <div className="flex h-full flex-col bg-white dark:bg-slate-950">
+    <div className="flex items-center justify-between border-b border-slate-100 px-5 py-5 dark:border-slate-800">
+      <div className="min-w-0">
+        <img
+          src="/managewisemd-logo.png"
+          alt="ManageWiseMD"
+          className="h-12 w-auto object-contain"
+        />
+        <p className="mt-2 truncate text-sm font-semibold text-slate-800 dark:text-slate-100">
+          {(settings as any).companyName || "Employee Workspace"}
+        </p>
+      </div>
+
+      {mobile && (
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          onClick={closeMobileSidebar}
+          aria-label="Close menu"
+          className="rounded-xl"
+        >
+          <X className="h-5 w-5" />
+        </Button>
+      )}
+    </div>
+
+    <nav className="flex-1 space-y-2 overflow-y-auto p-4">
+      <Button
+        type="button"
+        variant="ghost"
+        onClick={() => openEmployeeTab("schedule")}
+        className={cn(
+          "h-12 w-full justify-start rounded-2xl px-4",
+          activeTab === "schedule" &&
+            "bg-violet-100 text-violet-800 hover:bg-violet-100 dark:bg-violet-950/50 dark:text-violet-200"
+        )}
+      >
+        <Home className="mr-3 h-5 w-5" />
+        Home
+      </Button>
+
+      <Button
+        type="button"
+        variant="ghost"
+        onClick={scrollToAssignments}
+        className="h-12 w-full justify-start rounded-2xl px-4"
+      >
+        <CalendarDays className="mr-3 h-5 w-5" />
+        My Schedule
+      </Button>
+
+      <Button
+        type="button"
+        variant="ghost"
+        onClick={scrollToAssignments}
+        className="h-12 w-full justify-start rounded-2xl px-4"
+      >
+        <Clock3 className="mr-3 h-5 w-5" />
+        Time Clock
+      </Button>
+
+      <Button
+        type="button"
+        variant="ghost"
+        onClick={() => openEmployeeTab("messages")}
+        className={cn(
+          "relative h-12 w-full justify-start rounded-2xl px-4",
+          activeTab === "messages" &&
+            "bg-violet-100 text-violet-800 hover:bg-violet-100 dark:bg-violet-950/50 dark:text-violet-200"
+        )}
+      >
+        <MessageSquare className="mr-3 h-5 w-5" />
+        Messages
+        {employeeUnreadMessages > 0 && (
+          <span className="ml-auto inline-flex min-w-6 items-center justify-center rounded-full bg-red-600 px-1.5 py-0.5 text-xs font-semibold text-white">
+            {employeeUnreadMessages}
+          </span>
+        )}
+      </Button>
+
+      <Button
+        type="button"
+        variant="ghost"
+        onClick={() => {
+          setOpenNotifications(true);
+          closeMobileSidebar();
+        }}
+        className="relative h-12 w-full justify-start rounded-2xl px-4"
+      >
+        <Bell className="mr-3 h-5 w-5" />
+        Notifications
+        {unreadNotificationCount > 0 && (
+          <span className="ml-auto inline-flex min-w-6 items-center justify-center rounded-full bg-red-600 px-1.5 py-0.5 text-xs font-semibold text-white">
+            {unreadNotificationCount}
+          </span>
+        )}
+      </Button>
+
+      <Button
+        type="button"
+        variant="ghost"
+        onClick={() => openEmployeeTab("payroll")}
+        className={cn(
+          "h-12 w-full justify-start rounded-2xl px-4",
+          activeTab === "payroll" &&
+            "bg-violet-100 text-violet-800 hover:bg-violet-100 dark:bg-violet-950/50 dark:text-violet-200"
+        )}
+      >
+        <WalletCards className="mr-3 h-5 w-5" />
+        Payroll
+      </Button>
+
+      <Button
+        type="button"
+        variant="ghost"
+        onClick={() => {
+          setIsProfileOpen(true);
+          closeMobileSidebar();
+        }}
+        className="h-12 w-full justify-start rounded-2xl px-4"
+      >
+        <User className="mr-3 h-5 w-5" />
+        My Profile
+      </Button>
+
+      <Button
+        type="button"
+        variant="ghost"
+        onClick={() => openEmployeeTab("activity")}
+        className={cn(
+          "h-12 w-full justify-start rounded-2xl px-4",
+          activeTab === "activity" &&
+            "bg-violet-100 text-violet-800 hover:bg-violet-100 dark:bg-violet-950/50 dark:text-violet-200"
+        )}
+      >
+        <ClipboardList className="mr-3 h-5 w-5" />
+        Activity
+      </Button>
+
+      <Button
+        type="button"
+        variant="ghost"
+        onClick={() => openEmployeeTab("messages")}
+        className="h-12 w-full justify-start rounded-2xl px-4"
+      >
+        <CircleHelp className="mr-3 h-5 w-5" />
+        Support
+      </Button>
+
+      <Button
+        type="button"
+        variant="ghost"
+        onClick={onLogout}
+        className="h-12 w-full justify-start rounded-2xl px-4 text-slate-600 hover:bg-rose-50 hover:text-rose-700 dark:text-slate-300 dark:hover:bg-rose-950/30 dark:hover:text-rose-300"
+      >
+        <Power className="mr-3 h-5 w-5" />
+        Log Out
+      </Button>
+    </nav>
+
+    <div className="m-4 rounded-2xl border border-violet-100 bg-gradient-to-br from-violet-50 to-blue-50 p-4 text-center dark:border-violet-900 dark:from-violet-950/30 dark:to-blue-950/30">
+      <CircleHelp className="mx-auto h-7 w-7 text-violet-700 dark:text-violet-300" />
+      <p className="mt-2 text-sm font-semibold text-slate-900 dark:text-white">
+        Need help?
+      </p>
+      <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+        Send a message to your manager.
+      </p>
+      <Button
+        type="button"
+        variant="link"
+        size="sm"
+        onClick={() => openEmployeeTab("messages")}
+        className="mt-1 text-violet-700 dark:text-violet-300"
+      >
+        Contact Support
+      </Button>
+    </div>
+  </div>
+);
+
  return (
-  <>
+  <div className="min-h-screen bg-slate-50/80 dark:bg-slate-950">
+    {/* Mobile and tablet overlay */}
+    {mobileSidebarOpen && (
+      <button
+        type="button"
+        className="fixed inset-0 z-[60] bg-slate-950/55 backdrop-blur-sm lg:hidden"
+        onClick={closeMobileSidebar}
+        aria-label="Close navigation overlay"
+      />
+    )}
+
+    {/* Mobile and tablet vertical slide-out sidebar */}
+    <aside
+      className={cn(
+        "fixed inset-y-0 left-0 z-[70] w-[86vw] max-w-xs transform border-r border-slate-200 bg-white shadow-2xl transition-transform duration-300 ease-out dark:border-slate-800 dark:bg-slate-950 lg:hidden",
+        mobileSidebarOpen ? "translate-x-0" : "-translate-x-full"
+      )}
+      aria-hidden={!mobileSidebarOpen}
+    >
+      <EmployeeSidebar mobile />
+    </aside>
+
+    <div className="mx-auto flex w-full max-w-[1600px] gap-5 p-3 sm:p-4 lg:gap-6 lg:p-6">
+      {/* Permanent desktop vertical sidebar */}
+      <aside className="sticky top-6 hidden h-[calc(100vh-3rem)] w-64 shrink-0 overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-lg dark:border-slate-800 dark:bg-slate-950 lg:block">
+        <EmployeeSidebar />
+      </aside>
+
+      <main className="min-w-0 flex-1">
+        {/* Mobile/tablet menu bar */}
+        <div className="sticky top-0 z-50 mb-4 flex items-center justify-between rounded-2xl border border-slate-200 bg-white/95 px-3 py-2 shadow-sm backdrop-blur dark:border-slate-800 dark:bg-slate-950/95 lg:hidden">
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            onClick={() => setMobileSidebarOpen(true)}
+            aria-label="Open menu"
+            className="rounded-xl"
+          >
+            <Menu className="h-6 w-6" />
+          </Button>
+
+          <div className="min-w-0 text-center">
+            <p className="truncate text-sm font-semibold text-slate-900 dark:text-white">
+              {(settings as any).companyName || "Employee Workspace"}
+            </p>
+            <p className="text-xs text-slate-500">
+              {activeShiftsCount > 0 ? "Clocked IN" : "Clocked OUT"}
+            </p>
+          </div>
+
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            onClick={() => setOpenNotifications(true)}
+            aria-label="Open notifications"
+            className="relative rounded-xl"
+          >
+            <Bell className="h-5 w-5" />
+            {unreadNotificationCount > 0 && (
+              <span className="absolute -right-1 -top-1 inline-flex min-h-5 min-w-5 items-center justify-center rounded-full bg-red-600 px-1 text-[10px] font-bold text-white">
+                {unreadNotificationCount}
+              </span>
+            )}
+          </Button>
+        </div>
     <section className="mb-6 rounded-3xl border border-slate-200 bg-gradient-to-br from-white via-blue-50/40 to-violet-50/60 p-5 shadow-sm dark:border-slate-800 dark:from-slate-950 dark:via-blue-950/20 dark:to-violet-950/20 sm:p-6">
       <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
         <div>
           <h1 className="text-3xl font-bold tracking-tight text-slate-950 dark:text-white sm:text-4xl">
-            Good Morning, {employeeFirstName}! <span aria-hidden="true">👋</span>
+            {greeting}, {employeeFirstName}! <span aria-hidden="true">👋</span>
           </h1>
           <p className="mt-2 text-base text-slate-600 dark:text-slate-300">
             Here&apos;s what&apos;s happening today.
@@ -1274,7 +1579,7 @@ const recentHeaderNotifications = headerNotifications.slice(0, 3);
   
 
   {/* 🔥 Sticky Tabs Bar */}
-  <div className="sticky top-0 z-40 rounded-2xl border bg-background/95 p-1 shadow-sm backdrop-blur supports-[backdrop-filter]:bg-background/80">
+  <div className="hidden">
     <div className="w-full overflow-x-auto">
       <TabsList className="flex w-max min-w-full gap-1 bg-transparent">
         <TabsTrigger value="schedule" className="rounded-xl">
@@ -1399,7 +1704,10 @@ const recentHeaderNotifications = headerNotifications.slice(0, 3);
 
             {/* Schedule */}
             {employee.name && (
-              <Card className="border-blue-100 shadow-md">
+              <Card
+                id="employee-assignments"
+                className="scroll-mt-24 border-blue-100 shadow-md"
+              >
                 <CardHeader className="border-b bg-gradient-to-r from-blue-50 via-white to-violet-50">
                   <div className="flex flex-wrap items-center justify-between gap-3">
                     <div>
@@ -2199,6 +2507,8 @@ const hoursSpent =
   </DialogContent>
 </Dialog>
 
-</>
+      </main>
+    </div>
+  </div>
   );
 }
