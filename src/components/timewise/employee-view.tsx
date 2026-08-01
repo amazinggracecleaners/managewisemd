@@ -318,8 +318,8 @@ const [liveNow, setLiveNow] = useState(Date.now());
 
 useEffect(() => {
   const id = window.setInterval(() => {
-    setLiveNow(Date.now());
-  }, 1000);
+  setLiveNow(Date.now());
+}, 60_000);
 
   return () => window.clearInterval(id);
 }, []);
@@ -1353,13 +1353,11 @@ const scrollToAssignments = useCallback(() => {
   }, 100);
 }, [closeMobileSidebar]);
 
-const EmployeeSidebar = ({
-  mobile = false,
-}: {
-  mobile?: boolean;
-}) => (
+const renderEmployeeSidebar = (
+  mobile = false
+) => (
   <div className="flex h-full min-h-0 flex-col overflow-hidden bg-white dark:bg-slate-950">
-    <div className="flex items-center justify-between border-b border-slate-100 px-5 py-5 dark:border-slate-800">
+    <div className="flex shrink-0 items-center justify-between border-b border-slate-100 px-5 py-5 dark:border-slate-800">
       <div className="min-w-0">
         <img
           src="/managewisemd-logo.png"
@@ -1385,7 +1383,13 @@ const EmployeeSidebar = ({
       )}
     </div>
 
-    <nav className="min-h-0 flex-1 space-y-2 overflow-y-auto overscroll-contain p-4 [scrollbar-width:thin]">
+   <nav
+  className="min-h-0 flex-1 touch-pan-y space-y-2 overflow-y-auto overscroll-contain p-4 [scrollbar-width:thin]"
+  style={{
+    WebkitOverflowScrolling: "touch",
+    overscrollBehaviorY: "contain",
+  }}
+>
       <Button
         type="button"
         variant="ghost"
@@ -1530,7 +1534,7 @@ const EmployeeSidebar = ({
       </Button>
     </nav>
 
-    <div className="m-4 rounded-2xl border border-violet-100 bg-gradient-to-br from-violet-50 to-blue-50 p-4 text-center dark:border-violet-900 dark:from-violet-950/30 dark:to-blue-950/30">
+   <div className="m-4 shrink-0 rounded-2xl border border-violet-100 bg-gradient-to-br from-violet-50 to-blue-50 p-4 text-center dark:border-violet-900 dark:from-violet-950/30 dark:to-blue-950/30">
       <CircleHelp className="mx-auto h-7 w-7 text-violet-700 dark:text-violet-300" />
       <p className="mt-2 text-sm font-semibold text-slate-900 dark:text-white">
         Need help?
@@ -1571,13 +1575,13 @@ const EmployeeSidebar = ({
   )}
   aria-hidden={!mobileSidebarOpen}
 >
-  <EmployeeSidebar mobile />
+  {renderEmployeeSidebar(true)}
 </aside>
 
     <div className="mx-auto flex w-full max-w-[1600px] gap-5 p-3 sm:p-4 lg:gap-6 lg:p-6">
       {/* Permanent desktop vertical sidebar */}
       <aside className="sticky top-6 hidden h-[calc(100dvh-3rem)] min-h-0 w-64 shrink-0 overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-lg dark:border-slate-800 dark:bg-slate-950 lg:block">
-  <EmployeeSidebar />
+  {renderEmployeeSidebar(false)}
 </aside>
 
       <main className="min-w-0 flex-1">
