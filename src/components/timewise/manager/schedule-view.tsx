@@ -83,6 +83,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { cleanForFirestore } from "@/lib/firestore-utils";
 import { cn}from "@/lib/utils";
+import { groupSessions } from "@/lib/time-utils";
 import {
   Tooltip,
   TooltipContent,
@@ -410,6 +411,7 @@ const [fixModal, setFixModal] = useState<{
   employeeName?: string;
   site?: Site;
   date?: Date;
+  scheduleId?: string;
   inEntryId?: string;
   outEntryId?: string;
 }>({ open: false });
@@ -455,10 +457,89 @@ const resolveAssignedEmployeeIds = (names: string[]): string[] => {
     );
   }, [weekStartsOn]);
 
-  const durationsForCurrentDate = useMemo(
-    () => getDurationsBySite(currentDate),
-    [getDurationsBySite, currentDate]
+  const durationsForCurrentDate = useMemo(() => {
+  const selectedDateKey = format(
+    currentDate,
+    "yyyy-MM-dd"
   );
+
+  const result = new Map<
+    string,
+    {
+      minutes: number;
+      byEmployee: Record<string, number>;
+    }
+  >();
+
+  /*
+   * Pair all entries first so crossover shifts remain complete.
+   */
+  const sessions = groupSessions(
+    entries
+      .slice()
+      .sort((a, b) => a.ts - b.ts)
+  );
+
+  for (const session of sessions) {
+    if (!session.in || !session.out) {
+      continue;
+    }
+
+    /*
+     * The display follows the assignment date.
+     * Legacy records fall back to the clock-in date.
+     */
+    const sessionDateKey =
+      session.in.scheduleDate ||
+      session.out.scheduleDate ||
+      format(
+        new Date(session.in.ts),
+        "yyyy-MM-dd"
+      );
+
+    if (sessionDateKey !== selectedDateKey) {
+      continue;
+    }
+
+    const siteName =
+      session.in.site ||
+      session.out.site;
+
+    if (!siteName) {
+      continue;
+    }
+
+    const minutes = Math.max(
+      0,
+      Math.round(
+        (session.out.ts -
+          session.in.ts) /
+          60000
+      )
+    );
+
+    const employeeKey =
+      session.employeeId ||
+      session.employee ||
+      "unknown";
+
+    const existing =
+      result.get(siteName) || {
+        minutes: 0,
+        byEmployee: {},
+      };
+
+    existing.minutes += minutes;
+
+    existing.byEmployee[employeeKey] =
+      (existing.byEmployee[employeeKey] || 0) +
+      minutes;
+
+    result.set(siteName, existing);
+  }
+
+  return result;
+}, [entries, currentDate]);
 
   // include any “deleted” site names that exist in schedules
   const sitesForDropdown = useMemo(() => {
@@ -517,24 +598,90 @@ const openFixShiftModal = (data: {
   employeeName: string;
   site: Site;
   date: Date;
+  scheduleId?: string;
 }) => {
-  const dayEntries = entries
-    .filter(
-      (e) =>
-        e.employeeId === data.employeeId &&
-        e.site === data.site.name &&
-        isSameDay(new Date(e.ts), data.date)
-    )
+  const selectedDateKey = format(
+    data.date,
+    "yyyy-MM-dd"
+  );
+
+  const employeeSiteEntries = entries
+    .filter((entry) => {
+      if (entry.employeeId !== data.employeeId) {
+        return false;
+      }
+
+      if (entry.site !== data.site.name) {
+        return false;
+      }
+
+      if (
+        data.scheduleId &&
+        entry.scheduleId &&
+        entry.scheduleId !== data.scheduleId
+      ) {
+        return false;
+      }
+
+      return true;
+    })
+    .slice()
     .sort((a, b) => a.ts - b.ts);
 
-  const inEntry = dayEntries.find((e) => e.action === "in");
-  const outEntry = dayEntries.find((e) => e.action === "out");
+  const sessions = groupSessions(
+    employeeSiteEntries
+  );
+
+  const matchingSession = sessions
+    .filter((session) => {
+      if (!session.in) {
+        return false;
+      }
+
+      const sessionDateKey =
+        session.in.scheduleDate ||
+        session.out?.scheduleDate ||
+        format(
+          new Date(session.in.ts),
+          "yyyy-MM-dd"
+        );
+
+      if (sessionDateKey !== selectedDateKey) {
+        return false;
+      }
+
+      if (
+        data.scheduleId &&
+        session.in.scheduleId &&
+        session.in.scheduleId !== data.scheduleId
+      ) {
+        return false;
+      }
+
+      return true;
+    })
+    .slice()
+    .sort(
+      (a, b) =>
+        (b.in?.ts ?? 0) -
+        (a.in?.ts ?? 0)
+    )[0];
+
+  const inEntry = matchingSession?.in;
+  const outEntry = matchingSession?.out;
 
   const toInput = (ts?: number) => {
     if (!ts) return "";
+
     const d = new Date(ts);
-    const pad = (n: number) => String(n).padStart(2, "0");
-    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+    const pad = (n: number) =>
+      String(n).padStart(2, "0");
+
+    return `${d.getFullYear()}-${pad(
+      d.getMonth() + 1
+    )}-${pad(d.getDate())}T${pad(
+      d.getHours()
+    )}:${pad(d.getMinutes())}`;
   };
 
   setFixModal({
@@ -547,6 +694,7 @@ const openFixShiftModal = (data: {
   setFixIn(toInput(inEntry?.ts));
   setFixOut(toInput(outEntry?.ts));
 };
+   
   const handleOpenDialog = (
     schedule: CleaningSchedule | null = null,
     occurrenceDate?: Date
@@ -3066,12 +3214,13 @@ const siteScheduleCompleted = entries.some((e) => {
   variant="outline"
   size="sm"
   onClick={() =>
-    openFixShiftModal({
-      employeeId: emp.id,
-      employeeName: emp.name,
-      site,
-      date: currentDate,
-    })
+   openFixShiftModal({
+  employeeId: emp.id,
+  employeeName: emp.name,
+  site,
+  date: currentDate,
+  scheduleId: s.id,
+})
   }
 >
   Fix
