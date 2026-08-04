@@ -138,7 +138,11 @@ const chargedOccurrences = new Set<string>();
 
 
   // Labor (timeclock entries)
-  const allSessions = groupSessions(entries);
+  const allSessions = groupSessions(
+  entries
+    .slice()
+    .sort((a, b) => a.ts - b.ts)
+);
 
   for (const session of allSessions) {
     // Only closed sessions have a final duration
@@ -155,17 +159,82 @@ const chargedOccurrences = new Set<string>();
     );
     if (!siteId || !siteName) continue;
 
-    // Use whichever timestamps are available
-    const sessionStart = session.in?.ts ?? session.out?.ts ?? 0;
-    const sessionEnd = session.out?.ts ?? session.in?.ts ?? 0;
+    /*
+ * SITE PROFITABILITY DATE RULE
+ *
+ * Labor belongs to the scheduled assignment date,
+ * not necessarily the actual calendar date worked.
+ *
+ * Examples:
+ *
+ * Scheduled July 31
+ * Worked entirely August 1
+ * => July profitability
+ *
+ * Scheduled July 31
+ * Clock IN July 31 / Clock OUT August 1
+ * => July profitability
+ */
+const sessionStart =
+  session.in?.ts ??
+  session.out?.ts ??
+  0;
 
-    const overlapStart = Math.max(sessionStart, min);
-    const overlapEnd = Math.min(sessionEnd, max);
-    if (overlapEnd <= overlapStart) continue;
+const sessionEnd =
+  session.out?.ts ??
+  session.in?.ts ??
+  0;
 
-    const minutesInMonth = (overlapEnd - overlapStart) / 60000;
-    const dayKey =
-  new Date(overlapStart).toISOString().slice(0, 10);
+/*
+ * Prefer the assignment date stored on the IN entry.
+ * OUT is a fallback for older/inconsistent records.
+ * Actual clock-in date is the final legacy fallback.
+ */
+const operationalDate =
+  session.in?.scheduleDate ??
+  session.out?.scheduleDate ??
+  new Date(sessionStart)
+    .toISOString()
+    .slice(0, 10);
+
+/*
+ * Determine which month owns the entire session.
+ */
+const operationalMonth =
+  operationalDate.slice(0, 7);
+
+const selectedMonth =
+  monthISO ??
+  new Date()
+    .toISOString()
+    .slice(0, 7);
+
+if (operationalMonth !== selectedMonth) {
+  continue;
+}
+
+/*
+ * Once the session belongs to this operational month,
+ * count the COMPLETE session.
+ *
+ * Do not split it at midnight/month-end.
+ */
+const minutesInMonth =
+  Math.max(
+    0,
+    sessionEnd - sessionStart
+  ) / 60000;
+
+if (minutesInMonth <= 0) {
+  continue;
+}
+
+/*
+ * Keep dayKey because your service-charge logic below
+ * still uses it for legacy records.
+ */
+const dayKey =
+  operationalDate.slice(0, 10);
 
 const rate =
   hourlyRatesByEmployee.get(session.employee) ??
