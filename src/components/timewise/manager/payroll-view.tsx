@@ -562,13 +562,40 @@ const paidProgressPct = useMemo(() => {
     }
 
     const fromTime = parseISO(startDate).getTime();
-    const toTime = new Date(parseISO(endDate)).setHours(23, 59, 59, 999);
+const toTime = new Date(parseISO(endDate)).setHours(23, 59, 59, 999);
 
-    const filteredEntries = timeEntries.filter(
-      (entry) => entry.ts >= fromTime && entry.ts <= toTime
-    );
+/*
+ * IMPORTANT:
+ * Build complete sessions BEFORE filtering by payroll period.
+ *
+ * Example:
+ * IN  — July 31, 11:15 PM
+ * OUT — August 1, 1:30 AM
+ *
+ * Both entries are available to groupSessions(), so the shift
+ * becomes one completed 2h15 session.
+ */
+const allSessions = groupSessions(
+  timeEntries
+    .slice()
+    .sort((a, b) => a.ts - b.ts)
+);
 
-    const sessions = groupSessions(filteredEntries);
+/*
+ * Payroll rule:
+ * The entire completed shift belongs to the payroll period
+ * in which the employee CLOCKED IN.
+ */
+const sessions = allSessions.filter((session) => {
+  if (!session.in) {
+    return false;
+  }
+
+  return (
+    session.in.ts >= fromTime &&
+    session.in.ts <= toTime
+  );
+});
 
     const newLineItems = employees
   .filter(
