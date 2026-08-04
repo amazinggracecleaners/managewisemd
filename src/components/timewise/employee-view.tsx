@@ -1090,21 +1090,70 @@ const dailyWorkedHHMM = useMemo(() => {
   return minutesToHHMM(dailyWorkedMinutes);
 }, [dailyWorkedMinutes]);
 
-  const handleViewTimesheet = (periodId: string, employeeId: string) => {
-    const period = payrollPeriods.find((p) => p.id === periodId);
-    if (!period || employee.id !== employeeId) return;
+ const handleViewTimesheet = (
+  periodId: string,
+  employeeId: string
+) => {
+  const period = payrollPeriods.find(
+    (candidate) => candidate.id === periodId
+  );
 
-    const fromTime = parseISO(period.startDate).getTime();
-    const toTime = endOfDay(parseISO(period.endDate)).getTime();
+  if (!period || employee.id !== employeeId) {
+    return;
+  }
 
-    const periodEntries = entries.filter((e) => e.employeeId === employee.id && e.ts >= fromTime && e.ts <= toTime);
+  const fromTime = parseISO(
+    period.startDate
+  ).getTime();
 
-    // ✅ Also sort before grouping (same reasoning)
-    const sessions = groupSessions(periodEntries.slice().sort((a, b) => a.ts - b.ts));
+  const toTime = endOfDay(
+    parseISO(period.endDate)
+  ).getTime();
 
-    setTimesheetData({ period, sessions });
-    setIsTimesheetDialogOpen(true);
-  };
+  /*
+   * Important:
+   * Group all employee entries before filtering by payroll period.
+   *
+   * This allows:
+   * IN  — July 31, 11:15 PM
+   * OUT — August 1, 1:30 AM
+   *
+   * to become one completed session.
+   */
+  const allEmployeeSessions = groupSessions(
+    entries
+      .filter(
+        (entry) =>
+          entry.employeeId === employee.id
+      )
+      .slice()
+      .sort((a, b) => a.ts - b.ts)
+  );
+
+  /*
+   * The complete shift belongs to the payroll period
+   * in which the employee clocked in.
+   */
+  const sessions = allEmployeeSessions.filter(
+    (session) => {
+      if (!session.in) {
+        return false;
+      }
+
+      return (
+        session.in.ts >= fromTime &&
+        session.in.ts <= toTime
+      );
+    }
+  );
+
+  setTimesheetData({
+    period,
+    sessions,
+  });
+
+  setIsTimesheetDialogOpen(true);
+};
 const sendEmployeeNoteToManager = async () => {
   if (!employeeNoteText.trim() || !employeeNoteSite) return;
 const attachment = employeeNoteFile

@@ -327,8 +327,8 @@ const y = 5;
   }
 };
   return (
-    <div className="space-y-6">
-      <section className="relative overflow-hidden rounded-3xl border border-blue-200/60 bg-gradient-to-br from-slate-950 via-blue-950 to-indigo-950 p-6 text-white shadow-2xl dark:border-blue-900/60">
+    <div className="min-w-0 space-y-4 sm:space-y-6">
+     <section className="relative overflow-hidden rounded-2xl border border-blue-200/60 bg-gradient-to-br from-slate-950 via-blue-950 to-indigo-950 p-4 text-white shadow-2xl dark:border-blue-900/60 sm:rounded-3xl sm:p-6">
         <div className="absolute -right-20 -top-24 h-72 w-72 rounded-full bg-cyan-400/15 blur-3xl" />
         <div className="absolute -bottom-20 left-1/3 h-56 w-56 rounded-full bg-violet-500/15 blur-3xl" />
 
@@ -339,13 +339,13 @@ const y = 5;
               Employee Payroll Center
             </div>
 
-            <div className="flex items-start gap-4">
+            <div className="flex min-w-0 items-start gap-3 sm:gap-4">
               <div className="rounded-2xl bg-gradient-to-br from-cyan-400 to-blue-500 p-3.5 shadow-lg shadow-cyan-500/20">
                 <WalletCards className="h-7 w-7 text-white" />
               </div>
 
               <div>
-                <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">
+                <h1 className="break-words text-xl font-bold tracking-tight sm:text-3xl">
                   Payroll & Pay Stubs
                 </h1>
                 <p className="mt-2 max-w-2xl text-sm leading-6 text-blue-100/85">
@@ -356,16 +356,16 @@ const y = 5;
             </div>
           </div>
 
-          <div className="rounded-2xl border border-white/15 bg-white/10 px-4 py-3 backdrop-blur">
+          <div className="w-full min-w-0 rounded-2xl border border-white/15 bg-white/10 px-4 py-3 backdrop-blur lg:w-auto">
             <p className="text-xs font-medium uppercase tracking-[0.16em] text-blue-200">
               Employee
             </p>
-            <p className="mt-1 font-semibold">{employee.name}</p>
+            <p className="mt-1 break-words font-semibold">{employee.name}</p>
           </div>
         </div>
       </section>
 
-      <div className="grid gap-4 md:grid-cols-3">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 sm:gap-4">
         <Card className="overflow-hidden border-blue-200 bg-gradient-to-br from-white to-blue-50 shadow-sm dark:border-blue-900 dark:from-slate-950 dark:to-blue-950/20">
           <CardContent className="flex items-center justify-between p-5">
             <div>
@@ -583,39 +583,44 @@ const y = 5;
                   <AccordionItem
                     value={safePeriodId}
                     key={safePeriodId}
-                    className="border-slate-200 px-5 dark:border-slate-800"
+                   className="border-slate-200 px-3 dark:border-slate-800 sm:px-5"
                   >
                     <AccordionTrigger className="py-5 hover:no-underline">
-                      <div className="flex w-full flex-col gap-3 pr-4 text-left sm:flex-row sm:items-center sm:justify-between">
-                        <div className="flex items-center gap-3">
-                          <div className="rounded-2xl bg-gradient-to-br from-blue-100 to-indigo-100 p-3 text-blue-700 dark:from-blue-950/50 dark:to-indigo-950/50 dark:text-blue-300">
-                            <CalendarRange className="h-5 w-5" />
-                          </div>
+  <div className="flex min-w-0 w-full flex-col gap-3 pr-2 text-left sm:pr-4 lg:flex-row lg:items-center lg:justify-between">
+    <div className="flex min-w-0 items-center gap-3">
+      <div className="shrink-0 rounded-2xl bg-gradient-to-br from-blue-100 to-indigo-100 p-3 text-blue-700 dark:from-blue-950/50 dark:to-indigo-950/50 dark:text-blue-300">
+        <CalendarRange className="h-5 w-5" />
+      </div>
 
-                          <div>
-                            <p className="font-semibold text-slate-900 dark:text-white">
-                              {fmt(period.startDate, "MMM d")} –{" "}
-                              {fmt(period.endDate, "MMM d, yyyy")}
-                            </p>
-                            <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                              Payroll revision {revision}
-                            </p>
-                          </div>
-                        </div>
+      <div className="min-w-0">
+        <p className="break-words font-semibold text-slate-900 dark:text-white">
+          {fmt(period.startDate, "MMM d")} –{" "}
+          {fmt(period.endDate, "MMM d, yyyy")}
+        </p>
 
-                        <div className="flex flex-wrap items-center gap-3">
-                          <div className="rounded-xl border border-emerald-100 bg-emerald-50 px-3 py-2 text-sm font-bold text-emerald-700 dark:border-emerald-900 dark:bg-emerald-950/30 dark:text-emerald-300">
-                            {money.format(net)}
-                          </div>
-                          <PayrollStatusBadge status={status} />
-                        </div>
-                      </div>
-                    </AccordionTrigger>
+        <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+          Payroll revision {revision}
+        </p>
+      </div>
+    </div>
+
+    <div className="flex w-full flex-wrap items-center gap-2 sm:gap-3 lg:w-auto lg:justify-end">
+      <div className="rounded-xl border border-emerald-100 bg-emerald-50 px-3 py-2 text-sm font-bold text-emerald-700 dark:border-emerald-900 dark:bg-emerald-950/30 dark:text-emerald-300">
+        {money.format(net)}
+      </div>
+
+      <PayrollStatusBadge status={status} />
+    </div>
+  </div>
+</AccordionTrigger>
 
                     <AccordionContent>
                       <div className="space-y-5 pb-6">
-                        <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3 shadow-inner dark:border-slate-800 dark:bg-slate-900/60">
-                          <div ref={paystubRef}>
+                        <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-slate-50 p-2 shadow-inner dark:border-slate-800 dark:bg-slate-900/60 sm:p-3">
+  <div
+    ref={paystubRef}
+    className="min-w-[760px] origin-top-left"
+  >
                             <PaystubCard
                               companyName={
                                 companyName || "Amazing Grace Cleaners LLC"
@@ -639,7 +644,7 @@ const y = 5;
                           </div>
                         </div>
 
-                        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-5 sm:gap-4">
                           <div className="rounded-2xl border border-blue-100 bg-blue-50/70 p-4 dark:border-blue-900 dark:bg-blue-950/25">
                             <p className="text-xs font-semibold uppercase tracking-wide text-blue-700 dark:text-blue-300">
                               Regular Hours
@@ -695,7 +700,7 @@ const y = 5;
                         <div className="flex flex-col gap-3 sm:flex-row">
                           <Button
                             type="button"
-                            className="h-11 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 px-5 font-semibold text-white shadow-lg shadow-blue-600/20 hover:from-blue-700 hover:to-indigo-700"
+                           className="h-11 w-full rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 px-5 font-semibold text-white shadow-lg shadow-blue-600/20 hover:from-blue-700 hover:to-indigo-700 sm:w-auto"
                             onClick={() =>
                               downloadPaystub({ period, employeeData })
                             }
@@ -711,7 +716,7 @@ const y = 5;
                           <Button
                             type="button"
                             variant="outline"
-                            className="h-11 rounded-xl px-5"
+                           className="h-11 w-full rounded-xl px-5 sm:w-auto"
                             onClick={() =>
                               handleViewTimesheet(period.id, employee.id)
                             }
