@@ -6,6 +6,23 @@ type PaystubDeduction = {
   amount: number;
 };
 
+type PaystubYTD = {
+  regularHours: number;
+  bonusHours: number;
+  flatBonus: number;
+  grossPay: number;
+
+  federalTax: number;
+  stateTax: number;
+  localTax: number;
+  socialSecurity: number;
+  medicare: number;
+  otherDeductions: number;
+
+  totalDeductions: number;
+  netPay: number;
+};
+
 type PaystubCardProps = {
   companyName: string;
   logoUrl?: string;
@@ -23,6 +40,8 @@ type PaystubCardProps = {
   deductions: PaystubDeduction[];
   netPay: number;
   companyContact?: string;
+
+  ytd?: PaystubYTD;
 };
 
 const currency = new Intl.NumberFormat("en-US", {
@@ -53,6 +72,7 @@ export function PaystubCard({
   deductions,
   netPay,
   companyContact,
+  ytd,
 }: PaystubCardProps) {
   const safeDeductions = deductions.filter(
     (deduction) =>
@@ -72,6 +92,43 @@ export function PaystubCard({
   // bonus-hour rate = regular hourly rate + $0.50.
   const bonusRate = payRate != null ? payRate + 0.5 : 0;
   const bonusAmount = payRate != null ? bonusHours * bonusRate : 0;
+  const getYTDDeductionAmount = (
+  label: string
+): number => {
+  const normalized = label
+    .trim()
+    .toLowerCase();
+
+  if (normalized.includes("federal")) {
+    return ytd?.federalTax ?? 0;
+  }
+
+  if (normalized.includes("state")) {
+    return ytd?.stateTax ?? 0;
+  }
+
+  if (normalized.includes("local")) {
+    return ytd?.localTax ?? 0;
+  }
+
+  if (normalized.includes("social security")) {
+    return ytd?.socialSecurity ?? 0;
+  }
+
+  if (normalized.includes("medicare")) {
+    return ytd?.medicare ?? 0;
+  }
+
+  if (normalized === "deductions") {
+  return ytd?.totalDeductions ?? 0;
+}
+
+if (normalized.includes("other")) {
+  return ytd?.otherDeductions ?? 0;
+}
+
+  return 0;
+};
 
   const totalHours = regularHours + bonusHours;
   const initials = employeeName
@@ -225,15 +282,24 @@ export function PaystubCard({
         <div className="overflow-hidden rounded-2xl border border-slate-200">
           <table className="w-full border-collapse text-sm">
             <thead>
-              <tr className="bg-slate-100 text-slate-700">
-                <th className="px-4 py-3 text-left font-semibold">
-                  Description
-                </th>
-                <th className="px-4 py-3 text-right font-semibold">Hours</th>
-                <th className="px-4 py-3 text-right font-semibold">Rate</th>
-                <th className="px-4 py-3 text-right font-semibold">Amount</th>
-              </tr>
-            </thead>
+  <tr>
+    <th className="border-b bg-gray-50 px-3 py-2 text-left font-semibold">
+      Description
+    </th>
+    <th className="border-b bg-gray-50 px-3 py-2 text-right font-semibold">
+      Current Hours
+    </th>
+    <th className="border-b bg-gray-50 px-3 py-2 text-right font-semibold">
+      Rate
+    </th>
+    <th className="border-b bg-gray-50 px-3 py-2 text-right font-semibold">
+      Current Amount
+    </th>
+    <th className="border-b bg-gray-50 px-3 py-2 text-right font-semibold">
+      YTD
+    </th>
+  </tr>
+</thead>
 
             <tbody className="divide-y divide-slate-200">
               <tr>
@@ -249,6 +315,9 @@ export function PaystubCard({
                 <td className="px-4 py-3 text-right font-semibold text-slate-900">
                   {formatMoney(regularAmount)}
                 </td>
+                <td className="px-4 py-3 text-right font-semibold text-blue-700">
+  {(ytd?.regularHours ?? regularHours).toFixed(2)}
+</td>
               </tr>
 
               {bonusHours > 0 ? (
@@ -265,6 +334,9 @@ export function PaystubCard({
                   <td className="px-4 py-3 text-right font-semibold text-slate-900">
                     {formatMoney(bonusAmount)}
                   </td>
+                  <td className="px-4 py-3 text-right font-semibold text-violet-700">
+  {(ytd?.bonusHours ?? bonusHours).toFixed(2)}
+</td>
                 </tr>
               ) : null}
 
@@ -278,23 +350,31 @@ export function PaystubCard({
                   <td className="px-4 py-3 text-right font-semibold text-blue-700">
                     {formatMoney(flatBonus)}
                   </td>
+                  <td className="px-4 py-3 text-right font-semibold text-blue-700">
+  {formatMoney(ytd?.flatBonus ?? flatBonus)}
+</td>
                 </tr>
               ) : null}
             </tbody>
 
             <tfoot>
-              <tr className="bg-blue-50">
-                <td
-                  colSpan={3}
-                  className="px-4 py-3 text-right font-bold text-blue-900"
-                >
-                  Total gross pay
-                </td>
-                <td className="px-4 py-3 text-right text-base font-black text-blue-700">
-                  {formatMoney(grossPay)}
-                </td>
-              </tr>
-            </tfoot>
+  <tr className="bg-blue-50">
+    <td
+      colSpan={3}
+      className="px-4 py-3 text-right font-bold text-blue-900"
+    >
+      Total gross pay
+    </td>
+
+    <td className="px-4 py-3 text-right text-base font-black text-blue-700">
+      {formatMoney(grossPay)}
+    </td>
+
+    <td className="px-4 py-3 text-right text-base font-black text-blue-700">
+      {formatMoney(ytd?.grossPay ?? grossPay)}
+    </td>
+  </tr>
+</tfoot>
           </table>
         </div>
       </section>
@@ -318,25 +398,39 @@ export function PaystubCard({
         <div className="overflow-hidden rounded-2xl border border-slate-200">
           <table className="w-full border-collapse text-sm">
             <thead>
-              <tr className="bg-slate-100 text-slate-700">
-                <th className="px-4 py-3 text-left font-semibold">
-                  Description
-                </th>
-                <th className="px-4 py-3 text-right font-semibold">Amount</th>
-              </tr>
-            </thead>
+  <tr className="bg-slate-100 text-slate-700">
+    <th className="px-4 py-3 text-left font-semibold">
+      Description
+    </th>
+
+    <th className="px-4 py-3 text-right font-semibold">
+      Current
+    </th>
+
+    <th className="px-4 py-3 text-right font-semibold">
+      YTD
+    </th>
+  </tr>
+</thead>
 
             <tbody className="divide-y divide-slate-200">
               {safeDeductions.length > 0 ? (
                 safeDeductions.map((deduction, index) => (
                   <tr key={`${deduction.label}-${index}`}>
-                    <td className="px-4 py-3 font-medium text-slate-800">
-                      {deduction.label}
-                    </td>
-                    <td className="px-4 py-3 text-right font-semibold text-rose-600">
-                      −{formatMoney(deduction.amount)}
-                    </td>
-                  </tr>
+  <td className="px-4 py-3 font-medium text-slate-800">
+    {deduction.label}
+  </td>
+
+  <td className="px-4 py-3 text-right font-semibold text-rose-600">
+    −{formatMoney(deduction.amount)}
+  </td>
+
+  <td className="px-4 py-3 text-right font-semibold text-rose-700">
+    −{formatMoney(
+      getYTDDeductionAmount(deduction.label)
+    )}
+  </td>
+</tr>
                 ))
               ) : (
                 <tr>
@@ -344,20 +438,30 @@ export function PaystubCard({
                   <td className="px-4 py-4 text-right font-semibold text-slate-700">
                     {formatMoney(0)}
                   </td>
+                   <td className="px-4 py-4 text-right font-semibold text-slate-700">
+    {formatMoney(ytd?.totalDeductions ?? 0)}
+  </td>
                 </tr>
               )}
             </tbody>
 
-            <tfoot>
-              <tr className="bg-rose-50">
-                <td className="px-4 py-3 text-right font-bold text-rose-900">
-                  Total deductions
-                </td>
-                <td className="px-4 py-3 text-right text-base font-black text-rose-700">
-                  −{formatMoney(totalDeductions)}
-                </td>
-              </tr>
-            </tfoot>
+           <tfoot>
+  <tr className="bg-rose-50">
+    <td className="px-4 py-3 text-right font-bold text-rose-900">
+      Total deductions
+    </td>
+
+    <td className="px-4 py-3 text-right text-base font-black text-rose-700">
+      −{formatMoney(totalDeductions)}
+    </td>
+
+    <td className="px-4 py-3 text-right text-base font-black text-rose-700">
+      −{formatMoney(
+        ytd?.totalDeductions ?? totalDeductions
+      )}
+    </td>
+  </tr>
+</tfoot>
           </table>
         </div>
       </section>
@@ -373,9 +477,25 @@ export function PaystubCard({
               Gross pay minus taxes and deductions
             </p>
           </div>
-          <p className="text-3xl font-black tracking-tight">
-            {formatMoney(netPay)}
-          </p>
+          <div className="grid grid-cols-2 gap-6 text-right">
+  <div>
+    <p className="text-xs uppercase tracking-wide text-emerald-100">
+      Current
+    </p>
+    <p className="mt-1 text-2xl font-black tracking-tight">
+      {formatMoney(netPay)}
+    </p>
+  </div>
+
+  <div>
+    <p className="text-xs uppercase tracking-wide text-emerald-100">
+      YTD
+    </p>
+    <p className="mt-1 text-2xl font-black tracking-tight">
+      {formatMoney(ytd?.netPay ?? netPay)}
+    </p>
+  </div>
+</div>
         </div>
       </section>
 

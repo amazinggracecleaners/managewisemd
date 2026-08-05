@@ -45,6 +45,7 @@ import {
   TrendingDown,
   TrendingUp,
   Equal,
+  Download,
 } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Calendar } from "@/components/ui/calendar";
@@ -82,7 +83,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { cleanForFirestore } from "@/lib/firestore-utils";
-import { cn}from "@/lib/utils";
+import { cn }from "@/lib/utils";
 import { groupSessions } from "@/lib/time-utils";
 import {
   Tooltip,
@@ -1503,6 +1504,148 @@ const dailySiteCount = new Set(
   });
 }, [schedules]);
 
+const downloadScheduleListCSV = useCallback(() => {
+  const escapeCSV = (
+    value: string | number | null | undefined
+  ) => {
+    const text = String(value ?? "");
+    return `"${text.replace(/"/g, '""')}"`;
+  };
+
+  const sortedSchedules = listSchedules
+    .slice()
+    .sort((a, b) =>
+      getScheduleDisplayName(a).localeCompare(
+        getScheduleDisplayName(b)
+      )
+    );
+
+  const rows = sortedSchedules.map((schedule) => {
+    const repeatFrequency =
+      schedule.repeatFrequency || "does-not-repeat";
+
+    const repeatDescription =
+      repeatFrequency.includes("week")
+        ? `${repeatFrequency.replace(/-/g, " ")} on ${
+            schedule.daysOfWeek
+              ?.map((day) => day.substring(0, 3))
+              .join(", ") || ""
+          }`
+        : repeatFrequency.replace(/-/g, " ");
+
+    const assignedEmployees =
+      schedule.assignedEmployeeIds?.length
+        ? schedule.assignedEmployeeIds
+            .map(
+              (employeeId) =>
+                employeeById.get(employeeId)?.name ||
+                employeeId
+            )
+            .join(", ")
+        : schedule.assignedTo?.join(", ") || "";
+
+    const assignedTeam =
+      schedule.assignedTeamId
+        ? teamsById.get(schedule.assignedTeamId)?.name ||
+          schedule.assignedTeamId
+        : "";
+
+    const assigned =
+      assignedTeam ||
+      assignedEmployees ||
+      "Unassigned";
+
+    const siteNames =
+      schedule.siteNames?.length
+        ? schedule.siteNames.join(", ")
+        : schedule.siteName;
+
+    const repeatUntil =
+      repeatFrequency === "does-not-repeat"
+        ? "—"
+        : schedule.repeatUntil || "Ongoing";
+
+    const serviceCharge =
+      schedule.siteNames &&
+      schedule.siteNames.length > 1
+        ? schedule.siteNames
+            .map((siteName) => {
+              const amount = Number(
+                schedule.siteServiceCharges?.[
+                  siteName
+                ] ?? 0
+              );
+
+              return `${siteName}: $${amount.toFixed(
+                2
+              )}`;
+            })
+            .join(" | ")
+        : schedule.serviceCharge !== undefined
+          ? `$${Number(
+              schedule.serviceCharge
+            ).toFixed(2)}`
+          : "—";
+
+    return [
+      getScheduleDisplayName(schedule),
+      siteNames,
+      repeatDescription,
+      schedule.startDate || "",
+      repeatUntil,
+      assigned,
+      schedule.tasks || "",
+      schedule.note || "",
+      serviceCharge,
+    ];
+  });
+
+  const headers = [
+    "Schedule Name",
+    "Site(s)",
+    "Repeats",
+    "Starts",
+    "Repeat Until",
+    "Assigned",
+    "Tasks",
+    "Note",
+    "Service Charge",
+  ];
+
+  const csv = [
+    headers.map(escapeCSV).join(","),
+    ...rows.map((row) =>
+      row.map(escapeCSV).join(",")
+    ),
+  ].join("\r\n");
+
+  const blob = new Blob(
+    ["\uFEFF", csv],
+    {
+      type: "text/csv;charset=utf-8;",
+    }
+  );
+
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+
+  anchor.href = url;
+  anchor.download = `cleaning-schedules-${format(
+    new Date(),
+    "yyyy-MM-dd"
+  )}.csv`;
+
+  document.body.appendChild(anchor);
+  anchor.click();
+  document.body.removeChild(anchor);
+
+  URL.revokeObjectURL(url);
+}, [
+  listSchedules,
+  employeeById,
+  teamsById,
+]);
+
 const getScheduleHours = useCallback(
   (
     siteName: string,
@@ -2179,12 +2322,44 @@ const getScheduleHours = useCallback(
         <TabsContent value="list" className="mt-0">
   <ScheduleCanvas minWidth="min-w-[1180px]">
     <Card className="overflow-hidden border-0 bg-transparent shadow-none">
-            <CardHeader>
-              <CardTitle>Cleaning Schedules</CardTitle>
-              <CardDescription>
-                Manage recurring cleaning tasks for each site.
-              </CardDescription>
-            </CardHeader>
+           <CardHeader>
+  <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+    <div>
+      <CardTitle>
+        Cleaning Schedules
+      </CardTitle>
+
+      <CardDescription>
+        Manage recurring cleaning tasks for each site.
+      </CardDescription>
+    </div>
+
+    <Button
+      type="button"
+      variant="outline"
+      onClick={downloadScheduleListCSV}
+      disabled={listSchedules.length === 0}
+      className="
+        w-full rounded-xl
+        border-emerald-200
+        bg-gradient-to-r
+        from-emerald-50 to-teal-50
+        font-semibold text-emerald-700
+        shadow-sm transition
+        hover:from-emerald-100
+        hover:to-teal-100
+        dark:border-emerald-900
+        dark:from-emerald-950/40
+        dark:to-teal-950/40
+        dark:text-emerald-300
+        sm:w-auto
+      "
+    >
+      <Download className="mr-2 h-4 w-4" />
+      Download List
+    </Button>
+  </div>
+</CardHeader>
             <CardContent>
               <ScrollArea className="h-[60vh]">
                 <Table className="min-w-[1080px]">
@@ -2248,9 +2423,11 @@ const getScheduleHours = useCallback(
                 : ""}
             </TableCell>
             <TableCell>{schedule.startDate}</TableCell>
-            <TableCell>
-              {schedule.repeatUntil ? schedule.repeatUntil : "Ongoing"}
-            </TableCell>
+           <TableCell>
+  {repeatFreq === "does-not-repeat"
+    ? "—"
+    : schedule.repeatUntil || "Ongoing"}
+</TableCell>
             <TableCell className="max-w-[14rem]">
               {renderAssignmentBadges(schedule)}
             </TableCell>

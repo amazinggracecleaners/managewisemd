@@ -237,6 +237,209 @@ function PayrollStatusBadge({
   );
 }
 
+type EmployeeYTD = {
+  regularHours: number;
+  bonusHours: number;
+  flatBonus: number;
+  grossPay: number;
+
+  federalTax: number;
+  stateTax: number;
+  localTax: number;
+  socialSecurity: number;
+  medicare: number;
+  otherDeductions: number;
+
+  totalDeductions: number;
+  netPay: number;
+};
+
+function getEmployeeYTD(
+  payrollPeriods: PayrollPeriod[],
+  employeeId: string,
+  currentPeriod: PayrollPeriod
+): EmployeeYTD {
+  const totals: EmployeeYTD = {
+    regularHours: 0,
+    bonusHours: 0,
+    flatBonus: 0,
+    grossPay: 0,
+
+    federalTax: 0,
+    stateTax: 0,
+    localTax: 0,
+    socialSecurity: 0,
+    medicare: 0,
+    otherDeductions: 0,
+
+    totalDeductions: 0,
+    netPay: 0,
+  };
+
+  const currentPayDate = parseISO(
+    currentPeriod.endDate
+  );
+
+  if (!isValid(currentPayDate)) {
+    return totals;
+  }
+
+  const currentYear =
+    currentPayDate.getFullYear();
+
+  const currentPayDateTime =
+    currentPayDate.getTime();
+
+  for (const period of payrollPeriods) {
+    const periodPayDate = parseISO(
+      period.endDate
+    );
+
+    if (!isValid(periodPayDate)) {
+      continue;
+    }
+
+    /*
+     * Only include payroll periods from the same
+     * calendar year as the current paystub.
+     */
+    if (
+      periodPayDate.getFullYear() !==
+      currentYear
+    ) {
+      continue;
+    }
+
+    /*
+     * Do not include payroll periods that occur
+     * after the paystub currently being viewed.
+     */
+    if (
+      periodPayDate.getTime() >
+      currentPayDateTime
+    ) {
+      continue;
+    }
+
+    const line = (
+      period.lineItems ?? []
+    ).find(
+      (item: PayrollLineItem) =>
+        item.employeeId === employeeId
+    );
+
+    if (!line) {
+      continue;
+    }
+
+    const regularHours =
+      Number(
+        (line as any).regularMinutes ?? 0
+      ) / 60;
+
+    const bonusHours =
+      Number(
+        (line as any).bonusMinutes ?? 0
+      ) / 60;
+
+    const flatBonus =
+      Number(
+        (line as any).flatBonus ?? 0
+      );
+
+    const grossPay =
+      Number(
+        (line as any).gross ?? 0
+      );
+
+    const totalDeductions =
+      Number(
+        (line as any).deductions ?? 0
+      );
+
+    const federalTax = Number(
+      (line as any).federalWithholding ??
+        (line as any).federalTax ??
+        0
+    );
+
+    const stateTax = Number(
+      (line as any).stateWithholding ??
+        (line as any).stateTax ??
+        0
+    );
+
+    const localTax = Number(
+      (line as any).localWithholding ??
+        (line as any).localTax ??
+        0
+    );
+
+    const socialSecurity = Number(
+      (line as any).socialSecurity ??
+        (line as any).socialSecurityTax ??
+        0
+    );
+
+    const medicare = Number(
+      (line as any).medicare ??
+        (line as any).medicareTax ??
+        0
+    );
+
+    const otherDeductions =
+      Math.max(
+        0,
+        totalDeductions -
+          federalTax -
+          stateTax -
+          localTax -
+          socialSecurity -
+          medicare
+      );
+
+    totals.regularHours +=
+      regularHours;
+
+    totals.bonusHours +=
+      bonusHours;
+
+    totals.flatBonus +=
+      flatBonus;
+
+    totals.grossPay +=
+      grossPay;
+
+    totals.federalTax +=
+      federalTax;
+
+    totals.stateTax +=
+      stateTax;
+
+    totals.localTax +=
+      localTax;
+
+    totals.socialSecurity +=
+      socialSecurity;
+
+    totals.medicare +=
+      medicare;
+
+    totals.otherDeductions +=
+      otherDeductions;
+
+    totals.totalDeductions +=
+      totalDeductions;
+
+    totals.netPay +=
+      Number(
+        (line as any).net ?? 0
+      );
+  }
+
+  return totals;
+}
+
 export function EmployeePayrollView({
   employee,
   payrollPeriods,
@@ -453,6 +656,11 @@ const y = 5;
                   (item: PayrollLineItem) => item.employeeId === employee.id
                 );
                 if (!employeeData) return null;
+                const ytd = getEmployeeYTD(
+  payrollPeriods,
+  employee.id,
+  period
+);
 
                 const summary = getPayrollConfirmationSummary(
                   period,
@@ -640,6 +848,25 @@ const y = 5;
                               deductions={deductions}
                               netPay={net}
                               companyContact={`${companyName || "Amazing Grace Cleaners LLC"} • amazinggracecleaners1@gmail.com • (859) 740-0101`}
+                              ytd={{
+  regularHours: ytd.regularHours,
+  bonusHours: ytd.bonusHours,
+  flatBonus: ytd.flatBonus,
+  grossPay: ytd.grossPay,
+
+  federalTax: ytd.federalTax,
+  stateTax: ytd.stateTax,
+  localTax: ytd.localTax,
+  socialSecurity: ytd.socialSecurity,
+  medicare: ytd.medicare,
+  otherDeductions:
+    ytd.otherDeductions,
+
+  totalDeductions:
+    ytd.totalDeductions,
+
+  netPay: ytd.netPay,
+}}
                             />
                           </div>
                         </div>
