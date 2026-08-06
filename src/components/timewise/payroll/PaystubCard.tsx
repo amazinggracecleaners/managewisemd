@@ -42,7 +42,6 @@ type PaystubCardProps = {
   deductions: PaystubDeduction[];
   netPay: number;
   companyContact?: string;
-
   ytd?: PaystubYTD;
 };
 
@@ -55,6 +54,71 @@ const currency = new Intl.NumberFormat("en-US", {
 
 function formatMoney(value: number) {
   return currency.format(Number.isFinite(value) ? value : 0);
+}
+
+function normalizeLabel(label: string) {
+  return label.trim().toLowerCase();
+}
+
+function isTaxDeduction(label: string) {
+  const normalized = normalizeLabel(label);
+
+  return (
+    normalized.includes("federal") ||
+    normalized.includes("state") ||
+    normalized.includes("local") ||
+    normalized.includes("social security") ||
+    normalized.includes("medicare")
+  );
+}
+
+/**
+ * Converts a company slug such as "amazing-grace-cleaners"
+ * into "Amazing Grace Cleaners".
+ *
+ * Already formatted names such as "Amazing Grace Cleaners LLC"
+ * are preserved.
+ */
+function formatCompanyName(value: string) {
+  const trimmed = value.trim();
+
+  if (!trimmed) {
+    return "Amazing Grace Cleaners";
+  }
+
+  const looksLikeSlug =
+    trimmed.includes("-") ||
+    trimmed.includes("_") ||
+    trimmed === trimmed.toLowerCase();
+
+  if (!looksLikeSlug) {
+    return trimmed;
+  }
+
+  return trimmed
+    .replace(/[-_]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .split(" ")
+    .map((word) => {
+      const upper = word.toUpperCase();
+
+      if (upper === "LLC" || upper === "INC" || upper === "DBA") {
+        return upper;
+      }
+
+      return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
+    })
+    .join(" ");
+}
+
+function deductionAmount(
+  deductions: PaystubDeduction[],
+  matcher: (normalizedLabel: string) => boolean
+) {
+  return deductions
+    .filter((deduction) => matcher(normalizeLabel(deduction.label)))
+    .reduce((sum, deduction) => sum + deduction.amount, 0);
 }
 
 export function PaystubCard({
@@ -76,6 +140,8 @@ export function PaystubCard({
   companyContact,
   ytd,
 }: PaystubCardProps) {
+  const displayCompanyName = formatCompanyName(companyName);
+
   const safeDeductions = deductions.filter(
     (deduction) =>
       deduction &&
@@ -83,32 +149,10 @@ export function PaystubCard({
       Number.isFinite(deduction.amount)
   );
 
-  const totalDeductions = safeDeductions.reduce(
-    (sum, deduction) => sum + deduction.amount,
-    0
-  );
-
-  const regularAmount = payRate != null ? regularHours * payRate : 0;
-
-  // Preserves your existing payroll rule:
-  // bonus-hour rate = regular hourly rate + $0.50.
-  const bonusRate = payRate != null ? payRate + 0.5 : 0;
-  const bonusAmount = payRate != null ? bonusHours * bonusRate : 0;
-
-  const isTaxDeduction = (label: string) => {
-    const normalized = label.trim().toLowerCase();
-    return (
-      normalized.includes("federal") ||
-      normalized.includes("state") ||
-      normalized.includes("local") ||
-      normalized.includes("social security") ||
-      normalized.includes("medicare")
-    );
-  };
-
   const taxDeductions = safeDeductions.filter((deduction) =>
     isTaxDeduction(deduction.label)
   );
+
   const otherDeductionRows = safeDeductions.filter(
     (deduction) => !isTaxDeduction(deduction.label)
   );
@@ -117,19 +161,17 @@ export function PaystubCard({
     (sum, deduction) => sum + deduction.amount,
     0
   );
+
   const currentOtherDeductions = otherDeductionRows.reduce(
     (sum, deduction) => sum + deduction.amount,
     0
   );
 
-  const ytdTaxes =
-    (ytd?.federalTax ?? 0) +
-    (ytd?.stateTax ?? 0) +
-    (ytd?.localTax ?? 0) +
-    (ytd?.socialSecurity ?? 0) +
-    (ytd?.medicare ?? 0);
+  const totalDeductions = currentTaxes + currentOtherDeductions;
 
-  const ytdOtherDeductions = ytd?.otherDeductions ?? 0;
+  const regularAmount = payRate != null ? regularHours * payRate : 0;
+  const bonusRate = payRate != null ? payRate + 0.5 : 0;
+  const bonusAmount = payRate != null ? bonusHours * bonusRate : 0;
 
   const ytdRegularPay =
     ytd?.regularPay ??
@@ -143,7 +185,16 @@ export function PaystubCard({
       ? (ytd?.bonusHours ?? bonusHours) * bonusRate
       : bonusAmount);
 
+  const ytdTaxes =
+    (ytd?.federalTax ?? 0) +
+    (ytd?.stateTax ?? 0) +
+    (ytd?.localTax ?? 0) +
+    (ytd?.socialSecurity ?? 0) +
+    (ytd?.medicare ?? 0);
+
+  const ytdOtherDeductions = ytd?.otherDeductions ?? 0;
   const totalHours = regularHours + bonusHours;
+
   const initials = employeeName
     .split(/\s+/)
     .filter(Boolean)
@@ -151,282 +202,471 @@ export function PaystubCard({
     .map((part) => part.charAt(0).toUpperCase())
     .join("");
 
+  const federalCurrent = deductionAmount(
+    taxDeductions,
+    (label) => label.includes("federal")
+  );
+
+  const socialSecurityCurrent = deductionAmount(
+    taxDeductions,
+    (label) => label.includes("social security")
+  );
+
+  const medicareCurrent = deductionAmount(
+    taxDeductions,
+    (label) => label.includes("medicare")
+  );
+
+  const stateCurrent = deductionAmount(
+    taxDeductions,
+    (label) => label.includes("state")
+  );
+
+  const localCurrent = deductionAmount(
+    taxDeductions,
+    (label) => label.includes("local")
+  );
+
+  const taxRows = [
+    {
+      label: "Federal Income Tax",
+      current: federalCurrent,
+      ytd: ytd?.federalTax ?? 0,
+    },
+    {
+      label: "Social Security",
+      current: socialSecurityCurrent,
+      ytd: ytd?.socialSecurity ?? 0,
+    },
+    {
+      label: "Medicare",
+      current: medicareCurrent,
+      ytd: ytd?.medicare ?? 0,
+    },
+    {
+      label: "State Tax",
+      current: stateCurrent,
+      ytd: ytd?.stateTax ?? 0,
+    },
+    {
+      label: "Local Tax",
+      current: localCurrent,
+      ytd: ytd?.localTax ?? 0,
+    },
+  ];
+
+  const otherRows = otherDeductionRows.map((deduction) => ({
+    label: deduction.label,
+    current: deduction.amount,
+    ytd:
+      normalizeLabel(deduction.label).includes("other") ||
+      normalizeLabel(deduction.label) === "deductions"
+        ? ytdOtherDeductions
+        : 0,
+  }));
+
+  if (otherRows.length === 0) {
+    otherRows.push(
+      {
+        label: "Health Insurance",
+        current: 0,
+        ytd: 0,
+      },
+      {
+        label: "Retirement",
+        current: 0,
+        ytd: 0,
+      },
+      {
+        label: "Garnishment",
+        current: 0,
+        ytd: 0,
+      },
+      {
+        label: "Uniforms",
+        current: 0,
+        ytd: 0,
+      },
+      {
+        label: "Other Deductions",
+        current: 0,
+        ytd: ytdOtherDeductions,
+      }
+    );
+  }
+
   return (
     <article
-      className="mx-auto w-full max-w-5xl overflow-hidden rounded-2xl border border-slate-200 bg-white text-slate-950 shadow-xl print:max-w-none print:rounded-none print:border-0 print:shadow-none"
+      className="mx-auto w-full min-w-[980px] max-w-[1180px] overflow-hidden rounded-3xl border border-slate-200 bg-white text-slate-950 shadow-2xl print:min-w-0 print:max-w-none print:rounded-none print:border-0 print:shadow-none"
       aria-label={`Pay stub for ${employeeName}`}
     >
-      {/* Branded header */}
-      <header className="relative overflow-hidden bg-gradient-to-r from-slate-950 via-blue-950 to-indigo-950 px-6 py-6 text-white sm:px-8">
-        <div className="absolute -right-16 -top-20 h-56 w-56 rounded-full bg-cyan-400/15 blur-3xl" />
-        <div className="absolute -bottom-24 left-1/3 h-52 w-52 rounded-full bg-violet-500/15 blur-3xl" />
+      {/* Header */}
+      <header className="relative overflow-hidden border-b border-blue-100 bg-white px-8 py-7">
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-16 bg-gradient-to-r from-blue-50 via-indigo-50 to-transparent opacity-80" />
 
-        <div className="relative flex flex-col gap-6 sm:flex-row sm:items-start sm:justify-between">
-          <div className="flex items-center gap-4">
-            {logoUrl ? (
-              <div className="flex h-16 w-20 items-center justify-center rounded-2xl border border-white/15 bg-white p-2 shadow-lg">
-                <img
-                  src={logoUrl}
-                  alt={`${companyName} logo`}
-                  className="max-h-12 w-auto object-contain"
-                />
-              </div>
-            ) : (
-              <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-cyan-400 to-blue-500 text-xl font-black shadow-lg">
-                {companyName.charAt(0).toUpperCase()}
-              </div>
-            )}
+        <div className="relative grid grid-cols-[minmax(0,1fr)_390px] items-start gap-8">
+          <div className="flex min-w-0 items-center gap-5">
+            <div className="flex h-28 w-28 shrink-0 items-center justify-center overflow-hidden rounded-[28px] bg-gradient-to-br from-slate-900 to-blue-950 p-3 shadow-lg">
+              {logoUrl ? (
+                <div className="flex h-full w-full items-center justify-center rounded-full bg-white p-2">
+                  <img
+                    src={logoUrl}
+                    alt={`${displayCompanyName} logo`}
+                    className="max-h-full max-w-full object-contain"
+                  />
+                </div>
+              ) : (
+                <span className="text-3xl font-black text-white">
+                  {displayCompanyName.charAt(0).toUpperCase()}
+                </span>
+              )}
+            </div>
 
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.22em] text-cyan-200">
-                Official Pay Statement
-              </p>
-              <h1 className="mt-1 text-xl font-bold tracking-tight sm:text-2xl">
-                {companyName}
+            <div className="min-w-0">
+              <h1 className="break-words text-4xl font-black tracking-tight text-blue-950">
+                {displayCompanyName}
               </h1>
-              <p className="mt-1 text-sm text-blue-100/80">
-                Employee earnings and deductions
+              <p className="mt-2 text-lg font-bold uppercase tracking-[0.16em] text-blue-800">
+                Official Pay Statement
               </p>
             </div>
           </div>
 
-          <div className="min-w-[240px] rounded-2xl border border-white/15 bg-white/10 p-4 backdrop-blur">
-            <div className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-sm">
-              <span className="text-blue-200">Pay date</span>
-              <span className="text-right font-semibold">{payDate}</span>
+          <div className="rounded-2xl bg-gradient-to-br from-blue-900 to-blue-950 px-6 py-5 text-white shadow-xl">
+            <dl className="grid grid-cols-[130px_1fr] gap-x-4 gap-y-3 text-sm">
+              <dt className="font-semibold text-blue-100">Pay Date:</dt>
+              <dd className="font-semibold">{payDate}</dd>
 
-              <span className="text-blue-200">Pay period</span>
-              <span className="text-right font-semibold">
+              <dt className="font-semibold text-blue-100">Pay Period:</dt>
+              <dd className="font-semibold">
                 {payPeriodStart} – {payPeriodEnd}
-              </span>
-
-              {employeeId ? (
-                <>
-                  <span className="text-blue-200">Employee ID</span>
-                  <span className="text-right font-semibold">{employeeId}</span>
-                </>
-              ) : null}
-            </div>
+              </dd>
+            </dl>
           </div>
         </div>
       </header>
 
-      {/* Employee and pay summary */}
-      <section className="grid gap-4 bg-slate-50 px-6 py-5 sm:grid-cols-2 sm:px-8">
-        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-          <div className="flex items-start gap-4">
-            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-100 to-indigo-100 font-bold text-blue-700">
+      {/* Employee card */}
+      <section className="px-8 py-6">
+        <div className="grid grid-cols-[minmax(0,1fr)_minmax(250px,0.85fr)] gap-8 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+          <div className="flex min-w-0 items-start gap-5">
+            <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-100 to-indigo-100 text-xl font-black text-blue-800">
               {initials || "E"}
             </div>
 
             <div className="min-w-0">
-              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
+              <p className="text-sm font-bold uppercase tracking-[0.16em] text-blue-800">
                 Employee
               </p>
-              <h2 className="mt-1 truncate text-lg font-bold text-slate-950">
+              <h2 className="mt-1 whitespace-normal break-words text-2xl font-black leading-tight text-slate-950">
                 {employeeName}
               </h2>
 
-              <div className="mt-3 space-y-1 text-sm text-slate-600">
-                <p>
-                  <span className="font-semibold text-slate-800">Address:</span>{" "}
+              <div className="mt-4 space-y-1.5 text-sm text-slate-700">
+                <p className="whitespace-normal break-words">
+                  <span className="font-bold text-slate-900">Address:</span>{" "}
                   {employeeAddress || "Not provided"}
                 </p>
-
-                {payRate != null ? (
-                  <p>
-                    <span className="font-semibold text-slate-800">
-                      Regular rate:
-                    </span>{" "}
-                    {formatMoney(payRate)}/hr
-                  </p>
-                ) : null}
-
                 <p>
-                  <span className="font-semibold text-slate-800">
-                    Total hours:
-                  </span>{" "}
+                  <span className="font-bold text-slate-900">Regular rate:</span>{" "}
+                  {payRate != null ? `${formatMoney(payRate)}/hr` : "—"}
+                </p>
+                <p>
+                  <span className="font-bold text-slate-900">Total hours:</span>{" "}
                   {totalHours.toFixed(2)}
                 </p>
               </div>
             </div>
           </div>
-        </div>
 
-        <div className="rounded-2xl border border-emerald-200 bg-gradient-to-br from-emerald-50 to-teal-50 p-5 shadow-sm">
-          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-emerald-700">
-            Take-home pay
-          </p>
-          <p className="mt-2 text-4xl font-black tracking-tight text-emerald-700">
-            {formatMoney(netPay)}
-          </p>
-
-          <div className="mt-4 grid grid-cols-2 gap-3 border-t border-emerald-200 pt-4 text-sm">
-            <div>
-              <p className="text-slate-500">Gross pay</p>
-              <p className="mt-1 font-bold text-slate-900">
-                {formatMoney(grossPay)}
-              </p>
-            </div>
-            <div className="text-right">
-              <p className="text-slate-500">Deductions</p>
-              <p className="mt-1 font-bold text-rose-600">
-                −{formatMoney(totalDeductions)}
-              </p>
-            </div>
+          <div className="border-l border-slate-200 pl-8">
+            <p className="text-sm font-bold text-slate-900">Employee ID:</p>
+            <p className="mt-1 break-all text-sm text-slate-700">
+              {employeeId || "—"}
+            </p>
           </div>
         </div>
       </section>
 
-      {/* Earnings */}
-      <section className="px-6 py-5 sm:px-8">
-        <div className="mb-3">
-          <h2 className="text-base font-bold text-slate-950">Earnings</h2>
-          <p className="text-xs text-slate-500">
-            Current pay-period earnings with year-to-date totals
-          </p>
-        </div>
-
-        <div className="overflow-x-auto rounded-2xl border border-slate-200">
-          <table className="w-full min-w-[720px] border-collapse text-sm">
-            <thead>
-              <tr className="bg-slate-100 text-slate-700">
-                <th className="px-4 py-3 text-left font-semibold">Earnings</th>
-                <th className="px-4 py-3 text-right font-semibold">Hours</th>
-                <th className="px-4 py-3 text-right font-semibold">Rate</th>
-                <th className="px-4 py-3 text-right font-semibold">Current</th>
-                <th className="px-4 py-3 text-right font-semibold">YTD</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-200">
-              <tr>
-                <td className="px-4 py-3 font-medium text-slate-900">Regular</td>
-                <td className="px-4 py-3 text-right text-slate-600">{regularHours.toFixed(2)}</td>
-                <td className="px-4 py-3 text-right text-slate-600">{payRate != null ? formatMoney(payRate) : "—"}</td>
-                <td className="px-4 py-3 text-right font-semibold text-slate-900">{formatMoney(regularAmount)}</td>
-                <td className="px-4 py-3 text-right font-semibold text-blue-700">{formatMoney(ytdRegularPay)}</td>
-              </tr>
-              {(bonusHours !== 0 || (ytd?.bonusHours ?? 0) !== 0) && (
-                <tr>
-                  <td className="px-4 py-3 font-medium text-slate-900">Bonus</td>
-                  <td className="px-4 py-3 text-right text-slate-600">{bonusHours.toFixed(2)}</td>
-                  <td className="px-4 py-3 text-right text-slate-600">{payRate != null ? formatMoney(bonusRate) : "—"}</td>
-                  <td className="px-4 py-3 text-right font-semibold text-slate-900">{formatMoney(bonusAmount)}</td>
-                  <td className="px-4 py-3 text-right font-semibold text-violet-700">{formatMoney(ytdBonusPay)}</td>
-                </tr>
-              )}
-              {(flatBonus !== 0 || (ytd?.flatBonus ?? 0) !== 0) && (
-                <tr>
-                  <td className="px-4 py-3 font-medium text-slate-900">Flat Bonus</td>
-                  <td className="px-4 py-3 text-right text-slate-400">—</td>
-                  <td className="px-4 py-3 text-right text-slate-400">—</td>
-                  <td className="px-4 py-3 text-right font-semibold text-blue-700">{formatMoney(flatBonus)}</td>
-                  <td className="px-4 py-3 text-right font-semibold text-blue-700">{formatMoney(ytd?.flatBonus ?? flatBonus)}</td>
-                </tr>
-              )}
-            </tbody>
-            <tfoot>
-              <tr className="bg-blue-50">
-                <td colSpan={3} className="px-4 py-3 text-right font-bold text-blue-900">Gross Pay</td>
-                <td className="px-4 py-3 text-right text-base font-black text-blue-700">{formatMoney(grossPay)}</td>
-                <td className="px-4 py-3 text-right text-base font-black text-blue-700">{formatMoney(ytd?.grossPay ?? grossPay)}</td>
-              </tr>
-            </tfoot>
-          </table>
-        </div>
-      </section>
-
-      {/* Taxes */}
-      <section className="border-t border-slate-100 px-6 py-5 sm:px-8">
-        <div className="mb-3">
-          <h2 className="text-base font-bold text-slate-950">Taxes</h2>
-          <p className="text-xs text-slate-500">Required taxes withheld from gross pay</p>
-        </div>
-        <div className="overflow-hidden rounded-2xl border border-slate-200">
-          <table className="w-full border-collapse text-sm">
-            <thead><tr className="bg-slate-100 text-slate-700"><th className="px-4 py-3 text-left font-semibold">Tax</th><th className="px-4 py-3 text-right font-semibold">Current</th><th className="px-4 py-3 text-right font-semibold">YTD</th></tr></thead>
-            <tbody className="divide-y divide-slate-200">
-              {[
-                ["Federal Income Tax", taxDeductions.find(d => d.label.toLowerCase().includes("federal"))?.amount ?? 0, ytd?.federalTax ?? 0],
-                ["Social Security", taxDeductions.find(d => d.label.toLowerCase().includes("social security"))?.amount ?? 0, ytd?.socialSecurity ?? 0],
-                ["Medicare", taxDeductions.find(d => d.label.toLowerCase().includes("medicare"))?.amount ?? 0, ytd?.medicare ?? 0],
-                ["State Tax", taxDeductions.find(d => d.label.toLowerCase().includes("state"))?.amount ?? 0, ytd?.stateTax ?? 0],
-                ["Local Tax", taxDeductions.find(d => d.label.toLowerCase().includes("local"))?.amount ?? 0, ytd?.localTax ?? 0],
-              ].filter(([, current, ytdAmount]) => Number(current) !== 0 || Number(ytdAmount) !== 0).map(([label, current, ytdAmount]) => (
-                <tr key={String(label)}>
-                  <td className="px-4 py-3 font-medium text-slate-800">{label}</td>
-                  <td className="px-4 py-3 text-right font-semibold text-rose-600">{Number(current) > 0 ? `−${formatMoney(Number(current))}` : formatMoney(0)}</td>
-                  <td className="px-4 py-3 text-right font-semibold text-rose-700">{Number(ytdAmount) > 0 ? `−${formatMoney(Number(ytdAmount))}` : formatMoney(0)}</td>
-                </tr>
-              ))}
-            </tbody>
-            <tfoot><tr className="bg-rose-50"><td className="px-4 py-3 text-right font-bold text-rose-900">Total Taxes</td><td className="px-4 py-3 text-right text-base font-black text-rose-700">−{formatMoney(currentTaxes)}</td><td className="px-4 py-3 text-right text-base font-black text-rose-700">−{formatMoney(ytdTaxes)}</td></tr></tfoot>
-          </table>
-        </div>
-      </section>
-
-      {/* Other Deductions */}
-      <section className="border-t border-slate-100 px-6 py-5 sm:px-8">
-        <div className="mb-3">
-          <h2 className="text-base font-bold text-slate-950">Other Deductions</h2>
-          <p className="text-xs text-slate-500">Insurance, retirement, garnishments, uniforms, and other deductions</p>
-        </div>
-        <div className="overflow-hidden rounded-2xl border border-slate-200">
-          <table className="w-full border-collapse text-sm">
-            <thead><tr className="bg-slate-100 text-slate-700"><th className="px-4 py-3 text-left font-semibold">Deduction</th><th className="px-4 py-3 text-right font-semibold">Current</th><th className="px-4 py-3 text-right font-semibold">YTD</th></tr></thead>
-            <tbody className="divide-y divide-slate-200">
-              {otherDeductionRows.length > 0 ? otherDeductionRows.map((deduction, index) => (
-                <tr key={`${deduction.label}-${index}`}><td className="px-4 py-3 font-medium text-slate-800">{deduction.label}</td><td className="px-4 py-3 text-right font-semibold text-rose-600">{deduction.amount > 0 ? `−${formatMoney(deduction.amount)}` : formatMoney(0)}</td><td className="px-4 py-3 text-right font-semibold text-rose-700">{index === 0 && ytdOtherDeductions > 0 ? `−${formatMoney(ytdOtherDeductions)}` : formatMoney(0)}</td></tr>
-              )) : (
-                <tr><td className="px-4 py-4 text-slate-600">No other deductions</td><td className="px-4 py-4 text-right">{formatMoney(0)}</td><td className="px-4 py-4 text-right">{formatMoney(ytdOtherDeductions)}</td></tr>
-              )}
-            </tbody>
-            <tfoot><tr className="bg-amber-50"><td className="px-4 py-3 text-right font-bold text-amber-900">Total Other Deductions</td><td className="px-4 py-3 text-right text-base font-black text-amber-700">−{formatMoney(currentOtherDeductions)}</td><td className="px-4 py-3 text-right text-base font-black text-amber-700">−{formatMoney(ytdOtherDeductions)}</td></tr></tfoot>
-          </table>
-        </div>
-      </section>
-
-      {/* Net Pay */}
-      <section className="mx-6 mb-5 rounded-2xl bg-gradient-to-r from-emerald-600 to-teal-600 px-5 py-5 text-white shadow-lg shadow-emerald-600/15 sm:mx-8">
-        <div className="grid gap-4 sm:grid-cols-[1fr_auto] sm:items-end">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-100">Net Pay</p>
-            <div className="mt-3 grid grid-cols-3 gap-3 text-sm">
-              <div><p className="text-emerald-100">Gross Pay</p><p className="mt-1 font-bold">{formatMoney(grossPay)}</p></div>
-              <div><p className="text-emerald-100">Taxes</p><p className="mt-1 font-bold">−{formatMoney(currentTaxes)}</p></div>
-              <div><p className="text-emerald-100">Other Deductions</p><p className="mt-1 font-bold">−{formatMoney(currentOtherDeductions)}</p></div>
+      {/* Main two-column body */}
+      <section className="grid grid-cols-[minmax(0,1fr)_300px] items-start gap-6 px-8 pb-7">
+        <div className="space-y-6">
+          {/* Earnings */}
+          <section className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
+            <div className="flex items-center gap-3 border-b border-slate-200 px-5 py-4">
+              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-emerald-100 text-xl font-black text-emerald-700">
+                $
+              </div>
+              <h3 className="text-xl font-black uppercase tracking-wide text-blue-950">
+                Earnings
+              </h3>
             </div>
-          </div>
-          <div className="border-t border-white/20 pt-4 text-left sm:border-l sm:border-t-0 sm:pl-6 sm:pt-0 sm:text-right"><p className="text-xs uppercase tracking-wide text-emerald-100">Take-home pay</p><p className="mt-1 text-3xl font-black tracking-tight">{formatMoney(netPay)}</p></div>
-        </div>
-      </section>
 
-      {/* YTD Totals */}
-      <section className="mx-6 mb-6 rounded-2xl border border-blue-200 bg-gradient-to-r from-blue-50 to-indigo-50 p-5 sm:mx-8">
-        <div className="mb-3"><h2 className="text-base font-bold text-slate-950">YTD Totals</h2><p className="text-xs text-slate-500">Calendar-year totals through this pay date</p></div>
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <div className="rounded-xl bg-white p-3 shadow-sm"><p className="text-xs text-slate-500">Gross Earnings</p><p className="mt-1 font-bold text-blue-700">{formatMoney(ytd?.grossPay ?? grossPay)}</p></div>
-          <div className="rounded-xl bg-white p-3 shadow-sm"><p className="text-xs text-slate-500">Taxes Withheld</p><p className="mt-1 font-bold text-rose-700">{formatMoney(ytdTaxes)}</p></div>
-          <div className="rounded-xl bg-white p-3 shadow-sm"><p className="text-xs text-slate-500">Other Deductions</p><p className="mt-1 font-bold text-amber-700">{formatMoney(ytdOtherDeductions)}</p></div>
-          <div className="rounded-xl bg-white p-3 shadow-sm"><p className="text-xs text-slate-500">Net Pay</p><p className="mt-1 font-bold text-emerald-700">{formatMoney(ytd?.netPay ?? netPay)}</p></div>
+            <table className="w-full border-collapse text-sm">
+              <thead>
+                <tr className="bg-slate-100 text-slate-800">
+                  <th className="px-5 py-3 text-left font-bold">Earnings</th>
+                  <th className="px-4 py-3 text-right font-bold">Hours</th>
+                  <th className="px-4 py-3 text-right font-bold">Rate</th>
+                  <th className="px-4 py-3 text-right font-bold">Current</th>
+                  <th className="px-5 py-3 text-right font-bold">YTD</th>
+                </tr>
+              </thead>
+
+              <tbody className="divide-y divide-slate-200">
+                <tr>
+                  <td className="px-5 py-3.5 font-medium">Regular</td>
+                  <td className="px-4 py-3.5 text-right">{regularHours.toFixed(2)}</td>
+                  <td className="px-4 py-3.5 text-right">
+                    {payRate != null ? formatMoney(payRate) : "—"}
+                  </td>
+                  <td className="px-4 py-3.5 text-right font-bold">
+                    {formatMoney(regularAmount)}
+                  </td>
+                  <td className="px-5 py-3.5 text-right font-bold text-blue-800">
+                    {formatMoney(ytdRegularPay)}
+                  </td>
+                </tr>
+
+                <tr>
+                  <td className="px-5 py-3.5 font-medium">Bonus</td>
+                  <td className="px-4 py-3.5 text-right">{bonusHours.toFixed(2)}</td>
+                  <td className="px-4 py-3.5 text-right">
+                    {payRate != null ? formatMoney(bonusRate) : "—"}
+                  </td>
+                  <td className="px-4 py-3.5 text-right font-bold">
+                    {formatMoney(bonusAmount)}
+                  </td>
+                  <td className="px-5 py-3.5 text-right font-bold text-blue-800">
+                    {formatMoney(ytdBonusPay)}
+                  </td>
+                </tr>
+
+                <tr>
+                  <td className="px-5 py-3.5 font-medium">Flat Bonus</td>
+                  <td className="px-4 py-3.5 text-right">—</td>
+                  <td className="px-4 py-3.5 text-right">—</td>
+                  <td className="px-4 py-3.5 text-right font-bold">
+                    {formatMoney(flatBonus)}
+                  </td>
+                  <td className="px-5 py-3.5 text-right font-bold text-blue-800">
+                    {formatMoney(ytd?.flatBonus ?? flatBonus)}
+                  </td>
+                </tr>
+              </tbody>
+
+              <tfoot>
+                <tr className="bg-blue-50">
+                  <td colSpan={3} className="px-5 py-3.5 font-black uppercase text-blue-900">
+                    Gross Pay
+                  </td>
+                  <td className="px-4 py-3.5 text-right text-lg font-black text-blue-800">
+                    {formatMoney(grossPay)}
+                  </td>
+                  <td className="px-5 py-3.5 text-right text-lg font-black text-blue-800">
+                    {formatMoney(ytd?.grossPay ?? grossPay)}
+                  </td>
+                </tr>
+              </tfoot>
+            </table>
+          </section>
+
+          {/* Taxes */}
+          <section className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
+            <div className="flex items-center gap-3 border-b border-slate-200 px-5 py-4">
+              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-rose-100 text-lg font-black text-rose-700">
+                %
+              </div>
+              <h3 className="text-xl font-black uppercase tracking-wide text-blue-950">
+                Taxes
+              </h3>
+            </div>
+
+            <table className="w-full border-collapse text-sm">
+              <thead>
+                <tr className="bg-slate-100 text-slate-800">
+                  <th className="px-5 py-3 text-left font-bold">Tax</th>
+                  <th className="px-5 py-3 text-right font-bold">Current</th>
+                  <th className="px-5 py-3 text-right font-bold">YTD</th>
+                </tr>
+              </thead>
+
+              <tbody className="divide-y divide-slate-200">
+                {taxRows.map((row) => (
+                  <tr key={row.label}>
+                    <td className="px-5 py-3 font-medium">{row.label}</td>
+                    <td className="px-5 py-3 text-right">
+                      {row.current > 0 ? `−${formatMoney(row.current)}` : formatMoney(0)}
+                    </td>
+                    <td className="px-5 py-3 text-right">
+                      {row.ytd > 0 ? `−${formatMoney(row.ytd)}` : formatMoney(0)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+
+              <tfoot>
+                <tr className="bg-rose-50">
+                  <td className="px-5 py-3.5 font-black uppercase text-rose-800">
+                    Total Taxes
+                  </td>
+                  <td className="px-5 py-3.5 text-right text-lg font-black text-rose-700">
+                    −{formatMoney(currentTaxes)}
+                  </td>
+                  <td className="px-5 py-3.5 text-right text-lg font-black text-rose-700">
+                    −{formatMoney(ytdTaxes)}
+                  </td>
+                </tr>
+              </tfoot>
+            </table>
+          </section>
+
+          {/* Other deductions */}
+          <section className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
+            <div className="flex items-center gap-3 border-b border-slate-200 px-5 py-4">
+              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-violet-100 text-lg font-black text-violet-700">
+                −
+              </div>
+              <h3 className="text-xl font-black uppercase tracking-wide text-blue-950">
+                Other Deductions
+              </h3>
+            </div>
+
+            <table className="w-full border-collapse text-sm">
+              <thead>
+                <tr className="bg-slate-100 text-slate-800">
+                  <th className="px-5 py-3 text-left font-bold">Deduction</th>
+                  <th className="px-5 py-3 text-right font-bold">Current</th>
+                  <th className="px-5 py-3 text-right font-bold">YTD</th>
+                </tr>
+              </thead>
+
+              <tbody className="divide-y divide-slate-200">
+                {otherRows.map((row, index) => (
+                  <tr key={`${row.label}-${index}`}>
+                    <td className="px-5 py-3 font-medium">{row.label}</td>
+                    <td className="px-5 py-3 text-right">
+                      {row.current > 0 ? `−${formatMoney(row.current)}` : formatMoney(0)}
+                    </td>
+                    <td className="px-5 py-3 text-right">
+                      {row.ytd > 0 ? `−${formatMoney(row.ytd)}` : formatMoney(0)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+
+              <tfoot>
+                <tr className="bg-violet-50">
+                  <td className="px-5 py-3.5 font-black uppercase text-violet-800">
+                    Total Other Deductions
+                  </td>
+                  <td className="px-5 py-3.5 text-right text-lg font-black text-violet-700">
+                    −{formatMoney(currentOtherDeductions)}
+                  </td>
+                  <td className="px-5 py-3.5 text-right text-lg font-black text-violet-700">
+                    −{formatMoney(ytdOtherDeductions)}
+                  </td>
+                </tr>
+              </tfoot>
+            </table>
+          </section>
         </div>
+
+        {/* Right summary rail */}
+        <aside className="space-y-6">
+          <section className="rounded-3xl border border-emerald-200 bg-gradient-to-br from-emerald-50 to-white p-6 shadow-sm">
+            <h3 className="text-xl font-black uppercase tracking-wide text-emerald-800">
+              Net Pay Summary
+            </h3>
+
+            <div className="mt-7 space-y-5 text-sm">
+              <div className="flex items-center justify-between gap-4">
+                <span>Gross Pay</span>
+                <strong>{formatMoney(grossPay)}</strong>
+              </div>
+
+              <div className="flex items-center justify-between gap-4 border-t border-slate-200 pt-5">
+                <span>Total Taxes</span>
+                <strong className="text-rose-600">−{formatMoney(currentTaxes)}</strong>
+              </div>
+
+              <div className="flex items-center justify-between gap-4">
+                <span>Other Deductions</span>
+                <strong className="text-rose-600">
+                  −{formatMoney(currentOtherDeductions)}
+                </strong>
+              </div>
+            </div>
+
+            <div className="mt-7 border-t-2 border-emerald-400 pt-6">
+              <p className="text-lg font-black uppercase text-emerald-800">
+                Net Pay
+              </p>
+              <p className="mt-2 text-4xl font-black tracking-tight text-emerald-700">
+                {formatMoney(netPay)}
+              </p>
+            </div>
+          </section>
+
+          <section className="rounded-3xl border border-blue-200 bg-gradient-to-br from-blue-50 to-white p-6 shadow-sm">
+            <h3 className="text-xl font-black uppercase tracking-wide text-blue-900">
+              YTD Totals
+            </h3>
+
+            <div className="mt-7 space-y-5 text-sm">
+              <div className="flex items-center justify-between gap-4">
+                <span>Gross Earnings</span>
+                <strong>{formatMoney(ytd?.grossPay ?? grossPay)}</strong>
+              </div>
+
+              <div className="flex items-center justify-between gap-4">
+                <span>Taxes Withheld</span>
+                <strong className="text-rose-600">−{formatMoney(ytdTaxes)}</strong>
+              </div>
+
+              <div className="flex items-center justify-between gap-4">
+                <span>Other Deductions</span>
+                <strong className="text-rose-600">
+                  −{formatMoney(ytdOtherDeductions)}
+                </strong>
+              </div>
+            </div>
+
+            <div className="mt-7 border-t border-slate-400 pt-6">
+              <div className="flex items-center justify-between gap-4">
+                <span className="text-lg font-black text-blue-950">Net Pay</span>
+                <strong className="text-xl text-blue-900">
+                  {formatMoney(ytd?.netPay ?? netPay)}
+                </strong>
+              </div>
+            </div>
+          </section>
+        </aside>
       </section>
 
       {/* Footer */}
-      <footer className="border-t border-slate-200 bg-slate-50 px-6 py-4 text-xs text-slate-500 sm:px-8">
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-          <div>
-            <p>
-              This is an electronically generated pay statement from{" "}
-              <span className="font-semibold text-slate-700">{companyName}</span>.
-            </p>
-            {companyContact ? (
-              <p className="mt-1 text-slate-600">{companyContact}</p>
-            ) : null}
-          </div>
+      <footer className="mx-8 mb-7 grid grid-cols-[1.2fr_1fr_1.2fr] divide-x divide-slate-200 rounded-2xl border border-slate-200 bg-slate-50 px-6 py-5 text-sm text-slate-700">
+        <div className="pr-6">
+          <p className="font-black text-slate-950">{displayCompanyName}</p>
+          {employeeAddress ? (
+            <p className="mt-1 text-slate-600">{employeeAddress}</p>
+          ) : null}
+        </div>
 
-          <p className="font-medium text-slate-500">
-            Keep this statement for your records.
+        <div className="px-6">
+          {companyContact ? (
+            <p className="whitespace-normal break-words text-slate-600">
+              {companyContact}
+            </p>
+          ) : (
+            <p className="text-slate-500">Company contact information</p>
+          )}
+        </div>
+
+        <div className="pl-6">
+          <p>This is an electronically generated pay statement.</p>
+          <p className="mt-1 font-semibold text-slate-900">
+            No signature required.
           </p>
         </div>
       </footer>
