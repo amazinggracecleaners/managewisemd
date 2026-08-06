@@ -11,6 +11,8 @@ type PaystubYTD = {
   bonusHours: number;
   flatBonus: number;
   grossPay: number;
+  regularPay?: number;
+  bonusPay?: number;
 
   federalTax: number;
   stateTax: number;
@@ -92,43 +94,54 @@ export function PaystubCard({
   // bonus-hour rate = regular hourly rate + $0.50.
   const bonusRate = payRate != null ? payRate + 0.5 : 0;
   const bonusAmount = payRate != null ? bonusHours * bonusRate : 0;
-  const getYTDDeductionAmount = (
-  label: string
-): number => {
-  const normalized = label
-    .trim()
-    .toLowerCase();
 
-  if (normalized.includes("federal")) {
-    return ytd?.federalTax ?? 0;
-  }
+  const isTaxDeduction = (label: string) => {
+    const normalized = label.trim().toLowerCase();
+    return (
+      normalized.includes("federal") ||
+      normalized.includes("state") ||
+      normalized.includes("local") ||
+      normalized.includes("social security") ||
+      normalized.includes("medicare")
+    );
+  };
 
-  if (normalized.includes("state")) {
-    return ytd?.stateTax ?? 0;
-  }
+  const taxDeductions = safeDeductions.filter((deduction) =>
+    isTaxDeduction(deduction.label)
+  );
+  const otherDeductionRows = safeDeductions.filter(
+    (deduction) => !isTaxDeduction(deduction.label)
+  );
 
-  if (normalized.includes("local")) {
-    return ytd?.localTax ?? 0;
-  }
+  const currentTaxes = taxDeductions.reduce(
+    (sum, deduction) => sum + deduction.amount,
+    0
+  );
+  const currentOtherDeductions = otherDeductionRows.reduce(
+    (sum, deduction) => sum + deduction.amount,
+    0
+  );
 
-  if (normalized.includes("social security")) {
-    return ytd?.socialSecurity ?? 0;
-  }
+  const ytdTaxes =
+    (ytd?.federalTax ?? 0) +
+    (ytd?.stateTax ?? 0) +
+    (ytd?.localTax ?? 0) +
+    (ytd?.socialSecurity ?? 0) +
+    (ytd?.medicare ?? 0);
 
-  if (normalized.includes("medicare")) {
-    return ytd?.medicare ?? 0;
-  }
+  const ytdOtherDeductions = ytd?.otherDeductions ?? 0;
 
-  if (normalized === "deductions") {
-  return ytd?.totalDeductions ?? 0;
-}
+  const ytdRegularPay =
+    ytd?.regularPay ??
+    (payRate != null
+      ? (ytd?.regularHours ?? regularHours) * payRate
+      : regularAmount);
 
-if (normalized.includes("other")) {
-  return ytd?.otherDeductions ?? 0;
-}
-
-  return 0;
-};
+  const ytdBonusPay =
+    ytd?.bonusPay ??
+    (payRate != null
+      ? (ytd?.bonusHours ?? bonusHours) * bonusRate
+      : bonusAmount);
 
   const totalHours = regularHours + bonusHours;
   const initials = employeeName
@@ -267,235 +280,135 @@ if (normalized.includes("other")) {
 
       {/* Earnings */}
       <section className="px-6 py-5 sm:px-8">
-        <div className="mb-3 flex items-center justify-between">
-          <div>
-            <h2 className="text-base font-bold text-slate-950">Earnings</h2>
-            <p className="text-xs text-slate-500">
-              Hours, rates, and earnings for this pay period
-            </p>
-          </div>
-          <span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700">
-            Gross {formatMoney(grossPay)}
-          </span>
+        <div className="mb-3">
+          <h2 className="text-base font-bold text-slate-950">Earnings</h2>
+          <p className="text-xs text-slate-500">
+            Current pay-period earnings with year-to-date totals
+          </p>
         </div>
 
-        <div className="overflow-hidden rounded-2xl border border-slate-200">
-          <table className="w-full border-collapse text-sm">
+        <div className="overflow-x-auto rounded-2xl border border-slate-200">
+          <table className="w-full min-w-[720px] border-collapse text-sm">
             <thead>
-  <tr>
-    <th className="border-b bg-gray-50 px-3 py-2 text-left font-semibold">
-      Description
-    </th>
-    <th className="border-b bg-gray-50 px-3 py-2 text-right font-semibold">
-      Current Hours
-    </th>
-    <th className="border-b bg-gray-50 px-3 py-2 text-right font-semibold">
-      Rate
-    </th>
-    <th className="border-b bg-gray-50 px-3 py-2 text-right font-semibold">
-      Current Amount
-    </th>
-    <th className="border-b bg-gray-50 px-3 py-2 text-right font-semibold">
-      YTD
-    </th>
-  </tr>
-</thead>
-
+              <tr className="bg-slate-100 text-slate-700">
+                <th className="px-4 py-3 text-left font-semibold">Earnings</th>
+                <th className="px-4 py-3 text-right font-semibold">Hours</th>
+                <th className="px-4 py-3 text-right font-semibold">Rate</th>
+                <th className="px-4 py-3 text-right font-semibold">Current</th>
+                <th className="px-4 py-3 text-right font-semibold">YTD</th>
+              </tr>
+            </thead>
             <tbody className="divide-y divide-slate-200">
               <tr>
-                <td className="px-4 py-3 font-medium text-slate-900">
-                  Regular earnings
-                </td>
-                <td className="px-4 py-3 text-right text-slate-600">
-                  {regularHours.toFixed(2)}
-                </td>
-                <td className="px-4 py-3 text-right text-slate-600">
-                  {payRate != null ? formatMoney(payRate) : "—"}
-                </td>
-                <td className="px-4 py-3 text-right font-semibold text-slate-900">
-                  {formatMoney(regularAmount)}
-                </td>
-                <td className="px-4 py-3 text-right font-semibold text-blue-700">
-  {(ytd?.regularHours ?? regularHours).toFixed(2)}
-</td>
+                <td className="px-4 py-3 font-medium text-slate-900">Regular</td>
+                <td className="px-4 py-3 text-right text-slate-600">{regularHours.toFixed(2)}</td>
+                <td className="px-4 py-3 text-right text-slate-600">{payRate != null ? formatMoney(payRate) : "—"}</td>
+                <td className="px-4 py-3 text-right font-semibold text-slate-900">{formatMoney(regularAmount)}</td>
+                <td className="px-4 py-3 text-right font-semibold text-blue-700">{formatMoney(ytdRegularPay)}</td>
               </tr>
-
-              {bonusHours > 0 ? (
+              {(bonusHours !== 0 || (ytd?.bonusHours ?? 0) !== 0) && (
                 <tr>
-                  <td className="px-4 py-3 font-medium text-slate-900">
-                    Bonus hours
-                  </td>
-                  <td className="px-4 py-3 text-right text-slate-600">
-                    {bonusHours.toFixed(2)}
-                  </td>
-                  <td className="px-4 py-3 text-right text-slate-600">
-                    {payRate != null ? formatMoney(bonusRate) : "—"}
-                  </td>
-                  <td className="px-4 py-3 text-right font-semibold text-slate-900">
-                    {formatMoney(bonusAmount)}
-                  </td>
-                  <td className="px-4 py-3 text-right font-semibold text-violet-700">
-  {(ytd?.bonusHours ?? bonusHours).toFixed(2)}
-</td>
+                  <td className="px-4 py-3 font-medium text-slate-900">Bonus</td>
+                  <td className="px-4 py-3 text-right text-slate-600">{bonusHours.toFixed(2)}</td>
+                  <td className="px-4 py-3 text-right text-slate-600">{payRate != null ? formatMoney(bonusRate) : "—"}</td>
+                  <td className="px-4 py-3 text-right font-semibold text-slate-900">{formatMoney(bonusAmount)}</td>
+                  <td className="px-4 py-3 text-right font-semibold text-violet-700">{formatMoney(ytdBonusPay)}</td>
                 </tr>
-              ) : null}
-
-              {flatBonus > 0 ? (
+              )}
+              {(flatBonus !== 0 || (ytd?.flatBonus ?? 0) !== 0) && (
                 <tr>
-                  <td className="px-4 py-3 font-medium text-slate-900">
-                    Flat bonus
-                  </td>
+                  <td className="px-4 py-3 font-medium text-slate-900">Flat Bonus</td>
                   <td className="px-4 py-3 text-right text-slate-400">—</td>
                   <td className="px-4 py-3 text-right text-slate-400">—</td>
-                  <td className="px-4 py-3 text-right font-semibold text-blue-700">
-                    {formatMoney(flatBonus)}
-                  </td>
-                  <td className="px-4 py-3 text-right font-semibold text-blue-700">
-  {formatMoney(ytd?.flatBonus ?? flatBonus)}
-</td>
-                </tr>
-              ) : null}
-            </tbody>
-
-            <tfoot>
-  <tr className="bg-blue-50">
-    <td
-      colSpan={3}
-      className="px-4 py-3 text-right font-bold text-blue-900"
-    >
-      Total gross pay
-    </td>
-
-    <td className="px-4 py-3 text-right text-base font-black text-blue-700">
-      {formatMoney(grossPay)}
-    </td>
-
-    <td className="px-4 py-3 text-right text-base font-black text-blue-700">
-      {formatMoney(ytd?.grossPay ?? grossPay)}
-    </td>
-  </tr>
-</tfoot>
-          </table>
-        </div>
-      </section>
-
-      {/* Deductions */}
-      <section className="border-t border-slate-100 px-6 py-5 sm:px-8">
-        <div className="mb-3 flex items-center justify-between">
-          <div>
-            <h2 className="text-base font-bold text-slate-950">
-              Taxes & Deductions
-            </h2>
-            <p className="text-xs text-slate-500">
-              Amounts withheld from gross pay
-            </p>
-          </div>
-          <span className="rounded-full bg-rose-50 px-3 py-1 text-xs font-semibold text-rose-700">
-            Total {formatMoney(totalDeductions)}
-          </span>
-        </div>
-
-        <div className="overflow-hidden rounded-2xl border border-slate-200">
-          <table className="w-full border-collapse text-sm">
-            <thead>
-  <tr className="bg-slate-100 text-slate-700">
-    <th className="px-4 py-3 text-left font-semibold">
-      Description
-    </th>
-
-    <th className="px-4 py-3 text-right font-semibold">
-      Current
-    </th>
-
-    <th className="px-4 py-3 text-right font-semibold">
-      YTD
-    </th>
-  </tr>
-</thead>
-
-            <tbody className="divide-y divide-slate-200">
-              {safeDeductions.length > 0 ? (
-                safeDeductions.map((deduction, index) => (
-                  <tr key={`${deduction.label}-${index}`}>
-  <td className="px-4 py-3 font-medium text-slate-800">
-    {deduction.label}
-  </td>
-
-  <td className="px-4 py-3 text-right font-semibold text-rose-600">
-    −{formatMoney(deduction.amount)}
-  </td>
-
-  <td className="px-4 py-3 text-right font-semibold text-rose-700">
-    −{formatMoney(
-      getYTDDeductionAmount(deduction.label)
-    )}
-  </td>
-</tr>
-                ))
-              ) : (
-                <tr>
-                  <td className="px-4 py-4 text-slate-600">No deductions</td>
-                  <td className="px-4 py-4 text-right font-semibold text-slate-700">
-                    {formatMoney(0)}
-                  </td>
-                   <td className="px-4 py-4 text-right font-semibold text-slate-700">
-    {formatMoney(ytd?.totalDeductions ?? 0)}
-  </td>
+                  <td className="px-4 py-3 text-right font-semibold text-blue-700">{formatMoney(flatBonus)}</td>
+                  <td className="px-4 py-3 text-right font-semibold text-blue-700">{formatMoney(ytd?.flatBonus ?? flatBonus)}</td>
                 </tr>
               )}
             </tbody>
-
-           <tfoot>
-  <tr className="bg-rose-50">
-    <td className="px-4 py-3 text-right font-bold text-rose-900">
-      Total deductions
-    </td>
-
-    <td className="px-4 py-3 text-right text-base font-black text-rose-700">
-      −{formatMoney(totalDeductions)}
-    </td>
-
-    <td className="px-4 py-3 text-right text-base font-black text-rose-700">
-      −{formatMoney(
-        ytd?.totalDeductions ?? totalDeductions
-      )}
-    </td>
-  </tr>
-</tfoot>
+            <tfoot>
+              <tr className="bg-blue-50">
+                <td colSpan={3} className="px-4 py-3 text-right font-bold text-blue-900">Gross Pay</td>
+                <td className="px-4 py-3 text-right text-base font-black text-blue-700">{formatMoney(grossPay)}</td>
+                <td className="px-4 py-3 text-right text-base font-black text-blue-700">{formatMoney(ytd?.grossPay ?? grossPay)}</td>
+              </tr>
+            </tfoot>
           </table>
         </div>
       </section>
 
-      {/* Final net-pay band */}
-      <section className="mx-6 mb-6 rounded-2xl bg-gradient-to-r from-emerald-600 to-teal-600 px-5 py-4 text-white shadow-lg shadow-emerald-600/15 sm:mx-8">
-        <div className="flex items-center justify-between gap-4">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-100">
-              Net pay
-            </p>
-            <p className="mt-1 text-sm text-emerald-50/90">
-              Gross pay minus taxes and deductions
-            </p>
-          </div>
-          <div className="grid grid-cols-2 gap-6 text-right">
-  <div>
-    <p className="text-xs uppercase tracking-wide text-emerald-100">
-      Current
-    </p>
-    <p className="mt-1 text-2xl font-black tracking-tight">
-      {formatMoney(netPay)}
-    </p>
-  </div>
+      {/* Taxes */}
+      <section className="border-t border-slate-100 px-6 py-5 sm:px-8">
+        <div className="mb-3">
+          <h2 className="text-base font-bold text-slate-950">Taxes</h2>
+          <p className="text-xs text-slate-500">Required taxes withheld from gross pay</p>
+        </div>
+        <div className="overflow-hidden rounded-2xl border border-slate-200">
+          <table className="w-full border-collapse text-sm">
+            <thead><tr className="bg-slate-100 text-slate-700"><th className="px-4 py-3 text-left font-semibold">Tax</th><th className="px-4 py-3 text-right font-semibold">Current</th><th className="px-4 py-3 text-right font-semibold">YTD</th></tr></thead>
+            <tbody className="divide-y divide-slate-200">
+              {[
+                ["Federal Income Tax", taxDeductions.find(d => d.label.toLowerCase().includes("federal"))?.amount ?? 0, ytd?.federalTax ?? 0],
+                ["Social Security", taxDeductions.find(d => d.label.toLowerCase().includes("social security"))?.amount ?? 0, ytd?.socialSecurity ?? 0],
+                ["Medicare", taxDeductions.find(d => d.label.toLowerCase().includes("medicare"))?.amount ?? 0, ytd?.medicare ?? 0],
+                ["State Tax", taxDeductions.find(d => d.label.toLowerCase().includes("state"))?.amount ?? 0, ytd?.stateTax ?? 0],
+                ["Local Tax", taxDeductions.find(d => d.label.toLowerCase().includes("local"))?.amount ?? 0, ytd?.localTax ?? 0],
+              ].filter(([, current, ytdAmount]) => Number(current) !== 0 || Number(ytdAmount) !== 0).map(([label, current, ytdAmount]) => (
+                <tr key={String(label)}>
+                  <td className="px-4 py-3 font-medium text-slate-800">{label}</td>
+                  <td className="px-4 py-3 text-right font-semibold text-rose-600">{Number(current) > 0 ? `−${formatMoney(Number(current))}` : formatMoney(0)}</td>
+                  <td className="px-4 py-3 text-right font-semibold text-rose-700">{Number(ytdAmount) > 0 ? `−${formatMoney(Number(ytdAmount))}` : formatMoney(0)}</td>
+                </tr>
+              ))}
+            </tbody>
+            <tfoot><tr className="bg-rose-50"><td className="px-4 py-3 text-right font-bold text-rose-900">Total Taxes</td><td className="px-4 py-3 text-right text-base font-black text-rose-700">−{formatMoney(currentTaxes)}</td><td className="px-4 py-3 text-right text-base font-black text-rose-700">−{formatMoney(ytdTaxes)}</td></tr></tfoot>
+          </table>
+        </div>
+      </section>
 
-  <div>
-    <p className="text-xs uppercase tracking-wide text-emerald-100">
-      YTD
-    </p>
-    <p className="mt-1 text-2xl font-black tracking-tight">
-      {formatMoney(ytd?.netPay ?? netPay)}
-    </p>
-  </div>
-</div>
+      {/* Other Deductions */}
+      <section className="border-t border-slate-100 px-6 py-5 sm:px-8">
+        <div className="mb-3">
+          <h2 className="text-base font-bold text-slate-950">Other Deductions</h2>
+          <p className="text-xs text-slate-500">Insurance, retirement, garnishments, uniforms, and other deductions</p>
+        </div>
+        <div className="overflow-hidden rounded-2xl border border-slate-200">
+          <table className="w-full border-collapse text-sm">
+            <thead><tr className="bg-slate-100 text-slate-700"><th className="px-4 py-3 text-left font-semibold">Deduction</th><th className="px-4 py-3 text-right font-semibold">Current</th><th className="px-4 py-3 text-right font-semibold">YTD</th></tr></thead>
+            <tbody className="divide-y divide-slate-200">
+              {otherDeductionRows.length > 0 ? otherDeductionRows.map((deduction, index) => (
+                <tr key={`${deduction.label}-${index}`}><td className="px-4 py-3 font-medium text-slate-800">{deduction.label}</td><td className="px-4 py-3 text-right font-semibold text-rose-600">{deduction.amount > 0 ? `−${formatMoney(deduction.amount)}` : formatMoney(0)}</td><td className="px-4 py-3 text-right font-semibold text-rose-700">{index === 0 && ytdOtherDeductions > 0 ? `−${formatMoney(ytdOtherDeductions)}` : formatMoney(0)}</td></tr>
+              )) : (
+                <tr><td className="px-4 py-4 text-slate-600">No other deductions</td><td className="px-4 py-4 text-right">{formatMoney(0)}</td><td className="px-4 py-4 text-right">{formatMoney(ytdOtherDeductions)}</td></tr>
+              )}
+            </tbody>
+            <tfoot><tr className="bg-amber-50"><td className="px-4 py-3 text-right font-bold text-amber-900">Total Other Deductions</td><td className="px-4 py-3 text-right text-base font-black text-amber-700">−{formatMoney(currentOtherDeductions)}</td><td className="px-4 py-3 text-right text-base font-black text-amber-700">−{formatMoney(ytdOtherDeductions)}</td></tr></tfoot>
+          </table>
+        </div>
+      </section>
+
+      {/* Net Pay */}
+      <section className="mx-6 mb-5 rounded-2xl bg-gradient-to-r from-emerald-600 to-teal-600 px-5 py-5 text-white shadow-lg shadow-emerald-600/15 sm:mx-8">
+        <div className="grid gap-4 sm:grid-cols-[1fr_auto] sm:items-end">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-100">Net Pay</p>
+            <div className="mt-3 grid grid-cols-3 gap-3 text-sm">
+              <div><p className="text-emerald-100">Gross Pay</p><p className="mt-1 font-bold">{formatMoney(grossPay)}</p></div>
+              <div><p className="text-emerald-100">Taxes</p><p className="mt-1 font-bold">−{formatMoney(currentTaxes)}</p></div>
+              <div><p className="text-emerald-100">Other Deductions</p><p className="mt-1 font-bold">−{formatMoney(currentOtherDeductions)}</p></div>
+            </div>
+          </div>
+          <div className="border-t border-white/20 pt-4 text-left sm:border-l sm:border-t-0 sm:pl-6 sm:pt-0 sm:text-right"><p className="text-xs uppercase tracking-wide text-emerald-100">Take-home pay</p><p className="mt-1 text-3xl font-black tracking-tight">{formatMoney(netPay)}</p></div>
+        </div>
+      </section>
+
+      {/* YTD Totals */}
+      <section className="mx-6 mb-6 rounded-2xl border border-blue-200 bg-gradient-to-r from-blue-50 to-indigo-50 p-5 sm:mx-8">
+        <div className="mb-3"><h2 className="text-base font-bold text-slate-950">YTD Totals</h2><p className="text-xs text-slate-500">Calendar-year totals through this pay date</p></div>
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <div className="rounded-xl bg-white p-3 shadow-sm"><p className="text-xs text-slate-500">Gross Earnings</p><p className="mt-1 font-bold text-blue-700">{formatMoney(ytd?.grossPay ?? grossPay)}</p></div>
+          <div className="rounded-xl bg-white p-3 shadow-sm"><p className="text-xs text-slate-500">Taxes Withheld</p><p className="mt-1 font-bold text-rose-700">{formatMoney(ytdTaxes)}</p></div>
+          <div className="rounded-xl bg-white p-3 shadow-sm"><p className="text-xs text-slate-500">Other Deductions</p><p className="mt-1 font-bold text-amber-700">{formatMoney(ytdOtherDeductions)}</p></div>
+          <div className="rounded-xl bg-white p-3 shadow-sm"><p className="text-xs text-slate-500">Net Pay</p><p className="mt-1 font-bold text-emerald-700">{formatMoney(ytd?.netPay ?? netPay)}</p></div>
         </div>
       </section>
 
