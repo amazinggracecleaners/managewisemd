@@ -297,16 +297,47 @@ export function PaystubCard({
 
   return (
     <article
-      className="mx-auto w-full min-w-[980px] max-w-[1180px] overflow-hidden rounded-3xl border border-slate-200 bg-white text-slate-950 shadow-2xl print:min-w-0 print:max-w-none print:rounded-none print:border-0 print:shadow-none"
-      aria-label={`Pay stub for ${employeeName}`}
-    >
+  className="
+    mx-auto w-full min-w-[980px] max-w-[1180px]
+    overflow-hidden rounded-3xl border border-slate-200
+    bg-white text-slate-950 shadow-2xl
+
+    print:min-w-0
+    print:max-w-[7.5in]
+    print:w-[7.5in]
+    print:rounded-none
+    print:border-0
+    print:shadow-none
+    print:overflow-visible
+  "
+  aria-label={`Pay stub for ${employeeName}`}
+>
       {/* Header */}
       <header className="relative overflow-hidden border-b border-blue-100 bg-white px-8 py-7">
         <div className="pointer-events-none absolute inset-x-0 bottom-0 h-16 bg-gradient-to-r from-blue-50 via-indigo-50 to-transparent opacity-80" />
 
-        <div className="relative grid grid-cols-[minmax(0,1fr)_390px] items-start gap-8">
+        <div
+  className="
+    relative grid grid-cols-[minmax(0,1fr)_390px]
+    items-start gap-8
+
+    print:grid-cols-[minmax(0,1fr)_250px]
+    print:gap-4
+  "
+>
           <div className="flex min-w-0 items-center gap-5">
-            <div className="flex h-28 w-28 shrink-0 items-center justify-center overflow-hidden rounded-[28px] bg-gradient-to-br from-slate-900 to-blue-950 p-3 shadow-lg">
+            <div
+  className="
+    flex h-28 w-28 shrink-0 items-center justify-center
+    overflow-hidden rounded-[28px]
+    bg-gradient-to-br from-slate-900 to-blue-950
+    p-3 shadow-lg
+
+    print:h-20
+    print:w-20
+    print:rounded-2xl
+  "
+>
               {logoUrl ? (
                 <div className="flex h-full w-full items-center justify-center rounded-full bg-white p-2">
                   <img
@@ -323,7 +354,7 @@ export function PaystubCard({
             </div>
 
             <div className="min-w-0">
-              <h1 className="break-words text-4xl font-black tracking-tight text-blue-950">
+              <h1 className="break-words text-4xl font-black tracking-tight text-blue-950 print:text-2xl">
                 {displayCompanyName}
               </h1>
               <p className="mt-2 text-lg font-bold uppercase tracking-[0.16em] text-blue-800">
@@ -347,8 +378,19 @@ export function PaystubCard({
       </header>
 
       {/* Employee card */}
-      <section className="px-8 py-6">
-        <div className="grid grid-cols-[minmax(0,1fr)_minmax(250px,0.85fr)] gap-8 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+    <section className="px-8 py-6 print:px-4 print:py-3">
+  <div
+    className="
+      grid grid-cols-[minmax(0,1fr)_minmax(250px,0.85fr)]
+      gap-8 rounded-3xl border border-slate-200
+      bg-white p-6 shadow-sm
+
+      print:grid-cols-[minmax(0,1fr)_190px]
+      print:gap-4
+      print:rounded-xl
+      print:p-3
+    "
+  >
           <div className="flex min-w-0 items-start gap-5">
             <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-100 to-indigo-100 text-xl font-black text-blue-800">
               {initials || "E"}
@@ -379,7 +421,7 @@ export function PaystubCard({
             </div>
           </div>
 
-          <div className="border-l border-slate-200 pl-8">
+          <div className="border-l border-slate-200 pl-8 print:pl-4">
             <p className="text-sm font-bold text-slate-900">Employee ID:</p>
             <p className="mt-1 break-all text-sm text-slate-700">
               {employeeId || "—"}
@@ -389,7 +431,17 @@ export function PaystubCard({
       </section>
 
       {/* Main two-column body */}
-      <section className="grid grid-cols-[minmax(0,1fr)_300px] items-start gap-6 px-8 pb-7">
+      <section
+  className="
+    grid grid-cols-[minmax(0,1fr)_300px]
+    items-start gap-6 px-8 pb-7
+
+    print:grid-cols-[minmax(0,1fr)_210px]
+    print:gap-3
+    print:px-4
+    print:pb-4
+  "
+>
         <div className="space-y-6">
           {/* Earnings */}
           <section className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
@@ -574,7 +626,7 @@ export function PaystubCard({
 
         {/* Right summary rail */}
         <aside className="space-y-6">
-          <section className="rounded-3xl border border-emerald-200 bg-gradient-to-br from-emerald-50 to-white p-6 shadow-sm">
+          <section className="rounded-3xl border border-emerald-200 bg-gradient-to-br from-emerald-50 to-white p-6 shadow-sm print:rounded-xl print:p-3">
             <h3 className="text-xl font-black uppercase tracking-wide text-emerald-800">
               Net Pay Summary
             </h3>
@@ -602,13 +654,13 @@ export function PaystubCard({
               <p className="text-lg font-black uppercase text-emerald-800">
                 Net Pay
               </p>
-              <p className="mt-2 text-4xl font-black tracking-tight text-emerald-700">
+              <p className="mt-2 text-4xl font-black tracking-tight text-emerald-700 print:text-2xl">
                 {formatMoney(netPay)}
               </p>
             </div>
           </section>
 
-          <section className="rounded-3xl border border-blue-200 bg-gradient-to-br from-blue-50 to-white p-6 shadow-sm">
+         <section className="rounded-3xl border border-blue-200 bg-gradient-to-br from-blue-50 to-white p-6 shadow-sm print:rounded-xl print:p-3">
             <h3 className="text-xl font-black uppercase tracking-wide text-blue-900">
               YTD Totals
             </h3>
@@ -645,15 +697,30 @@ export function PaystubCard({
       </section>
 
       {/* Footer */}
-      <footer className="mx-8 mb-7 grid grid-cols-[1.2fr_1fr_1.2fr] divide-x divide-slate-200 rounded-2xl border border-slate-200 bg-slate-50 px-6 py-5 text-sm text-slate-700">
-        <div className="pr-6">
+     <footer
+  className="
+    mx-8 mb-7 grid grid-cols-[1.2fr_1fr_1.2fr]
+    divide-x divide-slate-200 rounded-2xl
+    border border-slate-200 bg-slate-50
+    px-6 py-5 text-sm text-slate-700
+
+    print:mx-4
+    print:mb-3
+    print:grid-cols-[1.1fr_1fr_1.1fr]
+    print:rounded-xl
+    print:px-3
+    print:py-3
+    print:text-[10px]
+  "
+>
+        <div className="pr-6 print:pr-3">
           <p className="font-black text-slate-950">{displayCompanyName}</p>
           {employeeAddress ? (
             <p className="mt-1 text-slate-600">{employeeAddress}</p>
           ) : null}
         </div>
 
-        <div className="px-6">
+        <div className="px-6 print:px-3">
           {companyContact ? (
             <p className="whitespace-normal break-words text-slate-600">
               {companyContact}
@@ -663,7 +730,7 @@ export function PaystubCard({
           )}
         </div>
 
-        <div className="pl-6">
+       <div className="pl-6 print:pl-3">
           <p>This is an electronically generated pay statement.</p>
           <p className="mt-1 font-semibold text-slate-900">
             No signature required.

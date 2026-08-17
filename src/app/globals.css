@@ -1,4 +1,3 @@
-
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -14,14 +13,13 @@
     --popover: 0 0% 100%;
     --popover-foreground: 222 47% 11%;
 
-    /* AGC brand-inspired */
-    --primary: 199 84% 47%;              /* blue */
+    --primary: 199 84% 47%;
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 84 53% 52%;             /* green */
+    --secondary: 84 53% 52%;
     --secondary-foreground: 0 0% 100%;
 
-    --accent: 35 89% 58%;                /* orange */
+    --accent: 35 89% 58%;
     --accent-foreground: 0 0% 100%;
 
     --muted: 210 40% 96%;
@@ -101,7 +99,6 @@
 
   .theme {
     --font-heading: var(--font-sans);
-    --font-sans: var(--font-sans);
   }
 
   * {
@@ -114,5 +111,25 @@
 
   body {
     @apply bg-background text-foreground;
+  }
+}
+
+@media print {
+  @page {
+    size: Letter portrait;
+    margin: 0.35in;
+  }
+
+  html,
+  body {
+    width: 100%;
+    margin: 0;
+    padding: 0;
+    background: white !important;
+  }
+
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
   }
 }
