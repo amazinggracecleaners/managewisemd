@@ -290,7 +290,7 @@ export function EmployeeView({
   >("home");
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
 const [dailySearch, setDailySearch] = useState("");
-
+const [clockInSubmitting, setClockInSubmitting] = useState(false);
 const [statusFilter, setStatusFilter] = useState<
   "all" | "complete" | "in-process" | "incomplete"
 >("all");
@@ -2156,14 +2156,22 @@ const hoursSpent =
         ) : (
           <Button
             size="sm"
-            onClick={() =>
+            onClick={() => {
+  if (clockInSubmitting) return;
+
+  setClockInSubmitting(true);
+
   handleClockInOut(
     "in",
     schedule.siteName,
     schedule.id
-  )
+  );
+}}
+            disabled={
+  isManagerPreview ||
+  clockInDisabled ||
+  clockInSubmitting
 }
-            disabled={isManagerPreview || clockInDisabled}
           >
             <LogIn className="mr-2 h-4 w-4" />
             Clock In
