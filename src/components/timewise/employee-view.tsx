@@ -295,6 +295,9 @@ const [statusFilter, setStatusFilter] = useState<
   "all" | "complete" | "in-process" | "incomplete"
 >("all");
 const [openNotifications, setOpenNotifications] = useState(false);
+const [scheduleView, setScheduleView] = useState<
+  "daily" | "weekly" | "monthly"
+>("daily");
 const [unreadNotificationCount, setUnreadNotificationCount] = useState(0);
 type HeaderEmployeeNotification = {
   id: string;
@@ -424,6 +427,20 @@ const markHeaderNotificationRead = useCallback(
   },
   [companyId]
 );
+
+const jumpToScheduleDay = useCallback((date: Date) => {
+  setCurrentDate(startOfDay(date));
+  setScheduleView("daily");
+
+  window.setTimeout(() => {
+    document
+      .getElementById("employee-assignments")
+      ?.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
+  }, 50);
+}, []);
 
 const markAllHeaderNotificationsRead = useCallback(async () => {
   const unread = headerNotifications.filter((n) => !n.read);
@@ -673,15 +690,62 @@ const routedDailySchedules = useMemo(() => {
   }, [schedules, employee.id, today, settings.weekStartsOn]);
 
   const weeklySchedule = useMemo(() => {
-    const startOfUserWeek = startOfWeek(today, { weekStartsOn: settings.weekStartsOn });
-    const week: Array<{ date: Date; schedules: CleaningSchedule[] }> = [];
+  const startOfUserWeek = startOfWeek(currentDate, {
+    weekStartsOn: settings.weekStartsOn,
+  });
 
-    for (let i = 0; i < 7; i++) {
-      const day = add(startOfUserWeek, { days: i });
-      week.push({ date: day, schedules: scheduleForDay(day) });
-    }
-    return week;
-  }, [schedules, employee.id, today, settings.weekStartsOn]);
+  const week: Array<{
+    date: Date;
+    schedules: CleaningSchedule[];
+  }> = [];
+
+  for (let i = 0; i < 7; i++) {
+    const day = add(startOfUserWeek, { days: i });
+
+    week.push({
+      date: day,
+      schedules: scheduleForDay(day),
+    });
+  }
+
+  return week;
+}, [
+  schedules,
+  employee.id,
+  currentDate,
+  settings.weekStartsOn,
+  entries,
+]);
+
+const monthlySchedule = useMemo(() => {
+  const monthStart = startOfMonth(currentDate);
+  const monthEnd = endOfMonth(currentDate);
+
+  const days: Array<{
+    date: Date;
+    schedules: CleaningSchedule[];
+  }> = [];
+
+  let day = monthStart;
+
+  while (day <= monthEnd) {
+    days.push({
+      date: day,
+      schedules: scheduleForDay(day),
+    });
+
+    day = add(day, { days: 1 });
+  }
+
+  return days;
+}, [
+  currentDate,
+  schedules,
+  employee.id,
+  employee.name,
+  settings.weekStartsOn,
+  entries,
+]);
 
   const handleOpenNoteDialog = (schedule: CleaningSchedule) => {
     setEditingNoteForSchedule(schedule);
@@ -1935,11 +1999,17 @@ const renderEmployeeSidebar = (
                 )}
               >
                <CardContent className="p-3 sm:p-4">
-                  <Tabs defaultValue="daily">
-                    <TabsList className="grid w-full grid-cols-2">
-                      <TabsTrigger value="daily">Daily</TabsTrigger>
-                      <TabsTrigger value="weekly">Weekly</TabsTrigger>
-                    </TabsList>
+                  <Tabs
+  value={scheduleView}
+  onValueChange={(value) =>
+    setScheduleView(value as "daily" | "weekly" | "monthly")
+  }
+>
+                    <TabsList className="grid w-full grid-cols-3">
+  <TabsTrigger value="daily">Daily</TabsTrigger>
+  <TabsTrigger value="weekly">Weekly</TabsTrigger>
+  <TabsTrigger value="monthly">Monthly</TabsTrigger>
+</TabsList>
 
                     {/* DAILY VIEW */}
                     <TabsContent value="daily">
@@ -2226,7 +2296,29 @@ const hoursSpent =
                         <ul className="space-y-4">
                           {weeklySchedule.map((day) => (
                             <li key={day.date.toISOString()}>
-                              <h3 className="font-semibold text-sm mb-1">{format(day.date, "eeee, MMM d")}</h3>
+  <button
+    type="button"
+    onClick={() => jumpToScheduleDay(day.date)}
+    className="mb-2 flex w-full items-center justify-between rounded-xl border bg-slate-50 px-3 py-3 text-left transition hover:bg-slate-100 dark:bg-slate-900 dark:hover:bg-slate-800"
+  >
+    <div>
+      <p className="font-semibold">
+        {format(day.date, "EEEE, MMM d")}
+      </p>
+
+      <p className="mt-1 text-xs text-muted-foreground">
+        {day.schedules.length === 0
+          ? "No assignments"
+          : `${day.schedules.length} ${
+              day.schedules.length === 1
+                ? "assignment"
+                : "assignments"
+            }`}
+      </p>
+    </div>
+
+    <ChevronRight className="h-4 w-4 text-muted-foreground" />
+  </button>
                               {day.schedules.length > 0 ? (
                                 <div className="pl-4 border-l-2 border-primary/50 space-y-2">
                                   {day.schedules.map((schedule) => {
@@ -2287,6 +2379,96 @@ const hoursSpent =
                         </ul>
                       </ScrollArea>
                     </TabsContent>
+
+                    {/* MONTHLY VIEW */}
+<TabsContent value="monthly">
+  <div className="my-4 flex items-center justify-between">
+    <div>
+      <h3 className="text-lg font-bold">
+        {format(currentDate, "MMMM yyyy")}
+      </h3>
+      <p className="text-sm text-muted-foreground">
+        Select a day to view its full schedule.
+      </p>
+    </div>
+  </div>
+
+  <div className="grid grid-cols-7 gap-1 sm:gap-2">
+    {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map(
+      (label) => (
+        <div
+          key={label}
+          className="py-2 text-center text-xs font-semibold text-muted-foreground"
+        >
+          {label}
+        </div>
+      )
+    )}
+
+    {Array.from({
+      length: startOfMonth(currentDate).getDay(),
+    }).map((_, index) => (
+      <div key={`blank-${index}`} />
+    ))}
+
+    {monthlySchedule.map((day) => {
+      const assignmentCount = day.schedules.length;
+      const selected = isSameDay(day.date, currentDate);
+      const todayDay = isToday(day.date);
+
+      return (
+        <button
+          key={format(day.date, "yyyy-MM-dd")}
+          type="button"
+          onClick={() => jumpToScheduleDay(day.date)}
+          className={cn(
+            "min-h-20 rounded-xl border p-2 text-left transition hover:bg-slate-50 dark:hover:bg-slate-900",
+            selected &&
+              "border-violet-500 bg-violet-50 dark:bg-violet-950/30",
+            todayDay &&
+              !selected &&
+              "border-blue-400"
+          )}
+        >
+          <div className="flex items-center justify-between">
+            <span className="text-sm font-semibold">
+              {format(day.date, "d")}
+            </span>
+
+            {assignmentCount > 0 && (
+              <Badge
+                variant="secondary"
+                className="h-5 min-w-5 justify-center px-1 text-[10px]"
+              >
+                {assignmentCount}
+              </Badge>
+            )}
+          </div>
+
+          {assignmentCount > 0 && (
+            <div className="mt-2 space-y-1">
+              {day.schedules.slice(0, 2).map((schedule) => (
+                <p
+                  key={schedule.id}
+                  className="truncate text-[10px] text-muted-foreground"
+                >
+                  {getScheduleDisplayName(schedule)}
+                </p>
+              ))}
+
+              {assignmentCount > 2 && (
+                <p className="text-[10px] font-medium text-violet-700">
+                  +{assignmentCount - 2} more
+                </p>
+              )}
+            </div>
+          )}
+        </button>
+      );
+    })}
+  </div>
+</TabsContent>
+
                   </Tabs>
                 </CardContent>
               </Card>
