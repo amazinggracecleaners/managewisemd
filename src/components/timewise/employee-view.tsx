@@ -139,7 +139,7 @@ interface EmployeeViewProps {
       | "manager-manual-entry";
     initiatedBy?: string;
   }
-) => void;
+) => void | Promise<void>;
   requestLocation: () => void;
   coord: { lat: number; lng: number } | null;
   entries: Entry[];
@@ -835,7 +835,7 @@ const getLiveHoursForOpenShift = useCallback(
   [getActiveShiftForSiteOnDate, liveNow]
 );
  const handleClockInOut = useCallback(
-  (
+  async (
     action: "in" | "out",
     siteName: string,
     scheduleId?: string
@@ -871,7 +871,7 @@ const getLiveHoursForOpenShift = useCallback(
         return;
       }
 
-      recordEntry(
+      await recordEntry(
         "in",
         site,
         currentDate,
@@ -922,7 +922,7 @@ const getLiveHoursForOpenShift = useCallback(
         )
       : 0;
 
-    recordEntry(
+    await recordEntry(
       "out",
       site,
       currentDate,
@@ -2226,16 +2226,22 @@ const hoursSpent =
         ) : (
           <Button
             size="sm"
-            onClick={() => {
+            onClick={async () => {
   if (clockInSubmitting) return;
 
+  // Disable immediately so a rapid second tap cannot submit another clock-in.
   setClockInSubmitting(true);
 
-  handleClockInOut(
-    "in",
-    schedule.siteName,
-    schedule.id
-  );
+  try {
+    await handleClockInOut(
+      "in",
+      schedule.siteName,
+      schedule.id
+    );
+  } finally {
+    // Re-enable after the clock-in attempt finishes, including validation failures.
+    setClockInSubmitting(false);
+  }
 }}
             disabled={
   isManagerPreview ||
@@ -2292,6 +2298,41 @@ const hoursSpent =
 
                     {/* WEEKLY VIEW */}
                     <TabsContent value="weekly">
+                      <div className="my-4 flex flex-wrap items-center justify-between gap-2">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setCurrentDate((date) => add(date, { weeks: -1 }))}
+                        >
+                          <ChevronLeft className="mr-1 h-4 w-4" />
+                          Previous Week
+                        </Button>
+
+                        <div className="text-center">
+                          <h3 className="font-bold">
+                            {format(startOfWeek(currentDate, { weekStartsOn: settings.weekStartsOn }), "MMM d")} – {format(endOfWeek(currentDate, { weekStartsOn: settings.weekStartsOn }), "MMM d, yyyy")}
+                          </h3>
+                          <button
+                            type="button"
+                            onClick={() => setCurrentDate(startOfDay(new Date()))}
+                            className="text-xs font-medium text-violet-700 hover:underline"
+                          >
+                            This Week
+                          </button>
+                        </div>
+
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setCurrentDate((date) => add(date, { weeks: 1 }))}
+                        >
+                          Next Week
+                          <ChevronRight className="ml-1 h-4 w-4" />
+                        </Button>
+                      </div>
+
                       <ScrollArea className="h-[50vh]">
                         <ul className="space-y-4">
                           {weeklySchedule.map((day) => (
@@ -2382,15 +2423,42 @@ const hoursSpent =
 
                     {/* MONTHLY VIEW */}
 <TabsContent value="monthly">
-  <div className="my-4 flex items-center justify-between">
-    <div>
+  <div className="my-4 flex flex-wrap items-center justify-between gap-2">
+    <Button
+      type="button"
+      variant="outline"
+      size="sm"
+      onClick={() => setCurrentDate((date) => add(date, { months: -1 }))}
+    >
+      <ChevronLeft className="mr-1 h-4 w-4" />
+      Previous Month
+    </Button>
+
+    <div className="text-center">
       <h3 className="text-lg font-bold">
         {format(currentDate, "MMMM yyyy")}
       </h3>
+      <button
+        type="button"
+        onClick={() => setCurrentDate(startOfDay(new Date()))}
+        className="text-xs font-medium text-violet-700 hover:underline"
+      >
+        This Month
+      </button>
       <p className="text-sm text-muted-foreground">
         Select a day to view its full schedule.
       </p>
     </div>
+
+    <Button
+      type="button"
+      variant="outline"
+      size="sm"
+      onClick={() => setCurrentDate((date) => add(date, { months: 1 }))}
+    >
+      Next Month
+      <ChevronRight className="ml-1 h-4 w-4" />
+    </Button>
   </div>
 
   <div className="grid grid-cols-7 gap-1 sm:gap-2">
