@@ -502,119 +502,265 @@ const [employeeNoteFile, setEmployeeNoteFile] = useState<File | null>(null);
   }, [orderedEmployeeEntries]);
 
   const today = new Date();
-  const isCurrentDayToday = isToday(currentDate);
+const isCurrentDayToday = isToday(currentDate);
 
-  const scheduleForDay = (date: Date) => {
-    return schedules.filter((s) => {
-      if (!s.startDate) return false;
+/*
+ * Only this employee's entries.
+ * This prevents scheduleForDay from searching every employee's
+ * timeclock entries over and over.
+ */
+const employeeEntries = useMemo(() => {
+  return entries.filter(
+    (entry) => entry.employeeId === employee.id
+  );
+}, [entries, employee.id]);
 
-     const isAssignedDirect =
-  (s.assignedEmployeeIds?.length
-    ? s.assignedEmployeeIds.includes(employee.id)
-    : (s.assignedTo ?? []).includes(employee.name));
-
+/*
+ * Resolve this once instead of recalculating it for every
+ * schedule and every calendar day.
+ */
 const employeeTeamId =
   (employee as any).teamId as string | undefined;
 
-const isAssignedViaTeam =
-  !!s.assignedTeamId &&
-  !!employeeTeamId &&
-  s.assignedTeamId === employeeTeamId;
-const dateStr = format(date, "yyyy-MM-dd");
+const scheduleForDay = useCallback(
+  (date: Date): CleaningSchedule[] => {
+    const normalizedDate = startOfDay(date);
+    const dateStr = format(normalizedDate, "yyyy-MM-dd");
 
-const viewingPast =
-  startOfDay(date) < startOfToday();
+    const viewingPast =
+      normalizedDate.getTime() <
+      startOfToday().getTime();
 
-const isAssigned =
-  isAssignedDirect || isAssignedViaTeam;
+    return schedules.filter((s) => {
+      if (!s.startDate) {
+        return false;
+      }
 
-/*
- * True when this employee has a saved clock-in or clock-out
- * for this exact schedule occurrence.
- */
-const workedThisOccurrence = entries.some((entry) => {
-  if (entry.employeeId !== employee.id) {
-    return false;
-  }
+      // -----------------------------
+      // Employee assignment
+      // -----------------------------
 
-  const entryDate =
-    entry.scheduleDate ||
-    format(new Date(entry.ts), "yyyy-MM-dd");
+      const isAssignedDirect =
+        s.assignedEmployeeIds?.length
+          ? s.assignedEmployeeIds.includes(employee.id)
+          : (s.assignedTo ?? []).includes(employee.name);
 
-  const exactScheduleMatch =
-    entry.scheduleId === s.id &&
-    entryDate === dateStr;
+      const isAssignedViaTeam =
+        !!s.assignedTeamId &&
+        !!employeeTeamId &&
+        s.assignedTeamId === employeeTeamId;
 
-  const siteAndDateMatch =
-    entry.site === s.siteName &&
-    entryDate === dateStr;
+      const isAssigned =
+        isAssignedDirect || isAssignedViaTeam;
 
-  return exactScheduleMatch || siteAndDateMatch;
-});
+      // -----------------------------
+      // Historical work detection
+      // -----------------------------
 
-/*
- * Today and future:
- * show only when currently assigned.
- *
- * Past:
- * show when assigned to the historical schedule
- * or when the employee has saved clock entries.
- */
-if (!isAssigned && !(viewingPast && workedThisOccurrence)) {
-  return false;
-}
+      /*
+       * Because employeeEntries already contains only this
+       * employee's records, we don't need:
+       *
+       * entry.employeeId !== employee.id
+       *
+       * inside every .some() call.
+       */
+      const workedThisOccurrence = employeeEntries.some(
+        (entry) => {
+          const entryDate =
+            entry.scheduleDate ||
+            format(
+              new Date(entry.ts),
+              "yyyy-MM-dd"
+            );
 
-const schStart = parseISO(s.startDate);
-if (s.exceptionDates?.includes(dateStr)) return false;
-      if (date < startOfDay(schStart)) return false;
+          const exactScheduleMatch =
+            entry.scheduleId === s.id &&
+            entryDate === dateStr;
 
-      if (s.repeatUntil && date > endOfDay(parseISO(s.repeatUntil))) return false;
+          const siteAndDateMatch =
+            entry.site === s.siteName &&
+            entryDate === dateStr;
 
-      const monthDiff = (getYear(date) - getYear(schStart)) * 12 + (getMonth(date) - getMonth(schStart));
+          return (
+            exactScheduleMatch ||
+            siteAndDateMatch
+          );
+        }
+      );
+
+      /*
+       * Today/future:
+       * employee must currently be assigned.
+       *
+       * Past:
+       * preserve historical work even if employee was
+       * later removed from the schedule.
+       */
+      if (
+        !isAssigned &&
+        !(viewingPast && workedThisOccurrence)
+      ) {
+        return false;
+      }
+
+      // -----------------------------
+      // Schedule date rules
+      // -----------------------------
+
+      const schStart =
+        startOfDay(parseISO(s.startDate));
+
+      if (
+        s.exceptionDates?.includes(dateStr)
+      ) {
+        return false;
+      }
+
+      if (
+        normalizedDate.getTime() <
+        schStart.getTime()
+      ) {
+        return false;
+      }
+
+      if (s.repeatUntil) {
+        const repeatEnd =
+          endOfDay(parseISO(s.repeatUntil));
+
+        if (
+          normalizedDate.getTime() >
+          repeatEnd.getTime()
+        ) {
+          return false;
+        }
+      }
+
+      const monthDiff =
+        (getYear(normalizedDate) -
+          getYear(schStart)) *
+          12 +
+        (getMonth(normalizedDate) -
+          getMonth(schStart));
+
+      // -----------------------------
+      // Recurrence rules
+      // -----------------------------
 
       switch (s.repeatFrequency) {
         case "does-not-repeat":
-          return isSameDay(date, schStart);
+          return isSameDay(
+            normalizedDate,
+            schStart
+          );
 
         case "weekly":
         case "every-2-weeks":
         case "every-3-weeks": {
-          const dayName = format(date, "EEEE") as any;
-          if (!s.daysOfWeek?.includes(dayName)) return false;
+          const dayName = format(
+            normalizedDate,
+            "EEEE"
+          ) as any;
 
-          const weekDiff = differenceInCalendarWeeks(date, schStart, {
-            weekStartsOn: settings.weekStartsOn,
-          });
+          if (
+            !s.daysOfWeek?.includes(dayName)
+          ) {
+            return false;
+          }
 
-          if (weekDiff < 0) return false;
-          if (s.repeatFrequency === "weekly") return true;
-          if (s.repeatFrequency === "every-2-weeks" && weekDiff % 2 === 0) return true;
-          if (s.repeatFrequency === "every-3-weeks" && weekDiff % 3 === 0) return true;
+          const weekDiff =
+            differenceInCalendarWeeks(
+              normalizedDate,
+              schStart,
+              {
+                weekStartsOn:
+                  settings.weekStartsOn,
+              }
+            );
+
+          if (weekDiff < 0) {
+            return false;
+          }
+
+          if (
+            s.repeatFrequency === "weekly"
+          ) {
+            return true;
+          }
+
+          if (
+            s.repeatFrequency ===
+              "every-2-weeks" &&
+            weekDiff % 2 === 0
+          ) {
+            return true;
+          }
+
+          if (
+            s.repeatFrequency ===
+              "every-3-weeks" &&
+            weekDiff % 3 === 0
+          ) {
+            return true;
+          }
+
           return false;
         }
 
         case "monthly":
-          return getDate(date) === getDate(schStart) && monthDiff >= 0;
+          return (
+            getDate(normalizedDate) ===
+              getDate(schStart) &&
+            monthDiff >= 0
+          );
 
         case "every-2-months":
-          return getDate(date) === getDate(schStart) && monthDiff >= 0 && monthDiff % 2 === 0;
+          return (
+            getDate(normalizedDate) ===
+              getDate(schStart) &&
+            monthDiff >= 0 &&
+            monthDiff % 2 === 0
+          );
 
         case "quarterly":
-          return getDate(date) === getDate(schStart) && monthDiff >= 0 && monthDiff % 3 === 0;
+          return (
+            getDate(normalizedDate) ===
+              getDate(schStart) &&
+            monthDiff >= 0 &&
+            monthDiff % 3 === 0
+          );
 
         case "yearly":
-          return getDate(date) === getDate(schStart) && getMonth(date) === getMonth(schStart) && monthDiff >= 0;
+          return (
+            getDate(normalizedDate) ===
+              getDate(schStart) &&
+            getMonth(normalizedDate) ===
+              getMonth(schStart) &&
+            monthDiff >= 0
+          );
 
         default:
           return false;
       }
     });
-  };
+  },
+  [
+    schedules,
+    employee.id,
+    employee.name,
+    employeeTeamId,
+    employeeEntries,
+    settings.weekStartsOn,
+  ]
+);
     const currentSiteStatuses = useMemo(() => getSiteStatuses(currentDate), [getSiteStatuses, currentDate]);
 
 const dailySchedules = useMemo(() => {
   return scheduleForDay(currentDate);
-}, [currentDate, schedules, employee.id, settings.weekStartsOn]);
+}, [
+  currentDate,
+  scheduleForDay,
+]);
 
 const filteredDailySchedules = useMemo(() => {
   const q = dailySearch.trim().toLowerCase();
@@ -687,64 +833,73 @@ const routedDailySchedules = useMemo(() => {
     const scheduledSiteNames = new Set(scheduleForDay(currentDate).map((s) => s.siteName));
 
     return sessionsForEmployee.filter((s) => s.active && s.in?.site && !scheduledSiteNames.has(s.in.site));
-  }, [schedules, employee.id, today, settings.weekStartsOn]);
+  }, [
+  currentDate,
+  scheduleForDay,
+  sessionsForEmployee,
+]);
 
   const weeklySchedule = useMemo(() => {
-  const startOfUserWeek = startOfWeek(currentDate, {
-    weekStartsOn: settings.weekStartsOn,
-  });
+  const startOfUserWeek = startOfWeek(
+    currentDate,
+    {
+      weekStartsOn: settings.weekStartsOn,
+    }
+  );
 
-  const week: Array<{
-    date: Date;
-    schedules: CleaningSchedule[];
-  }> = [];
+  return Array.from(
+    { length: 7 },
+    (_, index) => {
+      const date = add(
+        startOfUserWeek,
+        { days: index }
+      );
 
-  for (let i = 0; i < 7; i++) {
-    const day = add(startOfUserWeek, { days: i });
-
-    week.push({
-      date: day,
-      schedules: scheduleForDay(day),
-    });
-  }
-
-  return week;
+      return {
+        date,
+        schedules: scheduleForDay(date),
+      };
+    }
+  );
 }, [
-  schedules,
-  employee.id,
   currentDate,
   settings.weekStartsOn,
-  entries,
+  scheduleForDay,
 ]);
 
 const monthlySchedule = useMemo(() => {
-  const monthStart = startOfMonth(currentDate);
-  const monthEnd = endOfMonth(currentDate);
+  const monthStart =
+    startOfMonth(currentDate);
+
+  const monthEnd =
+    endOfMonth(currentDate);
 
   const days: Array<{
     date: Date;
     schedules: CleaningSchedule[];
   }> = [];
 
-  let day = monthStart;
+  let date = monthStart;
 
-  while (day <= monthEnd) {
+  while (
+    date.getTime() <=
+    monthEnd.getTime()
+  ) {
     days.push({
-      date: day,
-      schedules: scheduleForDay(day),
+      date,
+      schedules:
+        scheduleForDay(date),
     });
 
-    day = add(day, { days: 1 });
+    date = add(date, {
+      days: 1,
+    });
   }
 
   return days;
 }, [
   currentDate,
-  schedules,
-  employee.id,
-  employee.name,
-  settings.weekStartsOn,
-  entries,
+  scheduleForDay,
 ]);
 
   const handleOpenNoteDialog = (schedule: CleaningSchedule) => {
@@ -1074,7 +1229,11 @@ const dailySiteSummary = useMemo(() => {
   }
 
   return { total, complete, inProcess, incomplete };
-}, [currentDate, schedules, employee.id, getSiteStatuses]);
+}, [
+  currentDate,
+  scheduleForDay,
+  getSiteStatuses,
+]);
 
   /**
  * ✅ Anchor cross-midnight sessions to the CLOCK-IN day.
