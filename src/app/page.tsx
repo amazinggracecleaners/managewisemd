@@ -1222,10 +1222,12 @@ if (!employeesStillActive) {
   }
 // --- CLOCK-OUT GEOFENCE CHECK ---
 if (!isManagerOverride) {
-  if (settings.requireGPS && !currentCoord) {
+  // Always get a fresh GPS location for clock-out.
+  // Never reuse the location captured during clock-in.
+  if (settings.requireGPS) {
     toast({
-      title: "Location required",
-      description: "Getting your location to verify clock-out...",
+      title: "Verifying location",
+      description: "Getting your current location for clock-out...",
     });
 
     currentCoord = await requestLocation();
@@ -1236,7 +1238,7 @@ if (!isManagerOverride) {
       variant: "destructive",
       title: "Clock-out denied",
       description:
-        "Could not get your location. Please enable location services.",
+        "Could not get your current location. Please enable location services and try again.",
     });
     return;
   }
