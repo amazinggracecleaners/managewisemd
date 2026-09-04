@@ -840,6 +840,12 @@ const routedDailySchedules = useMemo(() => {
 ]);
 
   const weeklySchedule = useMemo(() => {
+  // Do not calculate the full week unless the employee
+  // is actually viewing the Weekly tab.
+  if (scheduleView !== "weekly") {
+    return [];
+  }
+
   const startOfUserWeek = startOfWeek(
     currentDate,
     {
@@ -862,12 +868,19 @@ const routedDailySchedules = useMemo(() => {
     }
   );
 }, [
+  scheduleView,
   currentDate,
   settings.weekStartsOn,
   scheduleForDay,
 ]);
 
 const monthlySchedule = useMemo(() => {
+  // Do not calculate every day of the month unless the
+  // employee is actually viewing the Monthly tab.
+  if (scheduleView !== "monthly") {
+    return [];
+  }
+
   const monthStart =
     startOfMonth(currentDate);
 
@@ -898,6 +911,7 @@ const monthlySchedule = useMemo(() => {
 
   return days;
 }, [
+  scheduleView,
   currentDate,
   scheduleForDay,
 ]);
