@@ -515,6 +515,39 @@ const employeeEntries = useMemo(() => {
   );
 }, [entries, employee.id]);
 
+const employeeWorkIndex = useMemo(() => {
+  const scheduleDateKeys = new Set<string>();
+  const siteDateKeys = new Set<string>();
+
+  for (const entry of employeeEntries) {
+    const entryDate =
+      entry.scheduleDate ||
+      format(
+        new Date(entry.ts),
+        "yyyy-MM-dd"
+      );
+
+    // Exact schedule occurrence
+    if (entry.scheduleId) {
+      scheduleDateKeys.add(
+        `${entry.scheduleId}|${entryDate}`
+      );
+    }
+
+    // Historical fallback by site + date
+    if (entry.site) {
+      siteDateKeys.add(
+        `${entry.site}|${entryDate}`
+      );
+    }
+  }
+
+  return {
+    scheduleDateKeys,
+    siteDateKeys,
+  };
+}, [employeeEntries]);
+
 /*
  * Resolve this once instead of recalculating it for every
  * schedule and every calendar day.
@@ -565,29 +598,13 @@ const scheduleForDay = useCallback(
        *
        * inside every .some() call.
        */
-      const workedThisOccurrence = employeeEntries.some(
-        (entry) => {
-          const entryDate =
-            entry.scheduleDate ||
-            format(
-              new Date(entry.ts),
-              "yyyy-MM-dd"
-            );
-
-          const exactScheduleMatch =
-            entry.scheduleId === s.id &&
-            entryDate === dateStr;
-
-          const siteAndDateMatch =
-            entry.site === s.siteName &&
-            entryDate === dateStr;
-
-          return (
-            exactScheduleMatch ||
-            siteAndDateMatch
-          );
-        }
-      );
+      const workedThisOccurrence =
+  employeeWorkIndex.scheduleDateKeys.has(
+    `${s.id}|${dateStr}`
+  ) ||
+  employeeWorkIndex.siteDateKeys.has(
+    `${s.siteName}|${dateStr}`
+  );
 
       /*
        * Today/future:
@@ -745,13 +762,13 @@ const scheduleForDay = useCallback(
     });
   },
   [
-    schedules,
-    employee.id,
-    employee.name,
-    employeeTeamId,
-    employeeEntries,
-    settings.weekStartsOn,
-  ]
+  schedules,
+  employee.id,
+  employee.name,
+  employeeTeamId,
+  employeeWorkIndex,
+  settings.weekStartsOn,
+]
 );
     const currentSiteStatuses = useMemo(() => getSiteStatuses(currentDate), [getSiteStatuses, currentDate]);
 
