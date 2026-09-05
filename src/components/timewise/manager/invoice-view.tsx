@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import type { Invoice, InvoiceLineItem, Site } from "@/shared/types/domain";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -47,15 +47,28 @@ interface InvoiceViewProps {
   sites: Site[];
 }
 
-const statusColors: Record<Invoice["status"], string> = {
+const statusColors: Record<string, string> = {
   draft:
     "border border-amber-200 bg-gradient-to-r from-amber-100 to-orange-100 text-amber-800 shadow-sm dark:border-amber-800 dark:from-amber-950/50 dark:to-orange-950/40 dark:text-amber-300",
   sent:
     "border border-blue-200 bg-gradient-to-r from-blue-100 to-sky-100 text-blue-800 shadow-sm dark:border-blue-800 dark:from-blue-950/50 dark:to-sky-950/40 dark:text-blue-300",
+  unpaid:
+    "border border-orange-200 bg-gradient-to-r from-orange-100 to-amber-100 text-orange-800 shadow-sm dark:border-orange-800 dark:from-orange-950/50 dark:to-amber-950/40 dark:text-orange-300",
+  partially_paid:
+    "border border-violet-200 bg-gradient-to-r from-violet-100 to-purple-100 text-violet-800 shadow-sm dark:border-violet-800 dark:from-violet-950/50 dark:to-purple-950/40 dark:text-violet-300",
   paid:
     "border border-emerald-200 bg-gradient-to-r from-emerald-100 to-green-100 text-emerald-800 shadow-sm dark:border-emerald-800 dark:from-emerald-950/50 dark:to-green-950/40 dark:text-emerald-300",
   void:
     "border border-rose-200 bg-gradient-to-r from-rose-100 to-red-100 text-rose-800 shadow-sm dark:border-rose-800 dark:from-rose-950/50 dark:to-red-950/40 dark:text-rose-300",
+};
+
+const todayISO = () => format(new Date(), "yyyy-MM-dd");
+
+const hasPaidDateArrived = (paidDate?: string | null) => {
+  if (!paidDate) return false;
+  const parsed = parseISO(paidDate);
+  if (!isValid(parsed)) return false;
+  return paidDate <= todayISO();
 };
 
 export function InvoiceView({ sites }: InvoiceViewProps) {
@@ -89,6 +102,32 @@ export function InvoiceView({ sites }: InvoiceViewProps) {
       total: inv.total,
     };
   }, [draftInvoice.lineItems, draftInvoice.taxRate, draftInvoice.discountAmount]);
+
+  const partialAmountPaid = Number((draftInvoice as any).amountPaid) || 0;
+  const partialBalanceDue = Math.max(derivedTotals.total - partialAmountPaid, 0);
+
+  // Persist the Paid status once the scheduled Paid Date arrives.
+  // A manager can override the automatic status; the override prevents this effect
+  // from changing it back again until the Paid Date is edited.
+  useEffect(() => {
+    invoices.forEach((invoice) => {
+      const status = String(invoice.status);
+      const paidDate = (invoice as any).paidDate as string | null | undefined;
+      const manuallyOverridden = Boolean((invoice as any).statusManuallyOverridden);
+
+      if (
+        !manuallyOverridden &&
+        status !== "paid" &&
+        status !== "void" &&
+        hasPaidDateArrived(paidDate)
+      ) {
+        updateInvoice(invoice.id, {
+          status: "paid" as Invoice["status"],
+          statusManuallyOverridden: false,
+        } as any);
+      }
+    });
+  }, [invoices, updateInvoice]);
 
   const displayedInvoices = useMemo(() => {
     let filtered = [...invoices];
@@ -165,17 +204,24 @@ if (q) {
     return displayedInvoices.reduce(
       (totals, invoice) => {
         const amount = withComputed(invoice).total || 0;
+        const status = String(invoice.status);
+        const amountPaid = status === "partially_paid"
+          ? Math.max(0, Number((invoice as any).amountPaid) || 0)
+          : 0;
+        const balanceDue = Math.max(amount - amountPaid, 0);
 
-        if (invoice.status !== "void") {
+        if (status !== "void") {
           totals.totalInvoiced += amount;
         }
 
-        if (invoice.status === "paid") {
+        if (status === "paid") {
           totals.paid += amount;
+        } else if (status === "partially_paid") {
+          totals.paid += Math.min(amountPaid, amount);
         }
 
-        if (invoice.status !== "paid" && invoice.status !== "void") {
-          totals.outstanding += amount;
+        if (status !== "paid" && status !== "void") {
+          totals.outstanding += status === "partially_paid" ? balanceDue : amount;
 
           if (
             invoice.dueDate &&
@@ -288,6 +334,29 @@ paidDate: null,
       return;
     }
 
+
+    if (String(draftInvoice.status) === "partially_paid") {
+      const amountPaid = Number((draftInvoice as any).amountPaid) || 0;
+      const invoiceTotal = derivedTotals.total;
+
+      if (amountPaid <= 0) {
+        alert("Amount Paid must be greater than $0 for a partially paid invoice.");
+        return;
+      }
+
+      if (amountPaid >= invoiceTotal) {
+        setDraftInvoice((prev) => ({
+          ...prev,
+          status: "paid" as Invoice["status"],
+          paidDate: (prev as any).paidDate || todayISO(),
+          amountPaid: null,
+          statusManuallyOverridden: true,
+        } as any));
+        alert("The amount paid covers the full invoice. Status has been changed to Paid. Please save again.");
+        return;
+      }
+    }
+
     const finalLineItems: InvoiceLineItem[] = (draftInvoice.lineItems || []).map((li) => {
       const quantity = Number(li.quantity) || 0;
       const unitPrice = Number(li.unitPrice) || 0;
@@ -301,7 +370,7 @@ paidDate: null,
       };
     });
 
-    const baseInvoice: Omit<Invoice, "id"> = {
+    const baseInvoice = {
       ...(draftInvoice as Omit<Invoice, "id">),
       siteName: draftInvoice.siteName,
       invoiceNumber: draftInvoice.invoiceNumber,
@@ -309,11 +378,19 @@ paidDate: null,
       serviceStartDate: (draftInvoice as any).serviceStartDate || null,
 serviceEndDate: (draftInvoice as any).serviceEndDate || null,
 paidDate: (draftInvoice as any).paidDate || null,
+      amountPaid:
+        String(draftInvoice.status) === "partially_paid"
+          ? Number((draftInvoice as any).amountPaid) || 0
+          : null,
+      statusManuallyOverridden: Boolean((draftInvoice as any).statusManuallyOverridden),
       dueDate: draftInvoice.dueDate,
       status: (draftInvoice.status ?? "draft") as Invoice["status"],
       lineItems: finalLineItems,
       taxRate: draftInvoice.taxRate ?? 0,
       discountAmount: draftInvoice.discountAmount ?? 0,
+    } as Omit<Invoice, "id"> & {
+      amountPaid?: number | null;
+      statusManuallyOverridden?: boolean;
     };
 
     const computed = withComputed(baseInvoice);
@@ -527,45 +604,28 @@ paidDate: (draftInvoice as any).paidDate || null,
                         />
                       </div>
 <div className="space-y-2">
-  <Label htmlFor="paidDate">
-    Paid Date
-  </Label>
-
-  <Input
-  id="paidDate"
-  type="date"
-  value={(draftInvoice as any).paidDate || ""}
-  onChange={(e) =>
-    setDraftInvoice((prev) => ({
-      ...prev,
-      paidDate: e.target.value || null,
-      status: e.target.value
-        ? "paid"
-        : prev.status === "paid"
-          ? "sent"
-          : prev.status,
-    }))
-  }
-/>
-</div>
-                      <div className="space-y-2">
   <Label htmlFor="paidDate">Paid Date</Label>
 
   <Input
     id="paidDate"
     type="date"
     value={(draftInvoice as any).paidDate || ""}
-    onChange={(e) =>
+    onChange={(e) => {
+      const paidDate = e.target.value || null;
+
       setDraftInvoice((prev) => ({
         ...prev,
-        paidDate: e.target.value || null,
-        status: e.target.value
-          ? "paid"
-          : prev.status === "paid"
-            ? "sent"
-            : prev.status,
-      }))
-    }
+        paidDate,
+        // Editing the Paid Date re-enables the automatic date-based rule.
+        statusManuallyOverridden: false,
+        status:
+          paidDate && hasPaidDateArrived(paidDate)
+            ? ("paid" as Invoice["status"])
+            : String(prev.status) === "paid"
+              ? ("unpaid" as Invoice["status"])
+              : prev.status,
+      } as any));
+    }}
   />
 </div>
 
@@ -573,31 +633,72 @@ paidDate: (draftInvoice as any).paidDate || null,
   <Label htmlFor="status">Status</Label>
 
   <Select
-  value={draftInvoice.status}
-  onValueChange={(v: Invoice["status"]) =>
-    setDraftInvoice((prev) => ({
-      ...prev,
-      status: v,
-      paidDate:
-        v === "paid"
-          ? prev.paidDate || format(new Date(), "yyyy-MM-dd")
-          : null,
-    }))
-  }
->
-  <SelectTrigger>
-    <SelectValue />
-  </SelectTrigger>
+    value={String(draftInvoice.status || "draft")}
+    onValueChange={(v) =>
+      setDraftInvoice((prev) => ({
+        ...prev,
+        status: v as Invoice["status"],
+        statusManuallyOverridden: true,
+        paidDate:
+          v === "paid"
+            ? (prev as any).paidDate || todayISO()
+            : (prev as any).paidDate,
+        amountPaid: v === "partially_paid" ? (prev as any).amountPaid ?? "" : null,
+      } as any))
+    }
+  >
+    <SelectTrigger>
+      <SelectValue />
+    </SelectTrigger>
 
-  <SelectContent>
-    <SelectItem value="draft">Draft</SelectItem>
-    <SelectItem value="sent">Sent</SelectItem>
-    <SelectItem value="paid">Paid</SelectItem>
-    <SelectItem value="void">Void</SelectItem>
-  </SelectContent>
-</Select>
+    <SelectContent>
+      <SelectItem value="draft">Draft</SelectItem>
+      <SelectItem value="sent">Sent</SelectItem>
+      <SelectItem value="unpaid">Unpaid</SelectItem>
+      <SelectItem value="partially_paid">Partially Paid</SelectItem>
+      <SelectItem value="paid">Paid</SelectItem>
+      <SelectItem value="void">Void</SelectItem>
+    </SelectContent>
+  </Select>
 </div>
                       </div>
+
+                      {String(draftInvoice.status) === "partially_paid" && (
+                        <div className="mt-4 grid grid-cols-1 gap-4 rounded-xl border border-violet-200 bg-white/80 p-4 sm:grid-cols-2 dark:border-violet-900 dark:bg-slate-950/70">
+                          <div className="space-y-2">
+                            <Label htmlFor="amountPaid">Amount Paid</Label>
+                            <Input
+                              id="amountPaid"
+                              type="number"
+                              min="0"
+                              step="0.01"
+                              max={derivedTotals.total || undefined}
+                              value={(draftInvoice as any).amountPaid ?? ""}
+                              onChange={(e) => {
+                                const raw = e.target.value;
+                                const amount = raw === "" ? "" : Math.max(0, Number(raw) || 0);
+
+                                setDraftInvoice((prev) => ({
+                                  ...prev,
+                                  amountPaid: amount,
+                                } as any));
+                              }}
+                              placeholder="0.00"
+                            />
+                          </div>
+
+                          <div className="space-y-2">
+                            <Label htmlFor="balanceDue">Balance Due</Label>
+                            <Input
+                              id="balanceDue"
+                              type="text"
+                              value={`$${partialBalanceDue.toFixed(2)}`}
+                              readOnly
+                              className="bg-slate-100 font-mono font-semibold dark:bg-slate-900"
+                            />
+                          </div>
+                        </div>
+                      )}
                     </div>
 
                     <div className="space-y-3 rounded-2xl border border-emerald-200 bg-emerald-50/70 p-4 shadow-sm dark:border-emerald-900 dark:bg-emerald-950/20">
@@ -971,8 +1072,8 @@ paidDate: (draftInvoice as any).paidDate || null,
                     className="odd:bg-white even:bg-slate-50/70 transition-colors hover:bg-blue-50/90 dark:odd:bg-slate-950 dark:even:bg-slate-900/60 dark:hover:bg-blue-950/20"
                   >
                     <TableCell>
-                      <Badge className={cn("rounded-full px-3 py-1 font-semibold capitalize", statusColors[inv.status])}>
-                        {inv.status}
+                      <Badge className={cn("rounded-full px-3 py-1 font-semibold capitalize", statusColors[String(inv.status)] || statusColors.draft)}>
+                        {String(inv.status).replace(/_/g, " ")}
                       </Badge>
                     </TableCell>
                     <TableCell className="font-semibold text-blue-700 dark:text-blue-300">
