@@ -1,5 +1,3 @@
-
-
 import type { Timestamp } from "firebase/firestore";
 
 export type Entry = {
@@ -307,7 +305,19 @@ paidDate?: string | null;
   tax: number;
   discount: number;
   total: number;
-  status: 'draft' | 'sent' | 'paid' | 'void';
+  status:
+    | "draft"
+    | "sent"
+    | "unpaid"
+    | "partially_paid"
+    | "paid"
+    | "void";
+
+  // Payment tracking
+  amountPaid?: number | null;
+  // Prevent automatic Paid Date logic from overwriting
+// a status manually selected by the manager.
+statusManuallyOverridden?: boolean;
 
   // 🔁 Recurring metadata
   recurring?: boolean;              // true if this is a monthly template
@@ -340,6 +350,16 @@ enableMapDisplay?: boolean;
   weekStartsOn: 0 | 1 | 2 | 3 | 4 | 5 | 6; // 0 = Sunday, 1 = Monday, etc.
   mileageRate: number; // dollars per mile
   taxRate?: number;
+
+  // Default recurring-invoice payment schedule for this company.
+  // Example:
+  // { defaultPaidDay: 27, paidDateMonthOffset: 1 } = 27th of following month
+  // { defaultPaidDay: 3, paidDateMonthOffset: 0 } = 3rd of same month
+  invoiceSettings?: {
+    defaultPaidDay: number; // 1-31
+    paidDateMonthOffset: 0 | 1; // 0 = same month, 1 = following month
+  };
+
   requireGeofence: boolean;
   requireClockOutGeofence?: boolean;
   geofenceRadius: number; //  stored internally in meters

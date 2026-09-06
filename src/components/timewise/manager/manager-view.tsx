@@ -589,7 +589,10 @@ updateEntry={props.updateEntry}
         </TabsContent>
 
         <TabsContent value="invoices" className="mt-2">
-          <InvoiceView sites={props.sites} />
+          <InvoiceView
+  sites={props.sites}
+  invoiceSettings={props.settings.invoiceSettings}
+/>
         </TabsContent>
 
         <TabsContent value="financials" className="mt-2">
