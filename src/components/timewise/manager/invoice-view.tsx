@@ -1207,65 +1207,77 @@ if (q) {
                       </div>
                     </div>
 
-                    <div className="space-y-3 rounded-2xl border border-violet-200 bg-violet-50/70 p-4 shadow-sm dark:border-violet-900 dark:bg-violet-950/20">
-                      <div className="flex items-center gap-2 font-semibold text-violet-800 dark:text-violet-300">
-                        <RefreshCw className="h-4 w-4" />
-                        Recurring Invoice
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Checkbox
-                          id="recurring"
-                          checked={draftInvoice.recurring ?? false}
-                          onCheckedChange={(checked) =>
-                            setDraftInvoice((prev) => ({
-                              ...prev,
-                              recurring: !!checked,
-                              recurringStart:
-                                !prev.recurring && !!checked
-                                  ? prev.date || format(new Date(), "yyyy-MM-dd")
-                                  : prev.recurringStart,
-                              recurringDayOfMonth:
-                                !!checked
-                                  ? prev.recurringDayOfMonth ?? 1
-                                  : prev.recurringDayOfMonth,
-                            }))
-                          }
-                        />
-                        <Label htmlFor="recurring">Repeat this invoice every month</Label>
-                      </div>
+                    {/* Recurring Invoice */}
+<div className="space-y-4 rounded-2xl border border-violet-200 bg-gradient-to-br from-violet-50 via-purple-50 to-fuchsia-50 p-4 shadow-sm dark:border-violet-900 dark:from-violet-950/40 dark:via-purple-950/30 dark:to-fuchsia-950/20">
 
-                      {draftInvoice.recurring && (
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
-                          <div className="space-y-1">
-                            <Label>Invoice creation day</Label>
-                            <div className="flex h-10 items-center rounded-md border bg-background px-3 text-sm font-medium">
-                              1st of each month
-                            </div>
-                            <p className="text-xs text-muted-foreground">
-                              Recurring invoices are created as Draft for the current month's service period.
-                            </p>
-                          </div>
+  <div className="flex items-center justify-between gap-4">
+    <div>
+      <div className="flex items-center gap-2 font-semibold text-violet-800 dark:text-violet-300">
+        <RefreshCw className="h-4 w-4" />
+        Recurring Invoice
+      </div>
 
-                          <div className="space-y-1">
-                            <Label htmlFor="recurringEnd">End date (optional)</Label>
-                            <FlexibleDateInput
-  id="recurringEnd"
-  value={draftInvoice.recurringEnd ?? ""}
-  allowEmpty
-  onChange={(recurringEnd) =>
-    setDraftInvoice((prev) => ({
-      ...prev,
-      recurringEnd,
-    }))
-  }
-/>
-                            <p className="text-xs text-muted-foreground">
-                              Leave empty to keep repeating until you turn it off.
-                            </p>
-                          </div>
-                        </div>
-                      )}
-                    </div>
+      <p className="mt-1 text-xs text-violet-700/80 dark:text-violet-300/80">
+        ManageWiseMD automatically creates the monthly draft on the 1st.
+      </p>
+    </div>
+
+    <div className="flex items-center gap-2">
+      <Checkbox
+        id="recurring"
+        checked={draftInvoice.recurring ?? false}
+        onCheckedChange={(checked) =>
+          setDraftInvoice((prev) => ({
+            ...prev,
+            recurring: !!checked,
+            recurringStart:
+              !prev.recurring && !!checked
+                ? prev.date || format(new Date(), "yyyy-MM-dd")
+                : prev.recurringStart,
+            recurringDayOfMonth:
+              !!checked
+                ? prev.recurringDayOfMonth ?? 1
+                : prev.recurringDayOfMonth,
+          }))
+        }
+      />
+
+      <Label
+        htmlFor="recurring"
+        className="font-medium"
+      >
+        Repeat monthly
+      </Label>
+    </div>
+  </div>
+
+  {draftInvoice.recurring && (
+    <div className="rounded-xl border border-violet-200 bg-white/80 p-4 dark:border-violet-900 dark:bg-slate-950/70">
+      <div className="space-y-2">
+        <Label htmlFor="recurringEnd">
+          End Date (optional)
+        </Label>
+
+        <FlexibleDateInput
+          id="recurringEnd"
+          value={draftInvoice.recurringEnd ?? ""}
+          allowEmpty
+          onChange={(recurringEnd) =>
+            setDraftInvoice((prev) => ({
+              ...prev,
+              recurringEnd,
+            }))
+          }
+        />
+
+        <p className="text-xs text-muted-foreground">
+          Leave empty to keep repeating until you turn it off.
+        </p>
+      </div>
+    </div>
+  )}
+
+</div>
                   </div>
                 </ScrollArea>
 

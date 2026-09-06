@@ -134,7 +134,7 @@ export function ManagerSettingsView(props: ManagerSettingsViewProps) {
   };
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+    <div className="grid grid-cols-1 gap-5 rounded-3xl bg-gradient-to-br from-slate-50 via-blue-50/40 to-violet-50/50 p-5 lg:grid-cols-2 dark:from-slate-950 dark:via-blue-950/20 dark:to-violet-950/20">
       <Card>
         <CardHeader>
           <CardTitle>Data Storage Mode</CardTitle>
@@ -424,10 +424,13 @@ export function ManagerSettingsView(props: ManagerSettingsViewProps) {
         </CardContent>
       </Card>
 
-      <Card>
-  <CardHeader>
-    <CardTitle>Invoice Settings</CardTitle>
-    <CardDescription>
+      <Card className="overflow-hidden border-0 bg-white shadow-xl ring-1 ring-indigo-100 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-2xl dark:bg-slate-950 dark:ring-indigo-900/50">
+  <CardHeader className="bg-gradient-to-r from-indigo-600 via-violet-600 to-purple-600 text-white">
+    <CardTitle className="text-xl font-bold text-white">
+  Invoice Settings
+</CardTitle>
+
+<CardDescription className="text-indigo-100">
       Set the default Due Date and Paid Date used when invoices are created.
       These dates can still be changed on an individual invoice.
     </CardDescription>
@@ -436,14 +439,24 @@ export function ManagerSettingsView(props: ManagerSettingsViewProps) {
   <CardContent className="space-y-6">
 
     {/* DUE DATE SETTINGS */}
-    <div className="space-y-4">
+    <div className="space-y-4 rounded-2xl border border-blue-200 bg-gradient-to-br from-blue-50 via-sky-50 to-cyan-50 p-5 shadow-sm dark:border-blue-900 dark:from-blue-950/40 dark:via-sky-950/30 dark:to-cyan-950/20">
       <div>
-        <p className="text-sm font-semibold">
-          Due Date
-        </p>
-        <p className="text-xs text-muted-foreground">
-          Choose when invoices are normally due.
-        </p>
+        <div className="flex items-center gap-3">
+  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-600 text-lg text-white shadow-md">
+    📅
+  </div>
+
+  <div>
+    <p className="text-base font-bold text-blue-900 dark:text-blue-200">
+      Due Date
+    </p>
+
+    <p className="text-xs text-blue-700 dark:text-blue-300">
+      Choose when invoices are normally due.
+    </p>
+  </div>
+</div>
+        
       </div>
 
       <div className="space-y-2">
@@ -541,15 +554,24 @@ export function ManagerSettingsView(props: ManagerSettingsViewProps) {
     </div>
 
     {/* PAID DATE SETTINGS */}
-    <div className="space-y-4 border-t pt-5">
+    <div className="space-y-4 rounded-2xl border border-emerald-200 bg-gradient-to-br from-emerald-50 via-green-50 to-teal-50 p-5 shadow-sm dark:border-emerald-900 dark:from-emerald-950/40 dark:via-green-950/30 dark:to-teal-950/20">
       <div>
-        <p className="text-sm font-semibold">
-          Paid Date
-        </p>
-        <p className="text-xs text-muted-foreground">
-          Choose when payment is normally expected.
-        </p>
-      </div>
+        <div className="flex items-center gap-3">
+  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-600 text-lg text-white shadow-md">
+    ✓
+  </div>
+
+  <div>
+    <p className="text-base font-bold text-emerald-900 dark:text-emerald-200">
+      Paid Date
+    </p>
+
+    <p className="text-xs text-emerald-700 dark:text-emerald-300">
+      Choose when payment is normally expected.
+    </p>
+  </div>
+</div>
+     </div>  
 
       <div className="space-y-2">
         <Label>Default Paid Day</Label>
