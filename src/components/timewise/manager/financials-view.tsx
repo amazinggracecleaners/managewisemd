@@ -349,14 +349,48 @@ const buildFinancialData = (view: "operational" | "cash") => {
     const maxMs = maxDate ? maxDate.getTime() : Infinity;
 
     for (const inv of invs) {
-  const d =
-  view === "cash"
-    ? toDateMaybe(
-        (inv as any).paidDate ??
-          (inv as any).paymentDate ??
-          (inv as any).paidAt
-      )
-    : toDateMaybe(
+      const status = String((inv as any).status || "draft");
+
+      // Void invoices never count as revenue.
+      if (status === "void") continue;
+
+      if (view === "cash") {
+        // Cash Flow counts only money actually received.
+        if (status !== "paid" && status !== "partially_paid") {
+          continue;
+        }
+
+        const d = toDateMaybe(
+          (inv as any).paidDate ??
+            (inv as any).paymentDate ??
+            (inv as any).paidAt
+        );
+
+        if (!d || !inRange(d, minDate, maxDate)) continue;
+
+        const invoiceTotal = getInvoiceTotal(inv);
+
+        const cashReceived =
+          status === "partially_paid"
+            ? Math.min(
+                invoiceTotal,
+                Math.max(0, Number((inv as any).amountPaid) || 0)
+              )
+            : invoiceTotal;
+
+        const key = monthKey(d);
+        const row =
+          monthly.get(key) ??
+          { revenue: 0, other: 0, payroll: 0, mileage: 0 };
+
+        row.revenue += cashReceived;
+        monthly.set(key, row);
+
+        continue;
+      }
+
+      // Operational P&L recognizes invoice revenue in the service period.
+      const d = toDateMaybe(
         (inv as any).serviceEndDate ??
           (inv as any).serviceDate ??
           (inv as any).date ??
@@ -364,12 +398,13 @@ const buildFinancialData = (view: "operational" | "cash") => {
           (inv as any).createdAt
       );
 
-  if (!d || !inRange(d, minDate, maxDate)) continue;
+      if (!d || !inRange(d, minDate, maxDate)) continue;
 
-  const key = monthKey(d);
+      const key = monthKey(d);
       const row =
         monthly.get(key) ??
         { revenue: 0, other: 0, payroll: 0, mileage: 0 };
+
       row.revenue += getInvoiceTotal(inv);
       monthly.set(key, row);
     }
@@ -403,11 +438,18 @@ const buildFinancialData = (view: "operational" | "cash") => {
 const payrollMonths = new Set<MonthKey>();
 
 for (const p of pays) {
-  const d = toDateMaybe(
-    (p as any).endDate ??
-    (p as any).payDate ??
-    (p as any).createdAt
-  );
+  const d =
+    view === "cash"
+      ? toDateMaybe(
+          (p as any).payDate ??
+            (p as any).paidDate ??
+            (p as any).createdAt
+        )
+      : toDateMaybe(
+          (p as any).endDate ??
+            (p as any).startDate ??
+            (p as any).createdAt
+        );
 
   if (!d || !inRange(d, minDate, maxDate)) continue;
 
@@ -425,7 +467,7 @@ for (const p of pays) {
 
 // If no saved payroll exists for the selected month/range,
 // calculate live payroll using the same Payroll formula.
-if (minDate && maxDate) {
+if (view === "operational" && minDate && maxDate) {
   const key = monthKey(minDate);
 
   if (!payrollMonths.has(key)) {
@@ -903,7 +945,7 @@ const {
   text={
     accountingView === "operational"
       ? "Revenue recognized from services performed during the selected period."
-      : "Cash revenue received during the selected period from paid invoices."
+      : "Cash actually received during the selected period from paid and partially paid invoices."
   }
 />
               </CardTitle>
@@ -1104,7 +1146,7 @@ const {
   text={
     accountingView === "operational"
       ? "Revenue recognized from work/service performed during this month."
-      : "Cash revenue received during this month from paid invoices."
+      : "Cash actually received during this month from paid and partially paid invoices."
   }
 />
                     </span>
