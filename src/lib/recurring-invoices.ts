@@ -1,46 +1,115 @@
 import type { Invoice } from "@/shared/types/domain";
 
-const toMonthKey = (d: string | undefined) => (d ? d.slice(0, 7) : undefined);
+const toMonthKey = (date?: string | null) =>
+  date ? date.slice(0, 7) : undefined;
 
 export function generateRecurringInvoicesForMonth(args: {
-  targetMonthISO: string; // "YYYY-MM"
+  targetMonthISO: string; // YYYY-MM
   allInvoices: Invoice[];
 }): Omit<Invoice, "id">[] {
   const { targetMonthISO, allInvoices } = args;
 
-  const templates = allInvoices.filter((inv) => inv.recurring);
+  /*
+   * Only true recurring templates may generate invoices.
+   *
+   * Generated monthly invoices are saved with recurring: false,
+   * so they can never become additional templates.
+   */
+  const templates = allInvoices.filter(
+    (invoice) => invoice.recurring === true
+  );
+
   const results: Omit<Invoice, "id">[] = [];
 
-  for (const tmpl of templates) {
-    const templateId = tmpl.recurringTemplateId || tmpl.id;
+  /*
+   * Keep track of template/month combinations during this generation
+   * pass as an additional duplicate safeguard.
+   */
+  const generatedKeys = new Set<string>();
 
-    const startKey = toMonthKey(tmpl.recurringStart);
-    const endKey = toMonthKey(tmpl.recurringEnd || undefined);
+  for (const template of templates) {
+    const templateId =
+      template.recurringTemplateId || template.id;
 
-    if (startKey && targetMonthISO < startKey) continue;
-    if (endKey && targetMonthISO > endKey) continue;
+    const generationKey =
+      `${templateId}_${targetMonthISO}`;
 
-    const alreadyExists = allInvoices.some((inv) => {
-      const templateKey = inv.recurringTemplateId || null;
-      const monthKey = toMonthKey(inv.date);
-      return templateKey === templateId && monthKey === targetMonthISO;
+    /*
+     * Prevent the same template from producing two invoices
+     * during this invocation.
+     */
+    if (generatedKeys.has(generationKey)) {
+      continue;
+    }
+
+    const startKey = toMonthKey(template.recurringStart);
+    const endKey = toMonthKey(template.recurringEnd);
+
+    if (startKey && targetMonthISO < startKey) {
+      continue;
+    }
+
+    if (endKey && targetMonthISO > endKey) {
+      continue;
+    }
+
+    /*
+ * Saved-invoice duplicate check:
+ * has an invoice for this template/month already been saved?
+ */
+    const alreadyExists = allInvoices.some((invoice) => {
+      if (invoice.id === template.id) {
+        return false;
+      }
+
+      const invoiceTemplateId =
+        invoice.recurringTemplateId;
+
+      const invoiceMonth =
+        toMonthKey(
+          invoice.serviceStartDate || invoice.date
+        );
+
+      return (
+        invoiceTemplateId === templateId &&
+        invoiceMonth === targetMonthISO
+      );
     });
-    if (alreadyExists) continue;
 
-    const baseDate = tmpl.date ? new Date(tmpl.date) : new Date();
-    const day = tmpl.recurringDayOfMonth || baseDate.getDate();
-    const dayPadded = String(day).padStart(2, "0");
-    const targetDateStr = `${targetMonthISO}-${dayPadded}`;
+    if (alreadyExists) {
+      generatedKeys.add(generationKey);
+      continue;
+    }
 
-    const { id: _ignore, ...rest } = tmpl;
+    const { id: _ignoredId, ...rest } = template;
 
     results.push({
       ...rest,
-      date: targetDateStr,
-      dueDate: targetDateStr,
+
+      /*
+       * InvoiceView will normalize the actual invoice date,
+       * service period, Due Date and Paid Date.
+       */
+      date: `${targetMonthISO}-01`,
+
+      serviceStartDate: `${targetMonthISO}-01`,
+
       status: "draft",
+
+      /*
+       * This is the critical duplicate-prevention change.
+       * A generated invoice is NOT another recurring template.
+       */
+      recurring: false,
+
       recurringTemplateId: templateId,
+
+      amountPaid: null,
+
+      statusManuallyOverridden: false,
     });
+
+    generatedKeys.add(generationKey);
   }
 
   return results;
