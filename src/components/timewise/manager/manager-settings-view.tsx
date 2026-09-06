@@ -425,73 +425,229 @@ export function ManagerSettingsView(props: ManagerSettingsViewProps) {
       </Card>
 
       <Card>
-        <CardHeader>
-          <CardTitle>Invoice Settings</CardTitle>
-          <CardDescription>
-            Set the default paid date used when recurring invoices are created.
-            The Paid Date can still be changed on an individual invoice.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-2">
-            <Label>Default Paid Day</Label>
-            <Input
-              type="number"
-              min={1}
-              max={31}
-              value={settings.invoiceSettings?.defaultPaidDay ?? 27}
-              onChange={(e) => {
-                const raw = Number(e.target.value);
-                const day = Math.min(31, Math.max(1, Number.isFinite(raw) ? raw : 27));
+  <CardHeader>
+    <CardTitle>Invoice Settings</CardTitle>
+    <CardDescription>
+      Set the default Due Date and Paid Date used when invoices are created.
+      These dates can still be changed on an individual invoice.
+    </CardDescription>
+  </CardHeader>
 
-                setSettings((s) => ({
-  ...s,
-  invoiceSettings: {
-    defaultPaidDay: day,
-    paidDateMonthOffset:
-      s.invoiceSettings?.paidDateMonthOffset ?? 1,
-  },
-}));
-              }}
-            />
-            <p className="text-xs text-muted-foreground">
-              Choose a day from 1 to 31. If that day does not exist in a month,
-              ManageWiseMD will use the last valid day of that month.
-            </p>
-          </div>
+  <CardContent className="space-y-6">
 
-          <div className="space-y-2">
-            <Label>Paid Date Month</Label>
-            <Select
-              value={String(
-               settings.invoiceSettings?.paidDateMonthOffset ?? 1
-              )}
-              onValueChange={(value) =>
-                setSettings((s) => ({
-  ...s,
-  invoiceSettings: {
-    defaultPaidDay:
-      s.invoiceSettings?.defaultPaidDay ?? 27,
-    paidDateMonthOffset: Number(value) as 0 | 1,
-  },
-}))
-              }
-            >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="0">Same month as the invoice</SelectItem>
-                <SelectItem value="1">Following month</SelectItem>
-              </SelectContent>
-            </Select>
-            <p className="text-xs text-muted-foreground">
-              Example: Day 27 + Following month makes a September invoice default
-              to October 27. Day 3 + Same month makes it default to September 3.
-            </p>
-          </div>
-        </CardContent>
-      </Card>
+    {/* DUE DATE SETTINGS */}
+    <div className="space-y-4">
+      <div>
+        <p className="text-sm font-semibold">
+          Due Date
+        </p>
+        <p className="text-xs text-muted-foreground">
+          Choose when invoices are normally due.
+        </p>
+      </div>
+
+      <div className="space-y-2">
+        <Label>Default Due Day</Label>
+
+        <Input
+          type="number"
+          min={1}
+          max={31}
+          value={
+            settings.invoiceSettings?.defaultDueDay ?? 31
+          }
+          onChange={(e) => {
+            const raw = Number(e.target.value);
+
+            const day = Math.min(
+              31,
+              Math.max(
+                1,
+                Number.isFinite(raw) ? raw : 31
+              )
+            );
+
+            setSettings((s) => ({
+              ...s,
+              invoiceSettings: {
+                defaultPaidDay:
+                  s.invoiceSettings?.defaultPaidDay ?? 27,
+
+                paidDateMonthOffset:
+                  s.invoiceSettings?.paidDateMonthOffset ?? 1,
+
+                defaultDueDay: day,
+
+                dueDateMonthOffset:
+                  s.invoiceSettings?.dueDateMonthOffset ?? 1,
+              },
+            }));
+          }}
+        />
+
+        <p className="text-xs text-muted-foreground">
+          Choose a day from 1 to 31. If that day does
+          not exist in a month, ManageWiseMD will use
+          the last valid day of that month.
+        </p>
+      </div>
+
+      <div className="space-y-2">
+        <Label>Due Date Month</Label>
+
+        <Select
+          value={String(
+            settings.invoiceSettings?.dueDateMonthOffset ?? 1
+          )}
+          onValueChange={(value) =>
+            setSettings((s) => ({
+              ...s,
+              invoiceSettings: {
+                defaultPaidDay:
+                  s.invoiceSettings?.defaultPaidDay ?? 27,
+
+                paidDateMonthOffset:
+                  s.invoiceSettings?.paidDateMonthOffset ?? 1,
+
+                defaultDueDay:
+                  s.invoiceSettings?.defaultDueDay ?? 31,
+
+                dueDateMonthOffset:
+                  Number(value) as 0 | 1,
+              },
+            }))
+          }
+        >
+          <SelectTrigger>
+            <SelectValue />
+          </SelectTrigger>
+
+          <SelectContent>
+            <SelectItem value="0">
+              Same month as the invoice
+            </SelectItem>
+
+            <SelectItem value="1">
+              Following month
+            </SelectItem>
+          </SelectContent>
+        </Select>
+
+        <p className="text-xs text-muted-foreground">
+          Example: Day 31 + Following month makes a
+          September invoice due October 31.
+        </p>
+      </div>
+    </div>
+
+    {/* PAID DATE SETTINGS */}
+    <div className="space-y-4 border-t pt-5">
+      <div>
+        <p className="text-sm font-semibold">
+          Paid Date
+        </p>
+        <p className="text-xs text-muted-foreground">
+          Choose when payment is normally expected.
+        </p>
+      </div>
+
+      <div className="space-y-2">
+        <Label>Default Paid Day</Label>
+
+        <Input
+          type="number"
+          min={1}
+          max={31}
+          value={
+            settings.invoiceSettings?.defaultPaidDay ?? 27
+          }
+          onChange={(e) => {
+            const raw = Number(e.target.value);
+
+            const day = Math.min(
+              31,
+              Math.max(
+                1,
+                Number.isFinite(raw) ? raw : 27
+              )
+            );
+
+            setSettings((s) => ({
+              ...s,
+              invoiceSettings: {
+                defaultPaidDay: day,
+
+                paidDateMonthOffset:
+                  s.invoiceSettings?.paidDateMonthOffset ?? 1,
+
+                defaultDueDay:
+                  s.invoiceSettings?.defaultDueDay ?? 31,
+
+                dueDateMonthOffset:
+                  s.invoiceSettings?.dueDateMonthOffset ?? 1,
+              },
+            }));
+          }}
+        />
+
+        <p className="text-xs text-muted-foreground">
+          Choose a day from 1 to 31. If that day does
+          not exist in a month, ManageWiseMD will use
+          the last valid day of that month.
+        </p>
+      </div>
+
+      <div className="space-y-2">
+        <Label>Paid Date Month</Label>
+
+        <Select
+          value={String(
+            settings.invoiceSettings?.paidDateMonthOffset ?? 1
+          )}
+          onValueChange={(value) =>
+            setSettings((s) => ({
+              ...s,
+              invoiceSettings: {
+                defaultPaidDay:
+                  s.invoiceSettings?.defaultPaidDay ?? 27,
+
+                paidDateMonthOffset:
+                  Number(value) as 0 | 1,
+
+                defaultDueDay:
+                  s.invoiceSettings?.defaultDueDay ?? 31,
+
+                dueDateMonthOffset:
+                  s.invoiceSettings?.dueDateMonthOffset ?? 1,
+              },
+            }))
+          }
+        >
+          <SelectTrigger>
+            <SelectValue />
+          </SelectTrigger>
+
+          <SelectContent>
+            <SelectItem value="0">
+              Same month as the invoice
+            </SelectItem>
+
+            <SelectItem value="1">
+              Following month
+            </SelectItem>
+          </SelectContent>
+        </Select>
+
+        <p className="text-xs text-muted-foreground">
+          Example: Day 27 + Following month makes a
+          September invoice default to October 27.
+          Day 3 + Same month makes it September 3.
+        </p>
+      </div>
+    </div>
+
+  </CardContent>
+</Card>
 
       <Card>
         <CardHeader>

@@ -46,6 +46,9 @@ import { Checkbox } from "@/components/ui/checkbox";
 interface InvoicePaymentSettings {
   defaultPaidDay?: number;
   paidDateMonthOffset?: 0 | 1;
+
+  defaultDueDay?: number;
+  dueDateMonthOffset?: 0 | 1;
 }
 
 interface InvoiceViewProps {
@@ -96,6 +99,54 @@ const getDefaultPaidDate = (
   const safeDay = Math.min(requestedDay, lastDayOfTargetMonth);
 
   return format(new Date(targetYear, targetMonth, safeDay), "yyyy-MM-dd");
+};
+
+const getDefaultDueDate = (
+  serviceOrInvoiceDate?: string | null,
+  invoiceSettings?: InvoicePaymentSettings
+) => {
+  const base = serviceOrInvoiceDate
+    ? parseISO(serviceOrInvoiceDate)
+    : new Date();
+
+  const validBase = isValid(base)
+    ? base
+    : new Date();
+
+  const requestedDay = Math.min(
+    31,
+    Math.max(
+      1,
+      Number(invoiceSettings?.defaultDueDay ?? 31)
+    )
+  );
+
+  const monthOffset =
+    invoiceSettings?.dueDateMonthOffset ?? 1;
+
+  const targetYear = validBase.getFullYear();
+  const targetMonth =
+    validBase.getMonth() + monthOffset;
+
+  const lastDayOfTargetMonth = new Date(
+    targetYear,
+    targetMonth + 1,
+    0
+  ).getDate();
+
+  const safeDay = Math.min(
+    requestedDay,
+    lastDayOfTargetMonth
+  );
+
+  return format(
+    new Date(
+      targetYear,
+      targetMonth,
+      safeDay
+    ),
+    "yyyy-MM-dd"
+  );
 };
 
 const getMonthBounds = (monthISO: string) => {
@@ -270,15 +321,25 @@ const prepareRecurringInvoice = (
   const { invoiceDate, serviceStartDate, serviceEndDate } = getMonthBounds(targetMonthISO);
 
   return {
-    ...invoice,
-    date: invoiceDate,
+  ...invoice,
+  date: invoiceDate,
+  serviceStartDate,
+  serviceEndDate,
+  status: "draft" as Invoice["status"],
+
+  dueDate: getDefaultDueDate(
     serviceStartDate,
-    serviceEndDate,
-    status: "draft" as Invoice["status"],
-    paidDate: getDefaultPaidDate(serviceStartDate, invoiceSettings),
-    amountPaid: null,
-    statusManuallyOverridden: false,
-  } as Omit<Invoice, "id">;
+    invoiceSettings
+  ),
+
+  paidDate: getDefaultPaidDate(
+    serviceStartDate,
+    invoiceSettings
+  ),
+
+  amountPaid: null,
+  statusManuallyOverridden: false,
+} as Omit<Invoice, "id">;
 };
 
 export function InvoiceView({ sites, invoiceSettings }: InvoiceViewProps) {
@@ -454,51 +515,95 @@ if (q) {
   sortBy,
 ]);
 
-  const invoiceKPIs = useMemo(() => {
-    const today = new Date();
-    today.setHours(23, 59, 59, 999);
+  
+   const invoiceKPIs = useMemo(() => {
+  const today = new Date();
+  today.setHours(23, 59, 59, 999);
 
-    return displayedInvoices.reduce(
-      (totals, invoice) => {
-        const amount = withComputed(invoice).total || 0;
-        const status = String(invoice.status);
-        const amountPaid = status === "partially_paid"
-          ? Math.max(0, Number((invoice as any).amountPaid) || 0)
+  return displayedInvoices.reduce(
+    (totals, invoice) => {
+      const amount = withComputed(invoice).total || 0;
+      const status = String(invoice.status);
+
+      const amountPaid =
+        status === "partially_paid"
+          ? Math.max(
+              0,
+              Number((invoice as any).amountPaid) || 0
+            )
           : 0;
-        const balanceDue = Math.max(amount - amountPaid, 0);
 
-        if (status !== "void") {
-          totals.totalInvoiced += amount;
-        }
+      const balanceDue = Math.max(
+        amount - amountPaid,
+        0
+      );
 
-        if (status === "paid") {
-          totals.paid += amount;
-        } else if (status === "partially_paid") {
-          totals.paid += Math.min(amountPaid, amount);
-        }
-
-        if (status !== "paid" && status !== "void") {
-          totals.outstanding += status === "partially_paid" ? balanceDue : amount;
-
-          if (
-            invoice.dueDate &&
-            isValid(parseISO(invoice.dueDate)) &&
-            parseISO(invoice.dueDate).getTime() < today.getTime()
-          ) {
-            totals.overdue += 1;
-          }
-        }
-
-        return totals;
-      },
-      {
-        totalInvoiced: 0,
-        paid: 0,
-        outstanding: 0,
-        overdue: 0,
+      /*
+       * Invoice counts
+       */
+      if (status !== "void") {
+        totals.totalInvoices += 1;
+        totals.totalInvoiced += amount;
       }
-    );
-  }, [displayedInvoices]);
+
+      if (status === "paid") {
+        totals.paidInvoices += 1;
+        totals.paidAmount += amount;
+      }
+
+      if (status === "unpaid") {
+        totals.unpaidInvoices += 1;
+      }
+
+      if (status === "partially_paid") {
+        totals.partiallyPaidInvoices += 1;
+
+        totals.paidAmount += Math.min(
+          amountPaid,
+          amount
+        );
+      }
+
+      /*
+       * Outstanding balance
+       */
+      if (
+        status !== "paid" &&
+        status !== "void"
+      ) {
+        totals.outstandingAmount +=
+          status === "partially_paid"
+            ? balanceDue
+            : amount;
+
+        /*
+         * Overdue invoice count
+         */
+        if (
+          invoice.dueDate &&
+          isValid(parseISO(invoice.dueDate)) &&
+          parseISO(invoice.dueDate).getTime() <
+            today.getTime()
+        ) {
+          totals.overdueInvoices += 1;
+        }
+      }
+
+      return totals;
+    },
+    {
+      totalInvoices: 0,
+      paidInvoices: 0,
+      unpaidInvoices: 0,
+      partiallyPaidInvoices: 0,
+      overdueInvoices: 0,
+
+      totalInvoiced: 0,
+      paidAmount: 0,
+      outstandingAmount: 0,
+    }
+  );
+}, [displayedInvoices]);
 
   const handleGenerateRecurring = () => {
     const newInvoices = generateRecurringInvoicesForMonth({
@@ -543,7 +648,10 @@ if (q) {
           "yyyy-MM-dd"
         ),
         paidDate: getDefaultPaidDate(format(new Date(), "yyyy-MM-01"), invoiceSettings),
-        dueDate: format(new Date(), "yyyy-MM-dd"),
+        dueDate: getDefaultDueDate(
+  format(new Date(), "yyyy-MM-01"),
+  invoiceSettings
+),
         lineItems: [{ id: uuid(), description: "", quantity: 1, unitPrice: 0, total: 0 }],
         status: "draft",
       });
@@ -1267,63 +1375,133 @@ if (q) {
       </CardHeader>
 
       <CardContent className="p-5">
-        <div className="mb-5 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-          <div className="group rounded-2xl border border-emerald-200 bg-gradient-to-br from-emerald-50 to-green-100 p-5 shadow-md transition-all duration-200 hover:-translate-y-1 hover:shadow-xl dark:border-emerald-900 dark:from-emerald-950/40 dark:to-green-950/30">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-emerald-700 dark:text-emerald-300">Total Invoiced</p>
-                <p className="mt-2 text-3xl font-bold tracking-tight text-emerald-900 dark:text-emerald-100">
-                  ${invoiceKPIs.totalInvoiced.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                </p>
-              </div>
-              <div className="rounded-2xl bg-emerald-600 p-3 text-white shadow-lg transition-transform group-hover:scale-110">
-                <DollarSign className="h-6 w-6" />
-              </div>
-            </div>
-          </div>
+       <div className="mb-5 space-y-4">
 
-          <div className="group rounded-2xl border border-blue-200 bg-gradient-to-br from-blue-50 to-sky-100 p-5 shadow-md transition-all duration-200 hover:-translate-y-1 hover:shadow-xl dark:border-blue-900 dark:from-blue-950/40 dark:to-sky-950/30">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-blue-700 dark:text-blue-300">Paid</p>
-                <p className="mt-2 text-3xl font-bold tracking-tight text-blue-900 dark:text-blue-100">
-                  ${invoiceKPIs.paid.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                </p>
-              </div>
-              <div className="rounded-2xl bg-blue-600 p-3 text-white shadow-lg transition-transform group-hover:scale-110">
-                <CheckCircle2 className="h-6 w-6" />
-              </div>
-            </div>
-          </div>
+  {/* Invoice Status Summary */}
+  <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
 
-          <div className="group rounded-2xl border border-amber-200 bg-gradient-to-br from-amber-50 to-orange-100 p-5 shadow-md transition-all duration-200 hover:-translate-y-1 hover:shadow-xl dark:border-amber-900 dark:from-amber-950/40 dark:to-orange-950/30">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-amber-700 dark:text-amber-300">Outstanding</p>
-                <p className="mt-2 text-3xl font-bold tracking-tight text-amber-900 dark:text-amber-100">
-                  ${invoiceKPIs.outstanding.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                </p>
-              </div>
-              <div className="rounded-2xl bg-amber-500 p-3 text-white shadow-lg transition-transform group-hover:scale-110">
-                <Clock3 className="h-6 w-6" />
-              </div>
-            </div>
-          </div>
+    <div className="rounded-xl border bg-white p-4 shadow-sm dark:bg-slate-950">
+      <p className="text-sm text-muted-foreground">
+        Total Invoices
+      </p>
+      <p className="mt-1 text-2xl font-bold">
+        {invoiceKPIs.totalInvoices}
+      </p>
+    </div>
 
-          <div className="group rounded-2xl border border-rose-200 bg-gradient-to-br from-rose-50 to-red-100 p-5 shadow-md transition-all duration-200 hover:-translate-y-1 hover:shadow-xl dark:border-rose-900 dark:from-rose-950/40 dark:to-red-950/30">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-rose-700 dark:text-rose-300">Overdue</p>
-                <p className="mt-2 text-3xl font-bold tracking-tight text-rose-900 dark:text-rose-100">
-                  {invoiceKPIs.overdue} {invoiceKPIs.overdue === 1 ? "invoice" : "invoices"}
-                </p>
-              </div>
-              <div className="rounded-2xl bg-rose-600 p-3 text-white shadow-lg transition-transform group-hover:scale-110">
-                <AlertCircle className="h-6 w-6" />
-              </div>
-            </div>
-          </div>
+    <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 shadow-sm dark:border-emerald-900 dark:bg-emerald-950/30">
+      <p className="text-sm font-medium text-emerald-700 dark:text-emerald-300">
+        Paid
+      </p>
+      <p className="mt-1 text-2xl font-bold text-emerald-800 dark:text-emerald-200">
+        {invoiceKPIs.paidInvoices}
+      </p>
+    </div>
+
+    <div className="rounded-xl border border-orange-200 bg-orange-50 p-4 shadow-sm dark:border-orange-900 dark:bg-orange-950/30">
+      <p className="text-sm font-medium text-orange-700 dark:text-orange-300">
+        Unpaid
+      </p>
+      <p className="mt-1 text-2xl font-bold text-orange-800 dark:text-orange-200">
+        {invoiceKPIs.unpaidInvoices}
+      </p>
+    </div>
+
+    <div className="rounded-xl border border-violet-200 bg-violet-50 p-4 shadow-sm dark:border-violet-900 dark:bg-violet-950/30">
+      <p className="text-sm font-medium text-violet-700 dark:text-violet-300">
+        Partially Paid
+      </p>
+      <p className="mt-1 text-2xl font-bold text-violet-800 dark:text-violet-200">
+        {invoiceKPIs.partiallyPaidInvoices}
+      </p>
+    </div>
+
+    <div className="rounded-xl border border-rose-200 bg-rose-50 p-4 shadow-sm dark:border-rose-900 dark:bg-rose-950/30">
+      <p className="text-sm font-medium text-rose-700 dark:text-rose-300">
+        Overdue
+      </p>
+      <p className="mt-1 text-2xl font-bold text-rose-800 dark:text-rose-200">
+        {invoiceKPIs.overdueInvoices}
+      </p>
+    </div>
+
+  </div>
+
+  {/* Financial Summary */}
+  <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+
+    <div className="rounded-2xl border border-emerald-200 bg-gradient-to-br from-emerald-50 to-green-100 p-5 shadow-md dark:border-emerald-900 dark:from-emerald-950/40 dark:to-green-950/30">
+      <div className="flex items-center justify-between">
+        <div>
+          <p className="text-sm font-medium text-emerald-700 dark:text-emerald-300">
+            Total Invoiced
+          </p>
+
+          <p className="mt-2 text-3xl font-bold text-emerald-900 dark:text-emerald-100">
+            $
+            {invoiceKPIs.totalInvoiced.toLocaleString(
+              undefined,
+              {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2,
+              }
+            )}
+          </p>
         </div>
+
+        <DollarSign className="h-7 w-7 text-emerald-600" />
+      </div>
+    </div>
+
+    <div className="rounded-2xl border border-blue-200 bg-gradient-to-br from-blue-50 to-sky-100 p-5 shadow-md dark:border-blue-900 dark:from-blue-950/40 dark:to-sky-950/30">
+      <div className="flex items-center justify-between">
+        <div>
+          <p className="text-sm font-medium text-blue-700 dark:text-blue-300">
+            Paid Amount
+          </p>
+
+          <p className="mt-2 text-3xl font-bold text-blue-900 dark:text-blue-100">
+            $
+            {invoiceKPIs.paidAmount.toLocaleString(
+              undefined,
+              {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2,
+              }
+            )}
+          </p>
+        </div>
+
+        <CheckCircle2 className="h-7 w-7 text-blue-600" />
+      </div>
+    </div>
+
+    <div className="rounded-2xl border border-amber-200 bg-gradient-to-br from-amber-50 to-orange-100 p-5 shadow-md dark:border-amber-900 dark:from-amber-950/40 dark:to-orange-950/30">
+      <div className="flex items-center justify-between">
+        <div>
+          <p className="text-sm font-medium text-amber-700 dark:text-amber-300">
+            Outstanding Amount
+          </p>
+
+          <p className="mt-2 text-3xl font-bold text-amber-900 dark:text-amber-100">
+            $
+            {invoiceKPIs.outstandingAmount.toLocaleString(
+              undefined,
+              {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2,
+              }
+            )}
+          </p>
+        </div>
+
+        <Clock3 className="h-7 w-7 text-amber-600" />
+      </div>
+    </div>
+
+  </div>
+
+</div>
         <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-lg dark:border-slate-800 dark:bg-slate-950">
         <ScrollArea className="h-96">
           <Table>

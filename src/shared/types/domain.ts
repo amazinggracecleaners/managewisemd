@@ -356,9 +356,14 @@ enableMapDisplay?: boolean;
   // { defaultPaidDay: 27, paidDateMonthOffset: 1 } = 27th of following month
   // { defaultPaidDay: 3, paidDateMonthOffset: 0 } = 3rd of same month
   invoiceSettings?: {
-    defaultPaidDay: number; // 1-31
-    paidDateMonthOffset: 0 | 1; // 0 = same month, 1 = following month
-  };
+  // Expected payment date
+  defaultPaidDay: number; // 1-31
+  paidDateMonthOffset: 0 | 1; // 0 = same month, 1 = following month
+
+  // Invoice due date
+  defaultDueDay?: number; // 1-31
+  dueDateMonthOffset?: 0 | 1; // 0 = same month, 1 = following month
+};
 
   requireGeofence: boolean;
   requireClockOutGeofence?: boolean;
