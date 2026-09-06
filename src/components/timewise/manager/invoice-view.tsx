@@ -109,6 +109,159 @@ const getMonthBounds = (monthISO: string) => {
   };
 };
 
+const isoToDisplayDate = (value?: string | null) => {
+  if (!value) return "";
+
+  const match = value.match(
+    /^(\d{4})-(\d{2})-(\d{2})$/
+  );
+
+  if (!match) return value;
+
+  const [, year, month, day] = match;
+
+  return `${month}/${day}/${year}`;
+};
+
+const flexibleDateToISO = (
+  value: string
+): string | null => {
+  const trimmed = value.trim();
+
+  if (!trimmed) return null;
+
+  // Already yyyy-MM-dd
+  const isoMatch = trimmed.match(
+    /^(\d{4})-(\d{2})-(\d{2})$/
+  );
+
+  if (isoMatch) {
+    const [, year, month, day] = isoMatch;
+
+    const candidate =
+      `${year}-${month}-${day}`;
+
+    return isValid(parseISO(candidate))
+      ? candidate
+      : null;
+  }
+
+  // MM/DD/YYYY
+  const slashMatch = trimmed.match(
+    /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/
+  );
+
+  if (slashMatch) {
+    const [, monthRaw, dayRaw, year] =
+      slashMatch;
+
+    const month = monthRaw.padStart(2, "0");
+    const day = dayRaw.padStart(2, "0");
+
+    const candidate =
+      `${year}-${month}-${day}`;
+
+    return isValid(parseISO(candidate))
+      ? candidate
+      : null;
+  }
+
+  // MMDDYYYY — example 09062026
+  const numberMatch = trimmed.match(
+    /^(\d{2})(\d{2})(\d{4})$/
+  );
+
+  if (numberMatch) {
+    const [, month, day, year] =
+      numberMatch;
+
+    const candidate =
+      `${year}-${month}-${day}`;
+
+    return isValid(parseISO(candidate))
+      ? candidate
+      : null;
+  }
+
+  return null;
+};
+
+function FlexibleDateInput({
+  id,
+  value,
+  onChange,
+  allowEmpty = false,
+}: {
+  id: string;
+  value?: string | null;
+  onChange: (value: string | null) => void;
+  allowEmpty?: boolean;
+}) {
+  const [textValue, setTextValue] =
+    useState(() => isoToDisplayDate(value));
+
+  useEffect(() => {
+    setTextValue(isoToDisplayDate(value));
+  }, [value]);
+
+  const commitTypedDate = () => {
+    if (!textValue.trim() && allowEmpty) {
+      onChange(null);
+      return;
+    }
+
+    const iso = flexibleDateToISO(textValue);
+
+    if (!iso) {
+      setTextValue(isoToDisplayDate(value));
+      return;
+    }
+
+    setTextValue(isoToDisplayDate(iso));
+    onChange(iso);
+  };
+
+  return (
+    <div className="flex gap-2">
+      <Input
+        id={id}
+        type="text"
+        inputMode="numeric"
+        placeholder="MM/DD/YYYY"
+        value={textValue}
+        onChange={(e) =>
+          setTextValue(e.target.value)
+        }
+        onBlur={commitTypedDate}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") {
+            e.preventDefault();
+            commitTypedDate();
+          }
+        }}
+        className="min-w-0 flex-1"
+      />
+
+      <Input
+        type="date"
+        aria-label={`${id} calendar`}
+        value={value || ""}
+        onChange={(e) => {
+          const next =
+            e.target.value || null;
+
+          setTextValue(
+            isoToDisplayDate(next)
+          );
+
+          onChange(next);
+        }}
+        className="w-36"
+      />
+    </div>
+  );
+}
+
 const prepareRecurringInvoice = (
   invoice: Omit<Invoice, "id">,
   targetMonthISO: string,
@@ -663,31 +816,35 @@ if (q) {
                       <div className="grid grid-cols-1 gap-4 md:grid-cols-5">
                       <div className="space-y-2">
                         <Label htmlFor="date">Date</Label>
-                        <Input
-                          id="date"
-                          type="date"
-                          value={draftInvoice.date}
-                          onChange={(e) => setDraftInvoice((prev) => ({ ...prev, date: e.target.value }))}
-                        />
+                        <FlexibleDateInput
+  id="date"
+  value={draftInvoice.date || ""}
+  onChange={(date) =>
+    setDraftInvoice((prev) => ({
+      ...prev,
+      date: date || "",
+    }))
+  }
+/>
                       </div>
 <div className="space-y-2">
   <Label htmlFor="serviceStartDate">
     Service Start
   </Label>
 
-  <Input
-    id="serviceStartDate"
-    type="date"
-    value={(draftInvoice as any).serviceStartDate || ""}
-    onChange={(e) => {
-      const serviceStartDate = e.target.value;
-
-      setDraftInvoice((prev) => ({
-        ...prev,
-        serviceStartDate,
-      }));
-    }}
-  />
+  <FlexibleDateInput
+  id="serviceStartDate"
+  value={
+    (draftInvoice as any)
+      .serviceStartDate || ""
+  }
+  onChange={(serviceStartDate) =>
+    setDraftInvoice((prev) => ({
+      ...prev,
+      serviceStartDate,
+    }))
+  }
+/>
 </div>
 
 <div className="space-y-2">
@@ -695,53 +852,64 @@ if (q) {
     Service End
   </Label>
 
-  <Input
-    id="serviceEndDate"
-    type="date"
-    value={(draftInvoice as any).serviceEndDate || ""}
-    onChange={(e) =>
-      setDraftInvoice((prev) => ({
-        ...prev,
-        serviceEndDate: e.target.value,
-      }))
-    }
-  />
+  <FlexibleDateInput
+  id="serviceEndDate"
+  value={
+    (draftInvoice as any)
+      .serviceEndDate || ""
+  }
+  onChange={(serviceEndDate) =>
+    setDraftInvoice((prev) => ({
+      ...prev,
+      serviceEndDate,
+    }))
+  }
+/>
 </div>
                       <div className="space-y-2">
                         <Label htmlFor="dueDate">Due Date</Label>
-                        <Input
-                          id="dueDate"
-                          type="date"
-                          value={draftInvoice.dueDate}
-                          onChange={(e) => setDraftInvoice((prev) => ({ ...prev, dueDate: e.target.value }))}
-                        />
+                        <FlexibleDateInput
+  id="dueDate"
+  value={draftInvoice.dueDate || ""}
+  onChange={(dueDate) =>
+    setDraftInvoice((prev) => ({
+      ...prev,
+      dueDate: dueDate || "",
+    }))
+  }
+/>
                       </div>
 <div className="space-y-2">
   <Label htmlFor="paidDate">Paid Date</Label>
 
-  <Input
-    id="paidDate"
-    type="date"
-    value={(draftInvoice as any).paidDate || ""}
-    onChange={(e) => {
-      const paidDate = e.target.value || null;
+  <FlexibleDateInput
+  id="paidDate"
+  value={
+    (draftInvoice as any)
+      .paidDate || ""
+  }
+  allowEmpty
+  onChange={(paidDate) => {
+    setDraftInvoice((prev) => ({
+      ...prev,
 
-      setDraftInvoice((prev) => ({
-        ...prev,
-        paidDate,
-        // The generated Paid Date is only a default. The manager can change it
-        // directly on this invoice without any separate override flag.
-        // Editing the Paid Date re-enables the automatic date-based status rule.
-        statusManuallyOverridden: false,
-        status:
-          paidDate && hasPaidDateArrived(paidDate)
-            ? ("paid" as Invoice["status"])
-            : String(prev.status) === "paid"
-              ? ("unpaid" as Invoice["status"])
-              : prev.status,
-      } as any));
-    }}
-  />
+      paidDate,
+
+      // Manager changed the Paid Date.
+      // Allow automatic date-based status
+      // logic to apply again.
+      statusManuallyOverridden: false,
+
+      status:
+        paidDate &&
+        hasPaidDateArrived(paidDate)
+          ? ("paid" as Invoice["status"])
+          : String(prev.status) === "paid"
+            ? ("unpaid" as Invoice["status"])
+            : prev.status,
+    } as any));
+  }}
+/>
 </div>
 
 <div className="space-y-2">
@@ -972,17 +1140,17 @@ if (q) {
 
                           <div className="space-y-1">
                             <Label htmlFor="recurringEnd">End date (optional)</Label>
-                            <Input
-                              id="recurringEnd"
-                              type="date"
-                              value={draftInvoice.recurringEnd ?? ""}
-                              onChange={(e) =>
-                                setDraftInvoice((prev) => ({
-                                  ...prev,
-                                  recurringEnd: e.target.value || null,
-                                }))
-                              }
-                            />
+                            <FlexibleDateInput
+  id="recurringEnd"
+  value={draftInvoice.recurringEnd ?? ""}
+  allowEmpty
+  onChange={(recurringEnd) =>
+    setDraftInvoice((prev) => ({
+      ...prev,
+      recurringEnd,
+    }))
+  }
+/>
                             <p className="text-xs text-muted-foreground">
                               Leave empty to keep repeating until you turn it off.
                             </p>
