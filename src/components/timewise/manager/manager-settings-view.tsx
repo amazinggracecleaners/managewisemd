@@ -135,10 +135,10 @@ export function ManagerSettingsView(props: ManagerSettingsViewProps) {
 
   return (
     <div className="grid grid-cols-1 gap-5 rounded-3xl bg-gradient-to-br from-slate-50 via-blue-50/40 to-violet-50/50 p-5 lg:grid-cols-2 dark:from-slate-950 dark:via-blue-950/20 dark:to-violet-950/20">
-      <Card>
-        <CardHeader>
-          <CardTitle>Data Storage Mode</CardTitle>
-          <CardDescription>
+      <Card className="overflow-hidden border-0 bg-white shadow-xl ring-1 ring-cyan-100 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-2xl dark:bg-slate-950 dark:ring-cyan-900/50">
+        <CardHeader className="bg-gradient-to-r from-cyan-600 via-sky-600 to-blue-600 text-white">
+          <CardTitle className="text-xl font-bold text-white">Data Storage Mode</CardTitle>
+          <CardDescription className="text-cyan-100">
             Select where this device stores and syncs company data.
           </CardDescription>
         </CardHeader>
@@ -192,10 +192,10 @@ export function ManagerSettingsView(props: ManagerSettingsViewProps) {
         </CardContent>
       </Card>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Manager access</CardTitle>
-          <CardDescription>Protect the Manager view with a simple PIN.</CardDescription>
+      <Card className="overflow-hidden border-0 bg-white shadow-xl ring-1 ring-violet-100 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-2xl dark:bg-slate-950 dark:ring-violet-900/50">
+        <CardHeader className="bg-gradient-to-r from-violet-600 via-purple-600 to-fuchsia-600 text-white">
+          <CardTitle className="text-xl font-bold text-white">Manager access</CardTitle>
+          <CardDescription className="text-violet-100">Protect the Manager view with a simple PIN.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="flex items-center justify-between gap-4">
@@ -233,10 +233,10 @@ export function ManagerSettingsView(props: ManagerSettingsViewProps) {
         </CardContent>
       </Card>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Clock-in rules</CardTitle>
-          <CardDescription>
+      <Card className="overflow-hidden border-0 bg-white shadow-xl ring-1 ring-emerald-100 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-2xl dark:bg-slate-950 dark:ring-emerald-900/50">
+        <CardHeader className="bg-gradient-to-r from-emerald-600 via-green-600 to-teal-600 text-white">
+          <CardTitle className="text-xl font-bold text-white">Clock-in rules</CardTitle>
+          <CardDescription className="text-emerald-100">
             Control how employees clock in and how strict location checks are.
           </CardDescription>
         </CardHeader>
@@ -317,10 +317,10 @@ export function ManagerSettingsView(props: ManagerSettingsViewProps) {
       </Card>
 
       {/* ✅ NEW: TEAMS MANAGER */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Teams</CardTitle>
-          <CardDescription>
+      <Card className="overflow-hidden border-0 bg-white shadow-xl ring-1 ring-amber-100 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-2xl dark:bg-slate-950 dark:ring-amber-900/50">
+        <CardHeader className="bg-gradient-to-r from-amber-500 via-orange-500 to-rose-500 text-white">
+          <CardTitle className="text-xl font-bold text-white">Teams</CardTitle>
+          <CardDescription className="text-amber-50">
             Create teams to group employees and assign schedules to a team.
           </CardDescription>
         </CardHeader>
@@ -390,10 +390,10 @@ export function ManagerSettingsView(props: ManagerSettingsViewProps) {
         </CardContent>
       </Card>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>General</CardTitle>
-          <CardDescription>General application settings.</CardDescription>
+      <Card className="overflow-hidden border-0 bg-white shadow-xl ring-1 ring-slate-200 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-2xl dark:bg-slate-950 dark:ring-slate-800">
+        <CardHeader className="bg-gradient-to-r from-slate-700 via-slate-600 to-blue-700 text-white">
+          <CardTitle className="text-xl font-bold text-white">General</CardTitle>
+          <CardDescription className="text-slate-200">General application settings.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-2">
@@ -671,10 +671,10 @@ export function ManagerSettingsView(props: ManagerSettingsViewProps) {
   </CardContent>
 </Card>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Financials</CardTitle>
-          <CardDescription>Settings related to payroll and expenses.</CardDescription>
+      <Card className="overflow-hidden border-0 bg-white shadow-xl ring-1 ring-emerald-100 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-2xl dark:bg-slate-950 dark:ring-emerald-900/50">
+        <CardHeader className="bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-600 text-white">
+          <CardTitle className="text-xl font-bold text-white">Financials</CardTitle>
+          <CardDescription className="text-emerald-100">Settings related to payroll and expenses.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-2">
@@ -693,11 +693,11 @@ export function ManagerSettingsView(props: ManagerSettingsViewProps) {
           </div>
         </CardContent>
       </Card>
-<Card>
-  <CardHeader>
-    <CardTitle>Route Optimization</CardTitle>
+<Card className="overflow-hidden border-0 bg-white shadow-xl ring-1 ring-indigo-100 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-2xl dark:bg-slate-950 dark:ring-indigo-900/50">
+  <CardHeader className="bg-gradient-to-r from-cyan-600 via-blue-600 to-indigo-600 text-white">
+    <CardTitle className="text-xl font-bold text-white">Route Optimization</CardTitle>
 
-    <CardDescription>
+    <CardDescription className="text-cyan-100">
       Configure route tools for employees working multiple sites in one day.
     </CardDescription>
   </CardHeader>
@@ -792,10 +792,10 @@ export function ManagerSettingsView(props: ManagerSettingsViewProps) {
     </div>
   </CardContent>
 </Card>
-      <Card>
-        <CardHeader>
-          <CardTitle>Backup & maintenance</CardTitle>
-          <CardDescription>
+      <Card className="overflow-hidden border-0 bg-white shadow-xl ring-1 ring-slate-200 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-2xl dark:bg-slate-950 dark:ring-slate-800">
+        <CardHeader className="bg-gradient-to-r from-slate-700 via-gray-700 to-zinc-700 text-white">
+          <CardTitle className="text-xl font-bold text-white">Backup & maintenance</CardTitle>
+          <CardDescription className="text-slate-200">
             Save settings, restore them, or rebuild sites from existing data.
           </CardDescription>
         </CardHeader>
