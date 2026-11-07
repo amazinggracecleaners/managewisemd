@@ -451,7 +451,7 @@ export function EmployeePayrollView({
 }: EmployeePayrollViewProps) {
   const [submittingFor, setSubmittingFor] = useState<string | null>(null);
   const [pdfFor, setPdfFor] = useState<string | null>(null);
-  const paystubRef = useRef<HTMLDivElement | null>(null);
+  const paystubRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
   const handleViewTimesheet = onViewTimesheet ?? (() => {});
 
@@ -489,42 +489,62 @@ export function EmployeePayrollView({
   employeeData: PayrollLineItem;
 }) => {
   const { period } = args;
+  const element = paystubRefs.current[period.id];
 
-  if (!paystubRef.current) return;
+  if (!element || pdfFor) return;
 
   setPdfFor(period.id);
 
   try {
-    const canvas = await html2canvas(paystubRef.current, {
-      scale: 10,
+    const paystub = element.firstElementChild as HTMLElement | null;
+
+    if (!paystub) {
+      throw new Error("Paystub content not found.");
+    }
+
+    if (document.fonts?.ready) {
+      await document.fonts.ready;
+    }
+
+    const width = Math.ceil(
+      Math.max(paystub.scrollWidth, paystub.getBoundingClientRect().width)
+    );
+    const height = Math.ceil(
+      Math.max(paystub.scrollHeight, paystub.getBoundingClientRect().height)
+    );
+
+    const canvas = await html2canvas(paystub, {
+      scale: 2,
       backgroundColor: "#ffffff",
       useCORS: true,
-      windowWidth: paystubRef.current.scrollWidth,
+      width,
+      height,
+      windowWidth: Math.max(document.documentElement.clientWidth, width),
+      scrollX: 0,
+      scrollY: 0,
     });
 
-    const imgData = canvas.toDataURL("image/png");
     const pdf = new jsPDF("p", "mm", "a4");
-
     const pageWidth = pdf.internal.pageSize.getWidth();
-const pageHeight = pdf.internal.pageSize.getHeight();
+    const pageHeight = pdf.internal.pageSize.getHeight();
+    const margin = 5;
 
-/* Bigger printable size */
-let imgWidth = 200; // increase size here
-let imgHeight = (canvas.height * imgWidth) / canvas.width;
+    const ratio = Math.min(
+      (pageWidth - margin * 2) / canvas.width,
+      (pageHeight - margin * 2) / canvas.height
+    );
 
-/* If too tall, reduce slightly */
-if (imgHeight > 280) {
-  imgHeight = 280;
-  imgWidth = (canvas.width * imgHeight) / canvas.height;
-}
+    const imgWidth = canvas.width * ratio;
+    const imgHeight = canvas.height * ratio;
+    const x = (pageWidth - imgWidth) / 2;
 
-/* Center horizontally, top aligned */
-const x = (pageWidth - imgWidth) / 2;
-const y = 5;
-
-    pdf.addImage(imgData, "PNG", x, y, imgWidth, imgHeight);
+    const imgData = canvas.toDataURL("image/jpeg", 0.92);
+    pdf.addImage(imgData, "JPEG", x, margin, imgWidth, imgHeight);
 
     pdf.save(`paystub_${employee.id}_${period.id}.pdf`);
+  } catch (error) {
+    console.error("Paystub PDF download failed:", error);
+    alert("Unable to download the paystub. Please try again.");
   } finally {
     setPdfFor(null);
   }
@@ -826,8 +846,10 @@ const y = 5;
                       <div className="space-y-5 pb-6">
                         <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-slate-50 p-2 shadow-inner dark:border-slate-800 dark:bg-slate-900/60 sm:p-3">
   <div
-    ref={paystubRef}
-    className="min-w-[760px] origin-top-left"
+    ref={(node) => {
+      paystubRefs.current[period.id] = node;
+    }}
+    className="min-w-[980px] origin-top-left"
   >
                             <PaystubCard
                               companyName={
