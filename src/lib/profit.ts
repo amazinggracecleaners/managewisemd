@@ -567,8 +567,6 @@ if (groupedSiteNames.length > 1) {
     siteRow.other += e.amount || 0;
   }
 
-  
-
   // Net & rounding
   for (const r of rows.values()) {
     r.net = round2(r.serviceCharge - r.labor - r.mileage - r.other);
@@ -609,7 +607,26 @@ if (groupedSiteNames.length > 1) {
 
 function safeDate(d?: string | number | Date) {
   if (!d) return 0;
+
   try {
+    if (
+      typeof d === "string" &&
+      /^\d{4}-\d{2}-\d{2}$/.test(d)
+    ) {
+      const [year, month, day] = d.split("-").map(Number);
+      const localDate = new Date(year, month - 1, day);
+
+      if (
+        localDate.getFullYear() !== year ||
+        localDate.getMonth() !== month - 1 ||
+        localDate.getDate() !== day
+      ) {
+        return 0;
+      }
+
+      return localDate.getTime();
+    }
+
     const ts = new Date(d as any).getTime();
     return isFinite(ts) ? ts : 0;
   } catch {
