@@ -506,23 +506,50 @@ export function EmployeePayrollView({
       await document.fonts.ready;
     }
 
-    const width = Math.ceil(
-      Math.max(paystub.scrollWidth, paystub.getBoundingClientRect().width)
-    );
-    const height = Math.ceil(
-      Math.max(paystub.scrollHeight, paystub.getBoundingClientRect().height)
-    );
+    // Render a temporary full-width copy for mobile-safe PDF capture.
+    const captureHost = document.createElement("div");
+    captureHost.setAttribute("data-paystub-pdf-capture", "true");
+    captureHost.style.cssText =
+      "position:fixed;left:0;top:0;width:1180px;" +
+      "background:#ffffff;z-index:-1;pointer-events:none;";
 
-    const canvas = await html2canvas(paystub, {
-      scale: 2,
-      backgroundColor: "#ffffff",
-      useCORS: true,
-      width,
-      height,
-      windowWidth: Math.max(document.documentElement.clientWidth, width),
-      scrollX: 0,
-      scrollY: 0,
-    });
+    const capturePaystub = paystub.cloneNode(true) as HTMLElement;
+    capturePaystub.style.width = "1180px";
+    capturePaystub.style.minWidth = "1180px";
+    capturePaystub.style.maxWidth = "1180px";
+    capturePaystub.style.margin = "0";
+    capturePaystub.style.overflow = "visible";
+
+    captureHost.appendChild(capturePaystub);
+    document.body.appendChild(captureHost);
+
+    let canvas: HTMLCanvasElement;
+
+    try {
+      const width = Math.ceil(capturePaystub.scrollWidth);
+      const height = Math.ceil(capturePaystub.scrollHeight);
+
+      canvas = await html2canvas(capturePaystub, {
+        scale: 2,
+        backgroundColor: "#ffffff",
+        useCORS: true,
+        width,
+        height,
+        windowWidth: 1400,
+        scrollX: 0,
+        scrollY: 0,
+        onclone: (clonedDocument) => {
+          const host = clonedDocument.querySelector(
+            '[data-paystub-pdf-capture="true"]'
+          ) as HTMLElement | null;
+          if (host) {
+            host.style.zIndex = "1";
+          }
+        },
+      });
+    } finally {
+      captureHost.remove();
+    }
 
     const pdf = new jsPDF("p", "mm", "a4");
     const pageWidth = pdf.internal.pageSize.getWidth();
