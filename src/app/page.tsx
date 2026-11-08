@@ -1324,7 +1324,7 @@ if (!isManagerOverride) {
   }
 
   if (!isManagerOverride) {
-    if (settings.requireGPS && !currentCoord) {
+    if (settings.requireGPS || settings.requireGeofence) {
       toast({
         title: "Location required",
         description: "Getting your location to verify...",
@@ -1332,7 +1332,7 @@ if (!isManagerOverride) {
       currentCoord = await requestLocation();
     }
 
-    if (settings.requireGPS && !currentCoord) {
+    if ((settings.requireGPS || settings.requireGeofence) && !currentCoord) {
       toast({
         variant: "destructive",
         title: "Clock-in denied",
@@ -1402,7 +1402,21 @@ if (!isManagerOverride) {
     if (engine === "cloud") {
       const cId = getCompanyId(settings);
       const ref = collection(db, "companies", cId, "timeclock_entries");
-      await addDoc(ref, { ...dataToSave, createdAt: serverTimestamp() });
+      try {
+        await addDoc(ref, { ...dataToSave, createdAt: serverTimestamp() });
+      } catch (error: any) {
+        console.error("[TIMECLOCK] Save failed:", error);
+        const code = String(error?.code || "");
+        toast({
+          variant: "destructive",
+          title: `Clock-${action === "in" ? "in" : "out"} could not be confirmed`,
+          description: code === "permission-denied"
+            ? "Permission to save your time entry was denied. Please contact your manager."
+            : "The system could not confirm whether your time entry was saved. Check your clock status before retrying. Contact your manager if unsure.",
+          duration: 12000,
+        });
+        return;
+      }
        /*
    * The first completed service for this site during the month
    * creates its monthly R/S Fee and Other Fee expenses.
