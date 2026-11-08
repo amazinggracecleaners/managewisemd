@@ -695,7 +695,7 @@ const openFixShiftModal = (data: {
   setFixIn(toInput(inEntry?.ts));
   setFixOut(toInput(outEntry?.ts));
 };
-   
+
   const handleOpenDialog = (
     schedule: CleaningSchedule | null = null,
     occurrenceDate?: Date
@@ -777,7 +777,7 @@ setSiteServiceCharges({});
     setIsDialogOpen(true);
   };
 
- 
+
  const handleSubmit = async () => {
   if (
   selectedSiteNames.length === 0 ||
@@ -1181,7 +1181,7 @@ siteServiceCharges:
     setCurrentDate((prev) => add(prev, { [unit + "s"]: amount } as any));
   };
 
- 
+
 const handleManagerClock = useCallback(
   async (
     action: "in" | "out",
@@ -1464,7 +1464,7 @@ const dailySiteCount = new Set(
   filteredDailySchedules.map((s) => s.siteName)
 ).size;
 
-  
+
 
   const { completeCount, incompleteCount, inProcessCount } = useMemo(() => {
     const siteNamesForToday = new Set(filteredDailySchedules.map((s) => s.siteName));
@@ -1703,7 +1703,121 @@ const getScheduleHours = useCallback(
   [entries]
 );
 
- const handleDeleteScheduleChoice = (
+ const calculateWorkloadSummary = (dates: Date[]) => {
+   let estimatedMinutes = 0;
+   let workedMinutes = 0;
+    const byEmployee: Record<string, number> = {};
+
+   for (const date of dates) {
+     const daySchedules = getSchedulesForDate(date);
+
+     for (const schedule of daySchedules) {
+       estimatedMinutes += getScheduleEstimatedMinutes(schedule, sites);
+     }
+
+     const dailyDurations = getDurationsBySite(date);
+
+     for (const duration of dailyDurations.values()) {
+       workedMinutes += duration.minutes;
+        for (const [employeeId, minutes] of Object.entries(duration.byEmployee)) {
+          byEmployee[employeeId] = (byEmployee[employeeId] || 0) + minutes;
+        }
+     }
+   }
+
+   return {
+     estimatedMinutes,
+     workedMinutes,
+     differenceMinutes: workedMinutes - estimatedMinutes,
+      byEmployee,
+   };
+ };
+ const dailyWorkload = calculateWorkloadSummary([currentDate]);
+ const weeklyWorkload = calculateWorkloadSummary(daysInWeek);
+ const monthlyWorkload = calculateWorkloadSummary(daysInMonth);
+  const renderEmployeeHours = (byEmployee: Record<string, number>) => {
+    const rows = Object.entries(byEmployee)
+      .filter(([, minutes]) => minutes > 0)
+      .sort((a, b) => b[1] - a[1]);
+
+    return (
+      <div className="mt-4 overflow-hidden rounded-2xl border border-sky-200/70 bg-gradient-to-br from-sky-50/80 via-white to-violet-50/70 p-4 shadow-sm dark:border-slate-700 dark:from-sky-950/30 dark:via-slate-950 dark:to-violet-950/30">
+        <div className="mb-4 flex items-center gap-3">
+          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-sky-500 to-violet-600 text-white shadow-sm">
+            <span className="text-lg font-bold">H</span>
+          </div>
+          <div>
+            <h3 className="text-base font-bold tracking-tight text-slate-900 dark:text-slate-100">
+              Individual Employee Hours
+            </h3>
+            <p className="text-xs text-muted-foreground">
+              Recorded hours for the selected period
+            </p>
+          </div>
+        </div>
+
+        {rows.length === 0 ? (
+          <div className="rounded-xl border border-dashed border-slate-300 bg-white/70 p-4 text-sm text-muted-foreground dark:border-slate-700 dark:bg-slate-900/50">
+            No recorded employee hours for this period.
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {rows.map(([employeeId, minutes], index) => {
+              const employeeName =
+                employeeById.get(employeeId)?.name ??
+                entries.find((e) => e.employeeId === employeeId)?.employee ??
+                `Employee ${employeeId}`;
+
+              const initials = employeeName
+                .trim()
+                .split(/\s+/)
+                .slice(0, 2)
+                .map((part) => part.charAt(0).toUpperCase())
+                .join("");
+
+              const isBlue = index % 2 === 0;
+
+              return (
+                <div
+                  key={employeeId}
+                  className={`flex flex-wrap items-center justify-between gap-3 rounded-xl border px-3 py-3 shadow-sm ${
+                    isBlue
+                      ? "border-sky-200/80 bg-sky-100/70 dark:border-sky-800/60 dark:bg-sky-950/40"
+                      : "border-violet-200/80 bg-violet-100/70 dark:border-violet-800/60 dark:bg-violet-950/40"
+                  }`}
+                >
+                  <div className="flex min-w-0 items-center gap-3">
+                    <span
+                      className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-xs font-bold ${
+                        isBlue
+                          ? "bg-sky-200 text-sky-900 dark:bg-sky-800 dark:text-sky-100"
+                          : "bg-violet-200 text-violet-900 dark:bg-violet-800 dark:text-violet-100"
+                      }`}
+                    >
+                      {initials}
+                    </span>
+                    <span className="break-words text-sm font-semibold text-slate-800 dark:text-slate-100">
+                      {employeeName}
+                    </span>
+                  </div>
+                  <span
+                    className={`shrink-0 rounded-full border px-3 py-1.5 text-sm font-bold tabular-nums shadow-sm ${
+                      isBlue
+                        ? "border-sky-200 bg-white/90 text-sky-800 dark:border-sky-700 dark:bg-slate-900 dark:text-sky-200"
+                        : "border-violet-200 bg-white/90 text-violet-800 dark:border-violet-700 dark:bg-slate-900 dark:text-violet-200"
+                    }`}
+                  >
+                    {formatHHMM(minutes)}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    );
+  };
+const handleDeleteScheduleChoice = (
   scope: "single" | "future" | "series"
 ) => {
   const schedule = deleteTarget.schedule;
@@ -1746,7 +1860,7 @@ const getScheduleHours = useCallback(
       </Badge>
     );
   }
-  
+
 
   return (
     <div className="flex flex-wrap gap-1">
@@ -2607,7 +2721,11 @@ const getScheduleHours = useCallback(
               </div>
             </CardHeader>
 
-            <CardContent className="px-5 py-4">
+
+<CardContent className="pt-4 pb-0">
+  {renderEmployeeHours(dailyWorkload.byEmployee)}
+</CardContent>
+<CardContent className="px-5 py-4">
                         <div
   className="
     mb-4 flex flex-wrap items-center gap-3
@@ -3076,11 +3194,11 @@ style={{
 </div>
 
               <ScrollArea className="h-[60vh]">
-      
+
                      {filteredDailySchedules.length > 0 ? (
-          
+
                   <div className="space-y-4">
-        
+
                     {filteredDailySchedules.map((s) => {
                       const site = sites.find((x) => x.name === s.siteName);
                       const status = dailyStatuses.get(s.siteName);
@@ -3100,11 +3218,11 @@ style={{
     border border-slate-200/90
     bg-white shadow-sm transition-all
     hover:-translate-y-0.5
-    
+
     hover:shadow-[0_14px_35px_rgba(15,23,42,0.10)]
     dark:border-slate-800
     dark:bg-slate-950
-    
+
   "
   style={{
   borderLeftWidth: "6px",
@@ -3299,7 +3417,7 @@ const displayTime =
     )
   );
 });
-                                
+
 
 const employeeCompletedThisSite = entries.some((e) => {
   if (e.employeeId !== emp.id) return false;
@@ -3363,7 +3481,7 @@ const siteScheduleCompleted = entries.some((e) => {
     format(currentDate, "yyyy-MM-dd")
   )
 }
- 
+
                                         >
                                           <LogOut className="mr-1 h-4 w-4" />
                                           Clock Out
@@ -3379,13 +3497,13 @@ const siteScheduleCompleted = entries.some((e) => {
   s.id,
   format(currentDate, "yyyy-MM-dd")
 )}
-   
+
                                          disabled={employeeCompletedThisSite || siteScheduleCompleted}
                                         >
                                           <LogIn className="mr-1 h-4 w-4" />
                                           Clock In
                                         </Button>
-                                       
+
                                       )}
                                        <Button
   variant="outline"
@@ -3415,7 +3533,7 @@ const siteScheduleCompleted = entries.some((e) => {
                   <div className="flex items-center justify-center h-48 text-muted-foreground">
                     No tasks scheduled for this day.
                   </div>
-             
+
                 )}
               </ScrollArea>
             </CardContent>
@@ -3461,7 +3579,11 @@ const siteScheduleCompleted = entries.some((e) => {
               </div>
             </CardHeader>
 
-            <CardContent>
+
+<CardContent className="pt-4 pb-0">
+  {renderEmployeeHours(weeklyWorkload.byEmployee)}
+</CardContent>
+<CardContent>
               <ScrollArea className="h-[60vh]">
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                   {daysInWeek.map((day) => {
@@ -3598,7 +3720,11 @@ const siteScheduleCompleted = entries.some((e) => {
               </div>
             </CardHeader>
 
-            <CardContent>
+
+<CardContent className="pt-4 pb-0">
+  {renderEmployeeHours(monthlyWorkload.byEmployee)}
+</CardContent>
+<CardContent>
               <ScrollArea className="h-[60vh]">
                 <div
   className="
@@ -3649,7 +3775,7 @@ const siteScheduleCompleted = entries.some((e) => {
                               : (s.assignedTo || []).join(", ");
 
                             return (
-                           
+
                                 <div
   key={s.id}
   onClick={() => jumpToShiftDay(day)}
